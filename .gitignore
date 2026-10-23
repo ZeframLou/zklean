@@ -1,1 +1,6 @@
 .eta/
+node_modules/
+target/
+.env
+*.elf
+examples/generated/

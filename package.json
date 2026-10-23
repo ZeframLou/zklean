@@ -1,0 +1,16 @@
+{
+  "name": "httpv",
+  "version": "0.1.0",
+  "description": "Verified Lean contracts over HTTP for Bun",
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "bin": { "zklean": "./src/cli.ts" },
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "check": "bun run typecheck && bun test",
+    "example": "bun examples/upgrades.ts"
+  },
+  "devDependencies": { "@types/bun": "1.3.11", "typescript": "5.9.3" },
+  "engines": { "bun": ">=1.3.0" }
+}
