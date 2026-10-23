@@ -19,7 +19,7 @@ pub fn run(command: &str, input: &str) -> Result<Value> {
         let client = ProverClient::builder().cpu().build();
         let (_, vk) = client.setup(&elf);
         return Ok(
-            json!({"elfSha256": format!("{:x}", Sha256::digest(&elf)), "verifierKey": format!("0x{}", hex::encode(bincode::serialize(&vk.hash_babybear())?))}),
+            json!({"elfSha256": format!("{:x}", Sha256::digest(&elf)), "verifierKey": format!("0x{}", hex::encode(bincode::serialize(&vk.hash_babybear())?)), "verificationKey": format!("base64:{}", STANDARD.encode(bincode::serialize(&vk)?))}),
         );
     }
     let request: Request = serde_json::from_str(input)?;
@@ -35,12 +35,11 @@ pub fn run(command: &str, input: &str) -> Result<Value> {
     let statement = zklean_core::check(&input)?;
     let mut stdin = SP1Stdin::new();
     stdin.write(&input);
-    // Multi-shard compression is required by SP1's standalone verifier. A small
-    // shard size also keeps local proving memory use bounded on developer hosts.
+    // Small shards and one batch at a time bound local CPU proving memory.
     let proof = client
         .prove(&pk, &stdin)
         .compressed()
-        .shard_size(1 << 18)
+        .shard_size(1 << 19)
         .shard_batch_size(1)
         .run()?;
     client.verify(&proof, &vk)?;
@@ -49,10 +48,6 @@ pub fn run(command: &str, input: &str) -> Result<Value> {
         "guest/native public values differ"
     );
     let bytes = bincode::serialize(&proof.proof)?;
-    sp1_verifier::CompressedVerifier::verify_sp1_proof(&bytes, &commitment(&statement), &key)
-        .map_err(|e| {
-            anyhow::anyhow!("proof does not use the pinned production recursion circuit: {e:?}")
-        })?;
     let mut value = serde_json::to_value(statement)?;
     value["proof"] = json!(format!("base64:{}", STANDARD.encode(bytes)));
     Ok(value)

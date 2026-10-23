@@ -64,22 +64,28 @@ The certificate's `proof` is `base64:` encoding of the SP1 5.2.4 `SP1Proof::Comp
 variant, serialized with bincode 1.3 fixed-width little-endian encoding. Trailing
 bytes and over-limit decoding are rejected. The verifier accepts only compressed
 proofs under SP1's pinned production recursion key root and permitted key set.
-Mock/development keys are not accepted. The proof authenticates the guest key
-and the statement commitment; the certificate cannot choose either verifier.
+Verification uses the **unmodified SP1 SDK**, which checks the full authenticated
+public-value digest, production recursion VK membership/root, proof completeness,
+and the guest verification key. Mock/development keys are not accepted.
 
-Trusted local verifier configuration pins `verifierKey`. A prover additionally
-pins `elfSha256` and the ELF path; verifiers may enforce these optional file pins
-but do not need the ELF to verify certificates. `verifierKey` is
-`0x` followed by hex of `bincode::serialize(&vk.hash_babybear())`: eight BabyBear
-field elements, 32 bytes total. It is **not** SP1's BN254 `vk.bytes32()` encoding.
-`zklean pin` derives these values from the locally built guest. Distribute the
-configuration through the client's trusted release process, never discovery.
+Trusted local configuration contains `verificationKey`, the base64-prefixed
+bincode serialization of the SDK's `SP1VerifyingKey`, plus its `verifierKey`
+fingerprint. The fingerprint is `0x` followed by hex of
+`bincode::serialize(&vk.hash_babybear())`: eight BabyBear field elements, 32 bytes.
+It is **not** SP1's BN254 `vk.bytes32()` encoding. The verifier independently
+checks that the trusted key matches the pinned fingerprint before calling the
+SDK. Certificates cannot select either key. The key map is the unchanged,
+checksum-verified upstream source-release artifact.
 
-SP1's standalone compressed verifier requires at least two execution shards.
-The prover chooses small shards and rejects any proof its standalone verifier
-cannot validate. Compressed proofs are larger and more expensive to verify than
-Groth16; they avoid Groth16's setup and circuit artifacts. This profile proves
-derivability and integrity; it does not promise zero knowledge of the witness.
+A prover additionally pins `elfSha256` and the ELF path. Verification does not
+need the ELF when a trusted serialized key is supplied; optional ELF file pins
+are enforced when present. `zklean pin` derives all these fields from the locally
+built guest. Distribute verifier configuration through the client's trusted
+release process, never discovery.
+
+Compressed proofs are larger and more expensive to verify than Groth16; they
+avoid Groth16's setup and circuit artifacts. This profile proves derivability and
+integrity; it does not promise zero knowledge of the witness.
 
 Certificate identity is
 `SHA256("zklean/certificate/1\0" || canonicalJSON(certificate))`.

@@ -5,12 +5,12 @@ import { runNative } from "../src/native.ts";
 import type { Certificate, ProofBackend, Requirements } from "../src/types.ts";
 
 export const root = resolve(import.meta.dir, "..");
-export const binary = resolve(root, "target/debug/zklean-native");
+export const binary = resolve(root, "target/release/zklean-native");
 let built: Promise<void> | undefined;
 export function buildNative(): Promise<void> {
   return (built ??= (async () => {
     const child = Bun.spawn(
-      ["cargo", "build", "--locked", "-p", "zklean-native"],
+      ["cargo", "build", "--release", "--locked", "-p", "zklean-native"],
       { cwd: root, stderr: "inherit", stdout: "inherit" },
     );
     if ((await child.exited) !== 0) throw new Error("native build failed");
@@ -42,7 +42,7 @@ export async function checked(
   )) as Omit<Certificate, "proof">;
 }
 
-/** Only E2E transport tests use signatures instead of Groth16. Each signed
+/** Only E2E transport tests use signatures instead of STARK proofs. Each signed
  * statement is first checked by the real Nanoda binary. This backend is never
  * exported by the library and does not exercise SP1 cryptographic soundness. */
 export function testAuthority() {

@@ -9,7 +9,7 @@ import {
 import { nativeBackend, runNative } from "../src/native.ts";
 import { binary, buildNative, checked, input } from "./helpers.ts";
 
-beforeAll(buildNative, 120_000);
+beforeAll(buildNative, 300_000);
 
 test("Nanoda checks a Lean export and produces a canonical proof-free closed model", async () => {
   const value = await checked("v1");

@@ -13,3 +13,13 @@ then sign statements with a test-only Ed25519 authority. That adapter is confine
 to `tests/helpers.ts`; the production native backend only accepts SP1 compressed
 STARK proofs. `guest.e2e.test.ts` executes the real compiled SP1 guest when
 `ZKLEAN_GUEST_ELF` is provided.
+
+`identity.certificate.json` is a **real locally generated SP1 compressed STARK
+proof**, not a test signature. `identity.verifier.json` records its trusted guest
+key, fingerprint, ELF digest, SP1 version, and guest source commit. The crypto
+E2E test verifies it with the unchanged upstream SDK and rejects a tampered axiom
+list and wrong key pin. It deliberately uses no original Lean proof or ELF during
+verification. This key is test data, not a default production trust policy.
+
+Regenerate using `zklean pin` and `zklean prove` on `identity.ndjson`, then verify
+the resulting certificate with `zklean verify` before replacing the fixture.

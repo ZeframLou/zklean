@@ -2,11 +2,13 @@
 
 The TypeScript package supplies HTTPV discovery, verification policy, compatibility,
 monitoring, and a Bun server adapter. The Rust workspace supplies the shared
-Nanoda checker, offline compressed STARK verifier, and optional local SP1 CPU
+Nanoda checker, offline SDK-based compressed STARK verifier and local SP1 CPU
 prover/executor. `crates/guest` is built with the SP1 toolchain.
 
 Nanoda is pinned and vendored; see `vendor/nanoda/UPSTREAM.md`. SP1 is pinned to
-5.2.4. A deployment builds the guest and pins its SHA-256 and SP1 key digest.
+5.2.4 and used without source modifications. Verification calls its upstream
+SDK with a trusted guest key and pinned fingerprint. A deployment builds the
+guest and pins its SHA-256 and SP1 key digest.
 Certificates cannot select a verifier identity. The production verifier accepts
 neither development signatures nor mock SP1 proofs. Proof generation forcibly
 enables SP1's production VK checks and uses fixed recursion/core shapes.

@@ -17,6 +17,7 @@ jobs:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
       - run: bun install --frozen-lockfile
+      - run: bash scripts/prepare-sp1.sh
       - run: cargo fmt --check -p zklean-core -p zklean-native
       - run: cargo clippy --locked -p zklean-native -- -D warnings
       - run: bun run check
@@ -38,6 +39,6 @@ jobs:
           echo "$HOME/.sp1/bin" >> "$GITHUB_PATH"
       - run: bun install --frozen-lockfile
       - run: bash scripts/build-guest.sh
-      - run: ZKLEAN_GUEST_ELF="$PWD/crates/guest/target/elf-compilation/riscv32im-succinct-zkvm-elf/release/zklean-guest" bun test tests/guest.e2e.test.ts
       - run: bash scripts/prepare-sp1.sh
-      - run: cargo check --locked -p zklean-native --features sp1,execute
+      - run: ZKLEAN_GUEST_ELF="$PWD/crates/guest/target/elf-compilation/riscv32im-succinct-zkvm-elf/release/zklean-guest" bun test tests/guest.e2e.test.ts
+      - run: cargo check --locked -p zklean-native --features execute

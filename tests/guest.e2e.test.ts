@@ -10,6 +10,7 @@ beforeAll(async () => {
     [
       "cargo",
       "build",
+      "--release",
       "--locked",
       "-p",
       "zklean-native",
@@ -20,7 +21,7 @@ beforeAll(async () => {
   );
   if ((await child.exited) !== 0)
     throw new Error("guest executor build failed");
-}, 120_000);
+}, 300_000);
 
 test.skipIf(!elfPath)(
   "SP1 executes Nanoda and commits the same model as native checking",
@@ -32,7 +33,7 @@ test.skipIf(!elfPath)(
     expect(result.cycles).toBeGreaterThan(0);
     expect(result.statement.axioms).toEqual([]);
   },
-  120_000,
+  300_000,
 );
 
 test.skipIf(!elfPath)(
@@ -50,5 +51,5 @@ test.skipIf(!elfPath)(
       }),
     ).rejects.toThrow("guest execution failed");
   },
-  120_000,
+  300_000,
 );

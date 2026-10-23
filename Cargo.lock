@@ -4074,18 +4074,11 @@ version = "5.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1904bbb3c2d16a7a11db32900f468149bc66253825e222f2db76f64fb8ffd1ab"
 dependencies = [
- "bincode",
  "blake3",
  "cfg-if",
  "hex",
  "lazy_static",
- "p3-baby-bear",
- "p3-field",
- "p3-symmetric",
  "sha2",
- "sp1-primitives",
- "sp1-recursion-core",
- "sp1-stark",
  "substrate-bn-succinct",
  "thiserror 2.0.21",
 ]
@@ -5328,7 +5321,6 @@ dependencies = [
  "sp1-core-executor",
  "sp1-sdk",
  "sp1-stark",
- "sp1-verifier",
  "zklean-core",
 ]
 

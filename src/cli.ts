@@ -16,7 +16,7 @@ const help = `ZKLean — Lean export, certificates, and HTTPV requirements
   zklean verify --certificate FILE --config FILE [--axioms A,B]
 
 Native commands accept --binary PATH (default: target/release/zklean-native).
-Config JSON pins binary, elfPath, elfSha256, verifierKey, and optional timeout.
+Config JSON pins binary, verificationKey, verifierKey, optional ELF pins and timeout.
 Export runs 'lake build MODULE' and lean4export in the specified Lake project.
 A .lean requirement uses a generated FILE.lean.httpv.json sidecar bound to its
 source SHA-256; --source writes that binding. No command infers axiom trust.

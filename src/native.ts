@@ -11,7 +11,10 @@ export interface NativeOptions {
   binary: string;
   elfPath?: string;
   elfSha256?: string;
+  /** Pinned guest-key fingerprint from zklean pin. */
   verifierKey: string;
+  /** Trusted SDK key from zklean pin; permits verification without the ELF. */
+  verificationKey?: string;
   timeout?: number;
 }
 
@@ -63,6 +66,7 @@ export function nativeBackend(
     elfPath: options.elfPath,
     elfSha256: options.elfSha256,
     verifierKey: options.verifierKey,
+    verificationKey: options.verificationKey,
   };
   return {
     async prove(input) {

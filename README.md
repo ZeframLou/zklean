@@ -8,7 +8,8 @@ This experimental implementation targets **Bun + TypeScript** and uses **local
 SP1 5.2.4 compressed STARK proofs**. It includes a real Nanoda SP1 guest, a local
 CPU prover, and an offline verifier with pinned production recursion keys.
 [SPEC.md](SPEC.md) describes the protocol; [docs/ENCODING.md](docs/ENCODING.md)
-specifies the wire profile and compatibility rules.
+specifies the wire profile and compatibility rules. SP1 is used unmodified;
+compressed proofs are verified through its upstream SDK.
 
 ## Build and test
 
@@ -16,7 +17,8 @@ Install Bun 1.3+ and stable Rust, then:
 
 ```sh
 bun install --frozen-lockfile
-cargo build --locked -p zklean-native
+bash scripts/prepare-sp1.sh
+cargo build --release --locked -p zklean-native
 bun run check
 cargo fmt --check -p zklean-core -p zklean-native
 ```
@@ -39,7 +41,7 @@ compiler flags.
 rustup toolchain install 1.91.1 --profile minimal
 bash scripts/prepare-sp1.sh
 bash scripts/build-guest.sh
-cargo build --release --locked -p zklean-native --features sp1,execute
+cargo build --release --locked -p zklean-native --features execute
 bun src/cli.ts pin \
   --elf crates/guest/target/elf-compilation/riscv32im-succinct-zkvm-elf/release/zklean-guest \
   --out examples/generated/verifier.json
@@ -52,8 +54,9 @@ always uses the CPU backend and enables production VK verification.
 
 Pin and distribute the generated configuration through the client's trusted
 release process. A certificate never supplies the trusted guest key. Verification
-only needs `binary` and `verifierKey`; a local prover additionally needs the ELF
-path and SHA-256. Never copy a verifier key out of an untrusted certificate.
+uses `binary`, the trusted serialized `verificationKey`, and its `verifierKey`
+fingerprint; a local prover additionally needs the ELF path and SHA-256. Never
+copy a verifier key out of an untrusted certificate.
 
 Prove and independently verify a small axiom-free theorem locally:
 
@@ -66,9 +69,8 @@ bun src/cli.ts verify --certificate examples/generated/identity.json \
 ```
 
 CPU proving is substantially heavier than checking or verification. The prover
-uses small shards and one shard per batch to limit memory. The bundled standalone
-SP1 verifier supports multi-shard compressed proofs; proof generation checks that
-the resulting proof is supported before publishing a certificate.
+uses small shards and one shard per batch to limit memory. The unchanged SP1 SDK
+verifies the proof and authenticated public values before publishing a certificate.
 
 Run the real guest's success and rejection tests:
 
@@ -108,10 +110,12 @@ bun scripts/export-examples.ts .tooling/lean4export/.lake/build/bin/lean4export
 ```ts
 import { createHTTPV, nativeBackend } from "httpv";
 
+const trusted = await Bun.file("/opt/zklean/verifier.json").json();
 const HTTPV = createHTTPV({
   backend: nativeBackend({
     binary: "/opt/zklean/zklean-native",
-    verifierKey: "0x…", // pinned 32-byte BabyBear digest from `zklean pin`
+    verifierKey: trusted.verifierKey,
+    verificationKey: trusted.verificationKey,
   }),
 });
 const certificate = await HTTPV.query("https://example.com/transfer", {

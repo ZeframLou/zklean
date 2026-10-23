@@ -3,11 +3,25 @@ import type { Certificate, Handler, ServeOptions } from "./types.ts";
 
 export const MEDIA_TYPE = "application/httpv+json";
 export function methodName(method: string): string {
-  const name = method.toUpperCase();
-  if (!/^[!#$%&'*+.^_`|~0-9A-Z-]+$/.test(name))
+  if (!/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(method))
     throw new Error("invalid HTTP method");
-  return name;
+  const upper = method.toUpperCase();
+  // Fetch normalizes standard methods. Extension methods remain case-sensitive.
+  return [
+    "DELETE",
+    "GET",
+    "HEAD",
+    "OPTIONS",
+    "POST",
+    "PUT",
+    "PATCH",
+    "CONNECT",
+    "TRACE",
+  ].includes(upper)
+    ? upper
+    : method;
 }
+
 function accepts(value: string | null): boolean {
   return (value ?? "").split(",").some((part) => {
     const [type, ...parameters] = part.trim().toLowerCase().split(";");

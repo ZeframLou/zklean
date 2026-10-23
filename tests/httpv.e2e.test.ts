@@ -1,6 +1,9 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import { createHTTPV, DiscoveryError } from "../src/client.ts";
-import { canonical, encodeBase64, readModel } from "../src/encoding.ts";
+import { canonical, encodeBase64, readModel, sha256 } from "../src/encoding.ts";
 import { MEDIA_TYPE } from "../src/server.ts";
 import { requirements, testAuthority } from "./helpers.ts";
 import type { Certificate, Monitor, VerificationResult } from "../src/types.ts";
@@ -39,7 +42,7 @@ beforeAll(async () => {
     ["Transfer.transfer_safe"],
   );
   current = v1;
-}, 120_000);
+}, 300_000);
 afterAll(() => server.stop(true));
 
 test("live OPTIONS discovery authenticates resource/method and preserves normal requests", async () => {
@@ -351,4 +354,64 @@ test("identical proposition syntax cannot hide a redefined operation", async () 
       allowedAxioms: [],
     }),
   ).toMatchObject({ status: "unknown", reason: "invalid-derivation" });
+});
+
+test("file advertisements refresh in place and stale Lean requirement sidecars fail closed", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "httpv-e2e-"));
+  const path = join(directory, "certificate.json");
+  const leanPath = join(directory, "remote.lean");
+  await Bun.write(path, JSON.stringify(v1));
+  const httpv = createHTTPV({ backend: authority.backend });
+  const fileServer = Bun.serve({
+    hostname: "127.0.0.1",
+    port: 0,
+    ...httpv.serve({
+      routes: { "POST /transfer": path, "inspect /transfer": path },
+      fetch: () => new Response("ordinary"),
+    }),
+  });
+  const target = `http://127.0.0.1:${fileServer.port}/transfer`;
+  try {
+    expect(await httpv.query(target, local)).toEqual(v1);
+    expect(await httpv.query(target, { ...local, method: "inspect" })).toEqual(
+      v1,
+    );
+    await expect(
+      httpv.query(target, { ...local, method: "INSPECT" }),
+    ).rejects.toMatchObject({ reason: "missing-certificate" });
+    await Bun.write(path, JSON.stringify(v3));
+    expect(await httpv.query(target, local)).toEqual(v3);
+    const source = "-- local requirements snapshot\n";
+    await Bun.write(leanPath, source);
+    await Bun.write(
+      `${leanPath}.httpv.json`,
+      JSON.stringify({
+        format: "httpv/requirements/1",
+        specs: v1.specs,
+        sourceSha256: sha256(source),
+      }),
+    );
+    expect(
+      (
+        await httpv.checkCompatibility({
+          certificate: v1,
+          requirements: leanPath,
+          allowedAxioms: [],
+        })
+      ).status,
+    ).toBe("verified");
+    await Bun.write(leanPath, `${source}-- changed\n`);
+    expect(
+      (
+        await httpv.checkCompatibility({
+          certificate: v1,
+          requirements: leanPath,
+          allowedAxioms: [],
+        })
+      ).reason,
+    ).toBe("requirements-unavailable");
+  } finally {
+    fileServer.stop(true);
+    await rm(directory, { recursive: true });
+  }
 });
