@@ -27,3 +27,4 @@ export {
   requirementsFor,
 } from "./context.ts";
 export { checkAxioms } from "./policy.ts";
+export { groth16Backend } from "./groth16.ts";

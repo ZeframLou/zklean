@@ -94,7 +94,7 @@ All security-relevant values MUST use deterministic, versioned encoding and be c
 
 Verification MUST use a trusted, pinned SP1 verifier identity rather than one arbitrarily supplied by a certificate.
 
-The initial implementation SHOULD use SP1's compressed STARK proof format. Groth16 MAY be supported by a separately pinned verifier profile.
+The implementation uses SP1 5.2.4 Groth16 proofs under a locally pinned checker key and the upstream circuit verification key. A certificate MUST NOT select either key. Verification MUST reject other proof formats, including legacy compressed STARK proofs.
 
 ### 3.4. Verification API
 
@@ -107,7 +107,7 @@ verify(
 ): boolean
 ```
 
-Verification succeeds only when the SP1 proof is valid, its authenticated public values match the certificate, and all trusted axioms are permitted by the client.
+Verification succeeds only when the SP1 proof is valid, its authenticated public values match the certificate, and all actual axioms are permitted by the client. Axiom permissions MUST bind the complete declaration and resolved dependency context; a matching name alone is insufficient. The SDK pins Lean's standard axioms and requires explicit reviewed fingerprints for custom axioms.
 
 The original Lean proof terms are not required for certificate verification.
 

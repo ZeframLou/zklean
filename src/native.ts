@@ -13,8 +13,6 @@ export interface NativeOptions {
   elfSha256?: string;
   /** Pinned guest-key fingerprint from zklean pin. */
   verifierKey: string;
-  /** Trusted SDK key from zklean pin; permits verification without the ELF. */
-  verificationKey?: string;
   timeout?: number;
 }
 
@@ -68,10 +66,9 @@ export function nativeBackend(
     elfPath: options.elfPath,
     elfSha256: options.elfSha256,
     verifierKey: options.verifierKey,
-    verificationKey: options.verificationKey,
   };
   return {
-    identity: `sp1:${options.verifierKey}`,
+    identity: `sp1:5.2.4:groth16:${options.verifierKey}`,
     async prove(input) {
       if (!config.elfPath || !config.elfSha256)
         throw new Error("proving requires a pinned guest ELF");

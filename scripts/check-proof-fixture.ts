@@ -12,9 +12,9 @@ const actual = (await runNative(binary, "identity", { elfPath })) as Record<
 const expected = (await Bun.file(
   resolve(import.meta.dir, "../tests/fixtures/identity.verifier.json"),
 ).json()) as Record<string, string>;
-for (const key of ["elfSha256", "verifierKey", "verificationKey"])
+for (const key of ["elfSha256", "verifierKey"])
   if (actual[key] !== expected[key])
     throw new Error(
-      `compressed proof fixture belongs to a different guest (${key})`,
+      `Groth16 proof fixture belongs to a different guest (${key})`,
     );
-console.log("Compressed proof fixture matches the current guest.");
+console.log("Groth16 proof fixture matches the current guest.");

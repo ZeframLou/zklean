@@ -5322,6 +5322,15 @@ dependencies = [
  "sp1-sdk",
  "sp1-stark",
  "zklean-core",
+ "zklean-verifier",
+]
+
+[[package]]
+name = "zklean-verifier"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "sp1-verifier",
 ]
 
 [[package]]

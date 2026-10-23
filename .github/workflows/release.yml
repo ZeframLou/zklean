@@ -13,13 +13,18 @@ concurrency:
 
 jobs:
   linux-x64:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: '1.4.4'
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.12'
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
@@ -37,7 +42,8 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bash scripts/prepare-sp1.sh
       - run: bash scripts/build-guest.sh
-      - run: cargo build --release --locked -p zklean-native
+      - run: cargo build --release --locked -p zklean-native --features prover
+      - run: bun run build:verifier
       - run: bash scripts/setup-exporter.sh
       - run: bun run check
       - run: bun scripts/check-proof-fixture.ts "$PWD/crates/guest/target/elf-compilation/riscv32im-succinct-zkvm-elf/release/zklean-guest"

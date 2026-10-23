@@ -17,6 +17,7 @@
     "check": "bun run typecheck && bun test",
     "format": "prettier --write src tests/*.ts scripts/*.ts examples/*.ts package.json tsconfig.json",
     "format:check": "prettier --check src tests/*.ts scripts/*.ts examples/*.ts package.json tsconfig.json",
+    "build:verifier": "bash scripts/build-verifier.sh",
     "compile": "bun build --compile src/cli.ts --outfile dist/zklean"
   },
   "devDependencies": {
@@ -31,6 +32,8 @@
     "src",
     "README.md",
     "SPEC.md",
-    "docs/ENCODING.md"
+    "docs/ENCODING.md",
+    "examples/lean/Inventory.lean",
+    "examples/lean/V1.lean"
   ]
 }

@@ -134,7 +134,7 @@ test("native and TypeScript use identical authenticated statement bytes", async 
   );
 });
 
-test("offline compressed STARK verifier rejects non-SP1 proofs and a changed guest pin", async () => {
+test("offline Groth16 verifier rejects non-SP1 proofs and a changed guest pin", async () => {
   const value = await checked("v1");
   const { sha256 } = await import("../src/encoding.ts");
   const elfPath = resolve(import.meta.dir, "fixtures/identity.ndjson");

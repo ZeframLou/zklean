@@ -105,16 +105,12 @@ export async function nativeOptions(
     string,
     unknown
   >;
-  const elfPath =
-    proving || typeof profile.verificationKey !== "string"
-      ? (tools.elf ?? configuredPath(profile.elfPath, tools.config))
-      : undefined;
+  const elfPath = proving
+    ? (tools.elf ?? configuredPath(profile.elfPath, tools.config))
+    : undefined;
   const options: NativeOptions = {
     binary: tools.binary,
     verifierKey: String(profile.verifierKey ?? ""),
-    ...(typeof profile.verificationKey === "string"
-      ? { verificationKey: profile.verificationKey }
-      : {}),
     ...(elfPath ? { elfPath } : {}),
     ...(elfPath && typeof profile.elfSha256 === "string"
       ? { elfSha256: profile.elfSha256 }

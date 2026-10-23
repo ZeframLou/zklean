@@ -1,23 +1,32 @@
 import { beforeAll, expect, test } from "bun:test";
 import { resolve } from "node:path";
-import { createVerifier, nativeBackend } from "zklean";
+import { createVerifier, nativeBackend, groth16Backend } from "zklean";
 import { sha256, statementCommitment } from "../src/encoding.ts";
 import { binary, buildNative } from "./helpers.ts";
 import type { Certificate } from "../src/types.ts";
 
 beforeAll(buildNative, 300_000);
 
-test("the unmodified SP1 SDK verifies a locally generated compressed STARK certificate", async () => {
+test("native and embedded upstream verifiers accept the locally generated Groth16 certificate", async () => {
   const certificate = (await Bun.file(
     resolve(import.meta.dir, "fixtures/identity.certificate.json"),
   ).json()) as Certificate;
+  // Migration is incomplete until a real Groth16 fixture is generated.
+  expect(Buffer.from(certificate.proof.slice(7), "base64").length).toBe(260);
+  for (const verifier of [
+    createVerifier(),
+    createVerifier({ backend: groth16Backend() }),
+  ]) {
+    expect(
+      await verifier.verify(certificate, { allowedAxioms: [] }),
+    ).toMatchObject({ status: "verified", reason: "valid" });
+  }
   const trusted = (await Bun.file(
     resolve(import.meta.dir, "fixtures/identity.verifier.json"),
-  ).json()) as { verifierKey: string; verificationKey: string };
+  ).json()) as { verifierKey: string };
   const config = {
     binary,
     verifierKey: trusted.verifierKey,
-    verificationKey: trusted.verificationKey,
   };
   const verifier = createVerifier({ backend: nativeBackend(config) });
   expect(
@@ -48,6 +57,6 @@ test("the unmodified SP1 SDK verifies a locally generated compressed STARK certi
   });
   expect(await wrong.verify(certificate, { allowedAxioms: [] })).toMatchObject({
     status: "unknown",
-    reason: "verifier-unavailable",
+    reason: "invalid-certificate",
   });
 }, 300_000);

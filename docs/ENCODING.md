@@ -1,9 +1,8 @@
 # ZKLean v1 encoding profile
 
-This implementation uses **SP1 5.2.4 compressed STARK proofs**. The experimental
-specification's initial profile was updated from Groth16 at the user's request.
-Proofs are generated locally with the CPU prover. No remote proving service,
-trusted Groth16 setup, S3 circuit download, or Docker container is needed.
+This profile uses **SP1 5.2.4 Groth16 over BN254**. The local CPU prover uses
+SP1's published circuit artifacts and native gnark backend. Verification is
+offline and requires no proving artifacts, Lean process, or native executable.
 
 ## Canonical public model
 
@@ -61,32 +60,32 @@ The guest commits exactly 32 bytes:
 SHA256(UTF8("zklean/statement/1\0") || canonicalJSON({format,specs,axioms}))
 ```
 
-The certificate's `proof` is `base64:` encoding of the SP1 5.2.4 `SP1Proof::Compressed`
-variant, serialized with bincode 1.3 fixed-width little-endian encoding. Trailing
-bytes and over-limit decoding are rejected. The verifier accepts only compressed
-proofs under SP1's pinned production recursion key root and permitted key set.
-Verification uses the **unmodified SP1 SDK**, which checks the full authenticated
-public-value digest, production recursion VK membership/root, proof completeness,
-and the guest verification key. Mock/development keys are not accepted.
+The certificate's `proof` is `base64:` followed by padded RFC 4648 base64 of
+exactly 260 bytes: SP1's four-byte circuit-key selector and 256-byte uncompressed
+Groth16 proof, as returned by `SP1ProofWithPublicValues.bytes()`. Other SP1 modes
+and proof lengths are rejected. The public specification is transmitted in
+addition to these proof bytes.
 
-Trusted local configuration contains `verificationKey`, the base64-prefixed
-bincode serialization of the SDK's `SP1VerifyingKey`, plus its `verifierKey`
-fingerprint. The fingerprint is `0x` followed by hex of
-`bincode::serialize(&vk.hash_babybear())`: eight BabyBear field elements, 32 bytes.
-It is **not** SP1's BN254 `vk.bytes32()` encoding. The verifier independently
-checks that the trusted key matches the pinned fingerprint before calling the
-SDK. Certificates cannot select either key. The key map is the unchanged,
-checksum-verified upstream source-release artifact.
+Both native and WebAssembly verification call the unmodified upstream
+`sp1-verifier` crate. Its circuit key is fixed by version 5.2.4; the checker key
+is SP1's BN254 `vk.bytes32()` encoding, **not** a serialized BabyBear digest.
+The npm package includes the WebAssembly verifier and the trusted checker key
+in `src/guest.json`. Applications can choose a different trusted checker through
+`groth16Backend(key)`; certificate data cannot supply this configuration.
 
-A prover additionally pins `elfSha256` and the ELF path. Verification does not
-need the ELF when a trusted serialized key is supplied; optional ELF file pins
-are enforced when present. `zklean pin` derives all these fields from the locally
-built guest. Distribute verifier configuration through the client's trusted
-release process, never discovery.
+A prover additionally pins `elfSha256` and the ELF path. `zklean pin` derives the
+key and digest from the built guest. Verification needs neither the ELF nor its
+serialized SP1 key. SP1's production recursion VK checks remain enabled during
+proving; no mock or development circuit is accepted. Groth16 soundness relies
+on SP1's trusted setup; a new theorem does not require a new setup ceremony.
 
-Compressed proofs are larger and more expensive to verify than Groth16; they
-avoid Groth16's setup and circuit artifacts. This profile proves derivability and
-integrity; it does not promise zero knowledge of the witness.
+Every permitted axiom must match its reviewed declaration and complete dependency
+context. The standard fingerprints are generated from the pinned Lean toolchain;
+custom fingerprints are supplied by the recipient. Bound-variable display names
+and binder annotations are ignored for context matching, while constant names,
+definition bodies, and types remain bound. A name-only allowlist is insufficient.
+This profile establishes derivability and integrity; it makes no claim about
+witness privacy beyond upstream SP1's guarantees.
 
 Certificate identity is
 `SHA256("zklean/certificate/1\0" || canonicalJSON(certificate))`.

@@ -72,7 +72,6 @@ test("concurrent consumers share one real cryptographic verification", async () 
   const native = nativeBackend({
     binary,
     verifierKey: profile.verifierKey,
-    verificationKey: profile.verificationKey,
   });
   let calls = 0;
   const verifier = createVerifier({

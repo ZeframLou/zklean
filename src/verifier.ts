@@ -1,5 +1,6 @@
 import { Cache, certificateId, modelId, parseCertificate } from "./encoding.ts";
 import { checkAxioms } from "./policy.ts";
+import { groth16Backend } from "./groth16.ts";
 import type {
   Certificate,
   VerificationResult,
@@ -9,7 +10,7 @@ import type {
 
 /** Local certificate verification has no HTTP or discovery dependency. */
 export function createVerifier(options: VerifierOptions = {}) {
-  const backend = options.backend;
+  const backend = options.backend ?? groth16Backend();
   const verified = new Cache<boolean>(options.cacheSize ?? 128);
   const pending = new Map<string, Promise<boolean>>();
   const limit = options.maxConcurrency ?? 2;
@@ -52,8 +53,6 @@ export function createVerifier(options: VerifierOptions = {}) {
     const policyError = checkAxioms(certificate, policy);
     if (policyError)
       return { ...identity, status: "unknown", reason: policyError };
-    if (!backend)
-      return { ...identity, status: "unknown", reason: "verifier-unavailable" };
     try {
       const cacheKey = `${backend.identity}\0${identity.certificateId}`;
       if (!verified.get(cacheKey)) {

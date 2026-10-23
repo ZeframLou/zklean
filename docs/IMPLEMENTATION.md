@@ -2,12 +2,12 @@
 
 The TypeScript package provides certificate decoding, model snapshots, verifier
 policy, and the CLI. The Rust workspace supplies the shared Nanoda checker,
-offline compressed STARK verifier, and local SP1 CPU prover and executor.
+upstream Groth16 verifier, and local SP1 CPU prover and executor.
 `crates/guest` is built with the SP1 toolchain.
 
 Nanoda is pinned and vendored; see `vendor/nanoda/UPSTREAM.md`. SP1 is pinned to
-5.2.4 and used without source modifications. Verification calls its upstream
-SDK with a trusted guest key and pinned fingerprint. A deployment builds the
+5.2.4 and used without source modifications. Native and WebAssembly verification call its lightweight
+`sp1-verifier` crate with a trusted BN254 checker key. A deployment builds the
 guest and pins its SHA-256 and SP1 key digest.
 The guest build stages a fresh source snapshot at a canonical temporary path:
 Cargo includes local package paths in crate identities, so arbitrary checkout
@@ -20,8 +20,10 @@ enables SP1's production VK checks and uses fixed recursion/core shapes.
 The SDK's recursion key map is omitted from its crates.io source package.
 `scripts/prepare-sp1.sh` fetches it from the pinned GitHub source release and
 checks the exact SHA-256 required by SP1's build script. This is a public
-verification-key map, not a secret or a trusted Groth16 setup. Compressed STARK
-proving needs no S3 artifacts or proving network.
+verification-key map. Local Groth16 proving also downloads SP1's production
+circuit artifacts on first use; verification uses the circuit key embedded in
+the upstream crate and downloads nothing. The native gnark backend is linked
+into the prover, so recipients and CLI users do not need Go or Docker.
 
 See README.md for commands and docs/ENCODING.md for the wire profile.
 SPEC.md is the normative experimental protocol specification.

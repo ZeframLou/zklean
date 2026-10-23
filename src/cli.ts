@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import { version } from "../package.json";
 import { nativeBackend, runNative } from "./native.ts";
 import { canonical, parseCertificate } from "./encoding.ts";
+import { groth16Backend } from "./groth16.ts";
 import { createVerifier } from "./verifier.ts";
 import { createSourceManifest } from "./requirements.ts";
 import { exportModule, findTools, nativeOptions } from "./tooling.ts";
@@ -11,11 +12,23 @@ import type { ProveInput } from "./native.ts";
 import { resolveLeanSource } from "./lean.ts";
 import { checkAxioms } from "./policy.ts";
 import type { Certificate, VerifyOptions } from "./types.ts";
+import { leanModule } from "./import.ts";
+import { declarationIdentity } from "./context.ts";
+import { readModel } from "./encoding.ts";
+import { runLake } from "./lean.ts";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import inventorySource from "../examples/lean/Inventory.lean" with { type: "text" };
+import exampleSource from "../examples/lean/V1.lean" with { type: "text" };
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const help = `ZKLean — check and certify Lean contracts
 
+  zklean init --project DIR
   zklean prove --project DIR --module NAME --claims A,B --out CERT.json
   zklean verify --certificate CERT.json [--axioms A,B]
+  zklean inspect --certificate CERT.json [--axioms A,B]
+  zklean import --certificate CERT.json --out Remote.lean [--axioms A,B]
   zklean requirements --project DIR --module NAME --claims A,B --out FILE.json
   zklean check --project DIR --module NAME --claims A,B [--axioms A,B]
 
@@ -72,6 +85,27 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
   };
   const optional = (name: string) =>
     typeof values[name] === "string" ? (values[name] as string) : undefined;
+  if (command === "init") {
+    const project = resolve(required("project"));
+    const files = {
+      "lean-toolchain": "leanprover/lean4:v4.36.0-rc1\n",
+      "lakefile.toml":
+        'name = "Contract"\n[[lean_lib]]\nname = "Contract"\nroots = ["Inventory", "V1"]\n',
+      "Inventory.lean": inventorySource,
+      "V1.lean": exampleSource,
+    };
+    for (const name of Object.keys(files))
+      if (await Bun.file(join(project, name)).exists())
+        throw new Error(`refusing to overwrite ${join(project, name)}`);
+    await mkdir(project, { recursive: true });
+    for (const [name, text] of Object.entries(files))
+      await writeFile(join(project, name), text, { flag: "wx" });
+    const quotedProject = `'${project.replaceAll("'", "'\\''")}'`;
+    console.log(
+      `Created ${project}. Run zklean prove --project ${quotedProject} --module V1 --claims Inventory.reservation_safe --axioms propext --out reservation.json`,
+    );
+    return;
+  }
   const tools = await findTools({
     binary: optional("binary"),
     elf: optional("elf"),
@@ -176,7 +210,7 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
         (await runNative(tools.binary, "check", input)) as Certificate,
       );
       console.error(
-        "Generating a local compressed STARK proof; this may take several minutes…",
+        "Generating a local Groth16 proof; this may take several minutes…",
       );
       result = await nativeBackend(await nativeOptions(tools, true)).prove(
         input,
@@ -193,15 +227,63 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
         });
       }
     }
-  } else if (command === "verify") {
+  } else if (["verify", "inspect", "import"].includes(command)) {
     const certificate = parseCertificate(
       await Bun.file(required("certificate")).json(),
     );
     result = await createVerifier({
-      backend: nativeBackend(await nativeOptions(tools, false)),
+      ...(tools.config
+        ? {
+            backend: groth16Backend(
+              (await nativeOptions(tools, false)).verifierKey,
+            ),
+          }
+        : {}),
     }).verify(certificate, policy);
     if ((result as { status: string }).status !== "verified")
       process.exitCode = 1;
+    else if (command === "import") {
+      const path = required("out");
+      await Bun.write(path, leanModule(certificate));
+      const model = readModel(certificate.specs);
+      await Bun.write(
+        `${path}.axioms.json`,
+        `${JSON.stringify(
+          Object.fromEntries(
+            certificate.specs.claims.map((name) => [
+              name,
+              declarationIdentity(model, name),
+            ]),
+          ),
+          null,
+          2,
+        )}\n`,
+      );
+      return;
+    } else if (command === "inspect") {
+      if (!tools.lake) throw new Error("Lean not found; reinstall ZKLean");
+      const directory = await mkdtemp(join(tmpdir(), "zklean-inspect-"));
+      try {
+        await Bun.write(
+          join(directory, "lean-toolchain"),
+          "leanprover/lean4:v4.36.0-rc1\n",
+        );
+        await Bun.write(
+          join(directory, "lakefile.toml"),
+          'name = "ZKLeanInspection"\n',
+        );
+        await Bun.write(
+          join(directory, "Inspect.lean"),
+          leanModule(certificate, true),
+        );
+        process.stdout.write(
+          await runLake(directory, tools.lake, ["env", "lean", "Inspect.lean"]),
+        );
+      } finally {
+        await rm(directory, { recursive: true, force: true });
+      }
+      return;
+    }
   } else {
     throw new Error(`unknown command: ${command}\n${help}`);
   }

@@ -8,7 +8,7 @@ use sp1_sdk::{HashableKey, Prover, ProverClient, SP1Stdin};
 use zklean_core::commitment;
 
 pub fn run(command: &str, input: &str) -> Result<Value> {
-    // These settings are required for SP1's pinned compressed recursion verifier.
+    // Groth16 wraps SP1's production recursion circuit.
     // Never honor inherited development settings that disable VK verification.
     std::env::set_var("VERIFY_VK", "true");
     std::env::set_var("FIX_CORE_SHAPES", "true");
@@ -19,16 +19,15 @@ pub fn run(command: &str, input: &str) -> Result<Value> {
         let client = ProverClient::builder().cpu().build();
         let (_, vk) = client.setup(&elf);
         return Ok(
-            json!({"elfSha256": format!("{:x}", Sha256::digest(&elf)), "verifierKey": format!("0x{}", hex::encode(bincode::serialize(&vk.hash_babybear())?)), "verificationKey": format!("base64:{}", STANDARD.encode(bincode::serialize(&vk)?))}),
+            json!({"elfSha256": format!("{:x}", Sha256::digest(&elf)), "verifierKey": vk.bytes32()}),
         );
     }
     let request: Request = serde_json::from_str(input)?;
     let elf = request.elf()?;
     let client = ProverClient::builder().cpu().build();
     let (pk, vk) = client.setup(&elf);
-    let key = bincode::serialize(&vk.hash_babybear())?;
     ensure!(
-        format!("0x{}", hex::encode(&key)) == request.verifier_key,
+        vk.bytes32() == request.verifier_key,
         "guest verifier identity mismatch"
     );
     let input = request.input.context("missing prove input")?;
@@ -38,7 +37,7 @@ pub fn run(command: &str, input: &str) -> Result<Value> {
     // Small shards and one batch at a time bound local CPU proving memory.
     let proof = client
         .prove(&pk, &stdin)
-        .compressed()
+        .groth16()
         .shard_size(1 << 19)
         .shard_batch_size(1)
         .run()?;
@@ -47,7 +46,15 @@ pub fn run(command: &str, input: &str) -> Result<Value> {
         proof.public_values.as_slice() == commitment(&statement),
         "guest/native public values differ"
     );
-    let bytes = bincode::serialize(&proof.proof)?;
+    let bytes = proof.bytes();
+    ensure!(
+        bytes.len() == zklean_verifier::PROOF_BYTES,
+        "unexpected Groth16 proof size"
+    );
+    ensure!(
+        zklean_verifier::verify(&bytes, &commitment(&statement), &vk.bytes32()),
+        "upstream lightweight verifier rejected the generated proof"
+    );
     let mut value = serde_json::to_value(statement)?;
     value["proof"] = json!(format!("base64:{}", STANDARD.encode(bytes)));
     Ok(value)

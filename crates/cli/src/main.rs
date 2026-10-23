@@ -4,6 +4,7 @@ use zklean_core::ProveInput;
 
 #[cfg(feature = "execute")]
 mod execute;
+#[cfg(feature = "prover")]
 mod sp1;
 mod verify;
 
@@ -30,6 +31,7 @@ fn main() -> Result<()> {
             let request: ProveInput = serde_json::from_str(&input)?;
             serde_json::json!({"format": "zklean/requirements/1", "specs": zklean_core::requirements(&request)?})
         }
+        #[cfg(feature = "prover")]
         "prove" | "identity" => sp1::run(&command, &input)?,
         "verify" => verify::run(&input)?,
         #[cfg(feature = "execute")]
