@@ -20,8 +20,8 @@ export function publicContext(
   model: PublicModel,
   roots: readonly string[],
 ): PublicModel {
-  const declarations: PublicModel["declarations"] = {};
-  const nodes: PublicModel["nodes"] = {};
+  const declarations: PublicModel["declarations"] = Object.create(null);
+  const nodes: PublicModel["nodes"] = Object.create(null);
   const pending = [...roots];
   const reference = (value: unknown): void => {
     if (typeof value === "string" && Object.hasOwn(model.nodes, value)) {

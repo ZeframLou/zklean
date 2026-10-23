@@ -6,6 +6,8 @@ export const MAX_CERTIFICATE_BYTES = 16 * 1024 * 1024;
 /** Canonical JSON uses keys sorted by UTF-8 bytes, no whitespace, and UTF-8 strings.
  * All protocol numeric values are safe nonnegative integers. */
 export function canonical(value: unknown): string {
+  if (typeof value === "string" && /[\uD800-\uDFFF]/u.test(value))
+    throw new Error("invalid Unicode scalar value");
   if (value === null || typeof value === "boolean" || typeof value === "string")
     return JSON.stringify(value);
   if (typeof value === "number" && Number.isSafeInteger(value) && value >= 0)
@@ -16,7 +18,7 @@ export function canonical(value: unknown): string {
     const keys = Object.keys(record).sort((a, b) =>
       Buffer.compare(Buffer.from(a), Buffer.from(b)),
     );
-    return `{${keys.map((k) => `${JSON.stringify(k)}:${canonical(record[k])}`).join(",")}}`;
+    return `{${keys.map((k) => `${canonical(k)}:${canonical(record[k])}`).join(",")}}`;
   }
   throw new Error("unsupported canonical value");
 }
@@ -32,7 +34,10 @@ export function decodeBase64(value: unknown): Uint8Array {
   ) {
     throw new Error("expected canonical base64: encoding");
   }
-  return Buffer.from(value.slice(7), "base64");
+  const bytes = Buffer.from(value.slice(7), "base64");
+  if (encodeBase64(bytes) !== value)
+    throw new Error("noncanonical base64 padding bits");
+  return bytes;
 }
 export function encodeBase64(value: Uint8Array | string): string {
   return `base64:${Buffer.from(value).toString("base64")}`;
