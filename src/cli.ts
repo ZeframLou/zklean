@@ -254,9 +254,13 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
           }
         : {}),
     }).verify(certificate, policy);
-    if ((result as { status: string }).status !== "verified")
+    if ((result as { status: string }).status !== "verified") {
       process.exitCode = 1;
-    else if (command === "import") {
+      if (command !== "verify") {
+        process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+        return;
+      }
+    } else if (command === "import") {
       const path = required("out");
       await Bun.write(path, leanModule(certificate));
       const model = readModel(certificate.specs);
