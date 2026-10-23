@@ -14,7 +14,6 @@ bun build --compile src/cli.ts --outfile "$root/bin/zklean"
 cp target/release/zklean-native "$root/libexec/zklean-native"
 cp crates/guest/target/elf-compilation/riscv32im-succinct-zkvm-elf/release/zklean-guest "$root/libexec/zklean-guest"
 cp .tooling/lean4export/.lake/build/bin/lean4export "$root/libexec/lean4export"
-cp -a "$(lean --print-prefix)" "$root/libexec/lean"
 strip "$root/libexec/zklean-native" "$root/libexec/lean4export"
 
 bun src/cli.ts pin \

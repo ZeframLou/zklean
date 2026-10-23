@@ -212,6 +212,48 @@ test("cached verification enforces new axiom policies and detects statement tamp
   expect((await httpv.verify(unresolved, { allowedAxioms: [] })).reason).toBe(
     "invalid-certificate",
   );
+  const malformed = readModel(v1.specs);
+  Object.assign(malformed.declarations["Transfer.transfer_safe"]!.thm!, {
+    junk: true,
+  });
+  expect(
+    (
+      await httpv.verify(
+        {
+          ...v1,
+          specs: {
+            ...v1.specs,
+            declarations: encodeBase64(canonical(malformed)),
+          },
+        },
+        { allowedAxioms: [] },
+      )
+    ).reason,
+  ).toBe("invalid-certificate");
+});
+
+test("a client snapshots its verifier trust profile", async () => {
+  let rejectedCalls = 0;
+  const options = { backend: authority.backend };
+  const httpv = createHTTPV(options);
+  expect((await httpv.verify(v1, { allowedAxioms: [] })).status).toBe(
+    "verified",
+  );
+  options.backend = {
+    identity: "test:replacement",
+    async verify() {
+      rejectedCalls++;
+      return false;
+    },
+  };
+  expect((await httpv.verify(v1, { allowedAxioms: [] })).status).toBe(
+    "verified",
+  );
+  expect(rejectedCalls).toBe(0);
+  expect(
+    (await createHTTPV(options).verify(v1, { allowedAxioms: [] })).reason,
+  ).toBe("invalid-certificate");
+  expect(rejectedCalls).toBe(1);
 });
 
 test("watch refreshes advertisements, emits transitions, contains callback failures, and stops", async () => {

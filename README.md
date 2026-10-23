@@ -13,16 +13,17 @@ compressed proofs are verified through its upstream SDK.
 
 ## Install
 
-The release is self-contained on Linux x86-64. It includes the CLI, Lean,
-lean4export, the checked guest, the CPU prover, and the offline verifier:
+The Linux x86-64 release includes the CLI, lean4export, the checked guest, the
+CPU prover, and the offline verifier. The same command installs the pinned Lean
+toolchain through `elan` when it is not already present:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/ZeframLou/zklean/main/install.sh | sh
 ```
 
 The installer verifies the release checksum and writes to `~/.local` by default.
-Set `ZKLEAN_PREFIX` to choose another location. Run `zklean doctor` to see the
-resolved bundled tools.
+Set `ZKLEAN_PREFIX` to choose another location. Set `ZKLEAN_SKIP_LEAN=1` for a
+verification-only installation. Run `zklean doctor` to see the resolved tools.
 
 ## Certify a Lean module
 

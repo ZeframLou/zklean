@@ -42,7 +42,15 @@ export async function createSourceManifest(
   const root = await projectRoot(sourcePath);
   const child = Bun.spawn(
     [lake, "env", "lean", "--deps", relative(root, sourcePath)],
-    { cwd: root, stdout: "pipe", stderr: "pipe" },
+    {
+      cwd: root,
+      env: {
+        ...process.env,
+        ELAN_TOOLCHAIN: "leanprover/lean4:v4.36.0-rc1",
+      },
+      stdout: "pipe",
+      stderr: "pipe",
+    },
   );
   const [code, stdout, stderr] = await Promise.all([
     child.exited,
