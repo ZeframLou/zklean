@@ -230,9 +230,7 @@ export function validateModel(model: PublicModel): void {
       return;
     }
     if (kind === "quot") {
-      const data = header(value, ["name", "levelParams", "type", "kind"]);
-      if (!["type", "ctor", "lift", "ind"].includes(string(data.kind)))
-        throw new Error("invalid quotient kind");
+      header(value, ["name", "levelParams", "type"]);
       return;
     }
     if (kind === "inductive") {
@@ -261,13 +259,12 @@ export function validateModel(model: PublicModel): void {
         "numNested",
         "isRec",
         "isUnsafe",
-        "isReflexive",
       ]);
       for (const key of ["numParams", "numIndices", "numNested"])
         uint(item[key], 0xffff);
       refs(item.all, "name");
       refs(item.ctors, "name");
-      for (const key of ["isRec", "isUnsafe", "isReflexive"])
+      for (const key of ["isRec", "isUnsafe"])
         boolean(item[key]);
     }
     for (const value of data.ctors) {

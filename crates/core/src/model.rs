@@ -209,6 +209,14 @@ impl Export {
         if kind != "inductive" {
             data.as_object_mut().unwrap().remove("all");
         }
+        if kind == "quot" {
+            data.as_object_mut().unwrap().remove("kind");
+        }
+        if kind == "inductive" {
+            for value in data["types"].as_array_mut().unwrap() {
+                value.as_object_mut().unwrap().remove("isReflexive");
+            }
+        }
         (kind.to_owned(), data)
     }
 

@@ -102,7 +102,7 @@ test("native and TypeScript use identical authenticated statement bytes", async 
   );
   // Pinned cross-language vector also guards accidental encoding changes.
   expect(statementCommitment({ ...value, proof: "base64:AA==" })).toBe(
-    "b07a76dd9e8bf5ef0732639f5902095fa91e46d62b3d7797e2451d38092b1596",
+    "e1839229e34aaa3ece4238a52480a10d8772fe8d581fae784b4bb29497ccdf8b",
   );
 });
 

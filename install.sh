@@ -27,12 +27,12 @@ curl -fsSL "$base/$asset.sha256" -o "$temporary/$asset.sha256"
 (cd "$temporary" && sha256sum -c "$asset.sha256")
 tar -xzf "$temporary/$asset" -C "$temporary"
 
-mkdir -p "$prefix/bin" "$prefix/libexec" "$prefix/share/zklean"
+mkdir -p "$prefix/bin" "$prefix/libexec/lean" "$prefix/share/zklean"
 cp "$temporary/zklean/bin/zklean" "$prefix/bin/zklean"
 cp "$temporary/zklean/libexec/zklean-native" "$prefix/libexec/zklean-native"
 cp "$temporary/zklean/libexec/zklean-guest" "$prefix/libexec/zklean-guest"
 cp "$temporary/zklean/libexec/lean4export" "$prefix/libexec/lean4export"
-cp -R "$temporary/zklean/libexec/lean" "$prefix/libexec/lean"
+cp -R "$temporary/zklean/libexec/lean/." "$prefix/libexec/lean/"
 cp "$temporary/zklean/share/zklean/verifier.json" "$prefix/share/zklean/verifier.json"
 chmod +x "$prefix/bin/zklean" "$prefix/libexec/zklean-native" "$prefix/libexec/lean4export"
 
