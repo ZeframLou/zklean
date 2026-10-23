@@ -14,11 +14,11 @@ cargo build --release --locked -p zklean-native --features prover,execute
 bun src/cli.ts pin --out examples/generated/verifier.json
 bun src/cli.ts prove --export tests/fixtures/identity.ndjson \
   --claims Demo.identity --out examples/generated/identity.groth16.json
-bun src/cli.ts prove --export tests/fixtures/v1.ndjson \
-  --claims Inventory.reservation_safe --axioms propext \
-  --out examples/generated/inventory.groth16.json
+bun src/cli.ts prove --export tests/fixtures/composition.ndjson \
+  --claims Pipeline.compose,Pipeline.weaken \
+  --out examples/generated/composition.groth16.json
 bun scripts/benchmark.ts examples/generated/identity.groth16.json \
-  examples/generated/inventory.groth16.json
+  examples/generated/composition.groth16.json
 ```
 
 The benchmark reports the complete stored and canonical certificate sizes,
@@ -30,7 +30,14 @@ Native measurements include process startup; SDK measurements include parsing,
 model validation, axiom policy, and hashing. The first embedded call includes
 WebAssembly compilation; subsequent calls reuse the compiled module.
 
-The examples compare a small propositional identity with an inventory model
-using natural numbers, options, and arithmetic proofs. They do not establish a
+The examples compare a small propositional identity with polymorphic pipeline
+guarantees about composition and weaker postconditions. They do not establish a
 general proof-size or speed advantage. Reproduce the measurements on the target
 hardware and use larger proof workloads before choosing a deployment policy.
+
+Real guest execution uses 827,835 cycles for identity, 11,482,006 for pipeline
+composition, and 353,114,958 for inventory. Cycle counts measure guest execution,
+not proving time. The first identity proving attempt exceeded this environment's
+16 GiB memory limit after 22 minutes; CPU proof generation for larger models can
+take hours and requires a resource budget established by measurement. Direct
+source checking remains available without cryptographic proof generation.

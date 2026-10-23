@@ -25,7 +25,7 @@ import { join } from "node:path";
 const help = `ZKLean — check and certify Lean contracts
 
   zklean init --project DIR
-  zklean prove --project DIR --module NAME --claims A,B --out CERT.json
+  zklean prove --project DIR --module NAME --claims A,B --out CERT.json [--timeout MS]
   zklean verify --certificate CERT.json [--axioms A,B]
   zklean inspect --certificate CERT.json [--axioms A,B]
   zklean import --certificate CERT.json --out Remote.lean [--axioms A,B]
@@ -74,6 +74,7 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
         "certificate",
         "binary",
         "elf",
+        "timeout",
       ].map((key) => [key, { type: "string" as const }]),
     ),
   });
@@ -85,6 +86,15 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
   };
   const optional = (name: string) =>
     typeof values[name] === "string" ? (values[name] as string) : undefined;
+  const timeout =
+    optional("timeout") === undefined ? undefined : Number(optional("timeout"));
+  if (
+    timeout !== undefined &&
+    (!Number.isSafeInteger(timeout) || timeout < 1 || timeout > 0x7fffffff)
+  )
+    throw new Error(
+      "--timeout must be an integer from 1 to 2147483647 milliseconds",
+    );
   if (command === "init") {
     const project = resolve(required("project"));
     const files = {
@@ -212,9 +222,13 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
       console.error(
         "Generating a local Groth16 proof; this may take several minutes…",
       );
-      result = await nativeBackend(await nativeOptions(tools, true)).prove(
-        input,
-      );
+      result = await nativeBackend({
+        ...(await nativeOptions(tools, true)),
+        ...(timeout === undefined ? {} : { timeout }),
+        onProgress: (text) => {
+          process.stderr.write(text);
+        },
+      }).prove(input);
     } else {
       result = await runNative(tools.binary, command, input);
       if (command === "check") enforcePolicy(result as Certificate);

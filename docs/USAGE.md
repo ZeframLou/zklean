@@ -21,8 +21,9 @@ zklean verify --certificate reservation.json --axioms propext
 ```
 
 `check` runs Nanoda directly. `prove` additionally runs the checker inside SP1
-and generates cryptographic evidence; this needs several gigabytes of memory
-and can take minutes. `verify` uses the embedded WebAssembly verifier and the
+and generates cryptographic evidence; this can take hours and needs a measured
+memory budget. See [Benchmarks](BENCHMARKS.md) before choosing a proving workload;
+`prove --timeout MS` overrides the default one-hour deadline. `verify` uses the embedded WebAssembly verifier and the
 locally trusted checker key. Recipients install only the npm SDK when they do
 not need source checking or proof generation:
 

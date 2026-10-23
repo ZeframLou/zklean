@@ -85,6 +85,29 @@ test("computational definitions retain embedded evidence without standalone theo
   expect(model.declarations["Demo.CheckedValue"]).toBeDefined();
 });
 
+test("polymorphic stage guarantees retain definitions and multiple certified claims", async () => {
+  const value = await checked(
+    "composition",
+    ["Pipeline.compose", "Pipeline.weaken"],
+    [],
+  );
+  expect(value.axioms).toEqual([]);
+  const model = readModel(value.specs);
+  expect(model.declarations["Pipeline.Preserves"]!.def!.value).toBeString();
+  expect(model.declarations["Pipeline.compose"]!.thm!.levelParams).toHaveLength(
+    3,
+  );
+  expect(model.declarations["Pipeline.weaken"]!.thm!.levelParams).toHaveLength(
+    2,
+  );
+  const native = (await runNative(binary, "commitment", value)) as {
+    commitment: string;
+  };
+  expect(native.commitment).toBe(
+    statementCommitment({ ...value, proof: "base64:AA==" }),
+  );
+});
+
 test("reports the exact used axioms, including their public declarations", async () => {
   const claims = ["Inventory.assumed_safe"];
   const allowed = ["Trusted.evidence", "Trusted.stock_policy"];

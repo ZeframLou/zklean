@@ -14,6 +14,8 @@ export interface NativeOptions {
   /** Pinned guest-key fingerprint from zklean pin. */
   verifierKey: string;
   timeout?: number;
+  /** Optional native proving diagnostics, delivered without changing evidence. */
+  onProgress?: (text: string) => void;
 }
 
 /** Process boundary keeps Nanoda's panic-based rejection out of the Bun host.
@@ -23,6 +25,7 @@ export async function runNative(
   command: string,
   input: unknown,
   timeout = 120_000,
+  onProgress?: (text: string) => void,
 ): Promise<unknown> {
   const child = Bun.spawn([binary, command], {
     stdin: "pipe",
@@ -33,10 +36,27 @@ export async function runNative(
   try {
     child.stdin.write(JSON.stringify(input));
     child.stdin.end();
+    const readStderr = async () => {
+      const reader = child.stderr.getReader();
+      const decoder = new TextDecoder();
+      let tail = "";
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        const text = decoder.decode(value, { stream: true });
+        tail = (tail + text).slice(-4000);
+        try {
+          onProgress?.(text);
+        } catch {
+          /* Diagnostics do not interrupt proving. */
+        }
+      }
+      return tail + decoder.decode();
+    };
     const [code, stdout, stderr] = await Promise.all([
       child.exited,
       new Response(child.stdout).text(),
-      new Response(child.stderr).text(),
+      readStderr(),
     ]);
     if (code !== 0)
       throw new Error(
@@ -50,6 +70,15 @@ export async function runNative(
 export function nativeBackend(
   options: NativeOptions,
 ): ProofBackend & { prove(input: ProveInput): Promise<Certificate> } {
+  if (
+    options.timeout !== undefined &&
+    (!Number.isSafeInteger(options.timeout) ||
+      options.timeout < 1 ||
+      options.timeout > 0x7fffffff)
+  )
+    throw new Error(
+      "native timeout must be an integer from 1 to 2147483647 milliseconds",
+    );
   if (!/^0x[a-f0-9]{64}$/.test(options.verifierKey))
     throw new Error("pin the SP1 guest verification key");
   if (
@@ -78,6 +107,7 @@ export function nativeBackend(
           "prove",
           { ...config, input },
           timeout ?? 3_600_000,
+          options.onProgress,
         ),
       );
     },

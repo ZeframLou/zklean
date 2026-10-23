@@ -51,9 +51,10 @@ zklean verify --certificate reservation.json --axioms propext
 ```
 
 The example permits `propext`, an axiom used by Lean's arithmetic library.
-Successful verification returns `"status": "verified"`. Generating the SP1 proof
-runs locally and can take minutes and several gigabytes of RAM; recipients can
-reuse the resulting certificate.
+Successful verification returns `"status": "verified"`. Local CPU proof generation
+can take hours and needs a measured memory budget; the [benchmark guide](docs/BENCHMARKS.md)
+records guest costs and resource limits. Recipients can reuse the resulting
+certificate. For long runs, set `zklean prove --timeout MS`; the default is one hour.
 
 For your own project, change the directory, module, and theorem names. Only the
 axioms explicitly allowed with `--axioms` are accepted.

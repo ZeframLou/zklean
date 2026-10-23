@@ -5,6 +5,12 @@ import { inventoryAxioms } from "../examples/inventory.ts";
 
 export const examples = [
   {
+    module: "Composition",
+    file: "composition",
+    claims: ["Pipeline.compose", "Pipeline.weaken"],
+    axioms: [],
+  },
+  {
     module: "AxiomSpoof",
     file: "axiom-spoof",
     claims: ["Spoof.everything"],

@@ -1,5 +1,5 @@
 use anyhow::{bail, Context, Result};
-use std::io::{self, Read};
+use std::io::{self, Read, Write};
 use zklean_core::ProveInput;
 
 #[cfg(feature = "execute")]
@@ -8,10 +8,40 @@ mod execute;
 mod sp1;
 mod verify;
 
+// Native libraries, including upstream gnark, print diagnostics to fd 1.
+// Reserve the original stdout for our JSON protocol before invoking them.
+fn json_output() -> Result<Box<dyn Write>> {
+    #[cfg(unix)]
+    {
+        use std::os::fd::AsFd;
+        let output = std::fs::File::from(io::stdout().as_fd().try_clone_to_owned()?);
+        if unsafe { libc::dup2(libc::STDERR_FILENO, libc::STDOUT_FILENO) } < 0 {
+            return Err(io::Error::last_os_error().into());
+        }
+        Ok(Box::new(output))
+    }
+    #[cfg(not(unix))]
+    {
+        Ok(Box::new(io::stdout()))
+    }
+}
+
 fn main() -> Result<()> {
+    let mut output = json_output()?;
     let command = std::env::args()
         .nth(1)
         .context("usage: zklean-native check|prove|verify < request.json")?;
+    if command == "prove" {
+        tracing_subscriber::fmt()
+            .with_env_filter(
+                tracing_subscriber::EnvFilter::try_from_default_env()
+                    .unwrap_or_else(|_| "info".into()),
+            )
+            .with_writer(io::stderr)
+            .with_span_events(tracing_subscriber::fmt::format::FmtSpan::CLOSE)
+            .with_ansi(false)
+            .init();
+    }
     let mut input = String::new();
     io::stdin().read_to_string(&mut input)?;
     let result = match command.as_str() {
@@ -38,6 +68,6 @@ fn main() -> Result<()> {
         "execute" => execute::run(&input)?,
         _ => bail!("unsupported command"),
     };
-    println!("{}", serde_json::to_string(&result)?);
+    writeln!(output, "{}", serde_json::to_string(&result)?)?;
     Ok(())
 }

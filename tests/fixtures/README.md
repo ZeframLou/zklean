@@ -10,6 +10,8 @@ Negative tests reject unknown fields, multiple variant tags, and duplicate JSON
 keys (including escaped keys) before the checker and model projection can diverge.
 `proof-data.ndjson` covers a computational definition containing embedded evidence;
 that evidence is retained while standalone theorem bodies are excluded.
+`composition.ndjson` covers multiple polymorphic guarantees, universe parameters,
+and resolved definitions for composed stages and weaker postconditions.
 
 `guest.e2e.test.ts` executes the real compiled SP1 guest when
 `ZKLEAN_GUEST_ELF` is provided.

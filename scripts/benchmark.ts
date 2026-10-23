@@ -10,7 +10,7 @@ const samples = 7;
 const paths = process.argv.slice(2);
 if (paths.length !== 2)
   throw new Error(
-    "usage: bun scripts/benchmark.ts IDENTITY_CERT INVENTORY_CERT",
+    "usage: bun scripts/benchmark.ts IDENTITY_CERT COMPOSITION_CERT",
   );
 const tools = await findTools();
 const native = nativeBackend(await nativeOptions(tools, false));
@@ -32,7 +32,7 @@ for (let i = 0; i < paths.length; i++) {
   const file = Bun.file(paths[i]!);
   const certificate = parseCertificate(await file.json());
   const exported = await Bun.file(
-    `tests/fixtures/${i === 0 ? "identity" : "v1"}.ndjson`,
+    `tests/fixtures/${i === 0 ? "identity" : "composition"}.ndjson`,
   ).text();
   const policy = { allowedAxioms: certificate.axioms };
   const model = readModel(certificate.specs);
@@ -46,7 +46,7 @@ for (let i = 0; i < paths.length; i++) {
     };
   };
   results.push({
-    example: i === 0 ? "identity" : "inventory",
+    example: i === 0 ? "identity" : "composition",
     claims: certificate.specs.claims,
     exportBytes: Buffer.byteLength(exported),
     certificateFileBytes: file.size,
