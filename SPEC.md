@@ -1,5 +1,6 @@
 # ZKLean & HTTPV
-**Internet-Draft**  
+**Protocol specification**
+
 **Status:** Experimental
 
 ## Abstract
