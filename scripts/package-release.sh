@@ -14,7 +14,7 @@ mkdir -p "$root/bin" "$root/libexec" "$root/share/zklean" "$output"
 # we distribute here, regardless of which checks ran immediately beforehand.
 cargo build --release --locked -p zklean-native --features prover,execute
 bun build --compile src/cli.ts --outfile "$root/bin/zklean"
-cp target/release/zklean-native "$root/libexec/zklean-native"
+cp "${CARGO_TARGET_DIR:-target}/release/zklean-native" "$root/libexec/zklean-native"
 cp crates/guest/target/elf-compilation/riscv32im-succinct-zkvm-elf/release/zklean-guest "$root/libexec/zklean-guest"
 cp .tooling/lean4export/.lake/build/bin/lean4export "$root/libexec/lean4export"
 strip "$root/libexec/zklean-native" "$root/libexec/lean4export"
@@ -29,4 +29,10 @@ chmod 644 "$root/libexec/zklean-guest" "$root/share/zklean/verifier.json"
 
 tar -czf "$output/$archive" -C "$stage" zklean
 (cd "$output" && sha256sum "$archive" > "$archive.sha256")
+cp install.sh "$output/install.sh"
+cp README.md "$output/README.md"
+cp SPEC.md "$output/SPEC.md"
+mkdir -p "$output/docs" "$output/examples/lean"
+cp docs/*.md "$output/docs/"
+cp examples/lean/Inventory.lean examples/lean/V1.lean "$output/examples/lean/"
 echo "Created $output/$archive"

@@ -4,9 +4,11 @@
 
 ## 1. Purpose
 
-ZKLean generates succinct cryptographic certificates that Lean propositions have
+ZKLean generates cryptographic certificates that Lean propositions have
 valid derivations under explicitly declared axioms. Recipients verify the
 certificate without receiving or rechecking the original Lean proof terms.
+The proof of checking is succinct; the accompanying public model has a size
+determined by its definitions and dependency closure.
 
 ZKLean is usable independently of HTTP. The separate
 [HTTPV protocol](https://github.com/ZeframLou/httpv) discovers API certificates
@@ -42,7 +44,7 @@ Lean specifications + proofs + axioms
                   |
            Nanoda inside SP1
                   |
-          Succinct certificate
+       Certificate: model + succinct proof
 ```
 
 No custom theorem language, intermediate representation, or proof system is required beyond serialization of Lean's existing kernel expressions.
@@ -59,7 +61,7 @@ The SP1 guest MUST:
 4. Reject undeclared axioms and invalid dependencies.
 5. Cryptographically bind the public formal model and actual axiom list to the SP1 proof.
 
-One succinct certificate covers the entire specification set.
+One proof covers the entire specification set.
 
 ### 3.3. Certificate Format
 
@@ -70,7 +72,7 @@ One succinct certificate covers the entire specification set.
     "declarations": "base64:...",
     "claims": ["Inventory.reservation_safe"]
   },
-  "axioms": ["propext", "Quot.sound"],
+  "axioms": ["propext"],
   "proof": "base64:..."
 }
 ```
@@ -120,7 +122,8 @@ generates an SP1 certificate, verifies it, and writes the result. `zklean verify
 checks a certificate against a locally trusted verifier and explicit axiom policy.
 
 ```sh
-zklean prove --project examples/lean --module V1 \
+zklean init --project inventory
+zklean prove --project inventory --module V1 \
   --claims Inventory.reservation_safe --axioms propext --out reservation.json
 zklean verify --certificate reservation.json --axioms propext
 ```
@@ -130,6 +133,16 @@ zklean verify --certificate reservation.json --axioms propext
 a verifier profile from a locally built guest; `zklean doctor` reports the resolved
 local tools. Verification does not require HTTP, a remote service, or the
 original Lean proof terms.
+
+`zklean inspect` MUST authenticate a certificate and enforce its axiom policy
+before displaying its public statements. `zklean import` MUST do the same
+before reconstructing declarations through Lean's public API. Certified
+propositions become explicit assumptions for a separate bridge proof; import
+does not certify that bridge. Existing Lean declarations MUST agree with the
+authenticated public context before reuse, ignoring only the exporter's erased
+metadata and binder display annotations. The emitted `<output>.axioms.json`
+binds imported assumptions to their complete resolved contexts for later policy
+checks.
 
 ## 5. Requirement snapshots
 

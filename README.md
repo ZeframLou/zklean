@@ -1,13 +1,13 @@
 # ZKLean
 
-ZKLean is a command-line tool that makes Lean specifications inexpensive to
-verify without downloading and rechecking their original mathematical arguments.
+ZKLean lets recipients verify Lean specifications without downloading and
+rechecking their original mathematical arguments.
 
 Lean describes software behavior mathematically. A **formal proof** establishes
 properties of that model under stated assumptions.
 
 ZKLean runs its checker inside [SP1](https://github.com/succinctlabs/sp1), a system
-for generating cryptographic proofs of program execution. The resulting small
+for generating cryptographic proofs of program execution. The resulting
 **cryptographic proof** certifies that the checker accepted the Lean argument.
 A certificate bundles this proof with the specification and its assumptions.
 
@@ -21,11 +21,17 @@ whether the statements and axioms capture what you need.
 
 ## Install ZKLean
 
+For a published binary release, install ZKLean and its dependencies on Linux
+x86-64 with one command:
+
 ```sh
-curl -fsSL https://raw.githubusercontent.com/ZeframLou/zklean/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/ZeframLou/zklean-dist/main/install.sh | sh
 ```
 
-The installer sets up ZKLean and its dependencies on Linux x86-64.
+The binary-only distribution is prepared separately from this private source
+repository; publishing it requires the steps in [Distribution](docs/DISTRIBUTION.md).
+The installer downloads about 2.9 GB of upstream proving data and the pinned
+Lean toolchain. SDK recipients need only `npm install zklean` and Bun 1.4.4 or newer.
 
 ## Certify an inventory reservation
 
@@ -36,10 +42,9 @@ available stock, and leave `remaining + reserved = original stock`.
 Generate a certificate for that guarantee, then verify it locally:
 
 ```sh
-git clone https://github.com/ZeframLou/zklean.git
-cd zklean
+zklean init --project inventory
 
-zklean prove --project examples/lean --module V1 \
+zklean prove --project inventory --module V1 \
   --claims Inventory.reservation_safe --axioms propext --out reservation.json
 
 zklean verify --certificate reservation.json --axioms propext
@@ -59,5 +64,9 @@ axioms explicitly allowed with `--axioms` are accepted.
 TypeScript library for discovering API specifications and checking whether they
 satisfy a client's requirements.
 
-See the [certificate specification](SPEC.md), [proof formats](docs/ENCODING.md),
-and [source build instructions](docs/DEVELOPMENT.md).
+The Groth16 evidence is 260 bytes; a full certificate also carries its public
+model, which can exceed the original Lean export. Compare complete sizes and
+checking costs with the [measurement procedure](docs/BENCHMARKS.md).
+
+See the [usage guide](docs/USAGE.md), [certificate specification](SPEC.md),
+[proof formats](docs/ENCODING.md), and [source build instructions](docs/DEVELOPMENT.md).

@@ -45,8 +45,9 @@ Lean's own elaborator and exporter, followed by Nanoda in SP1.
 
 Canonical JSON sorts keys by UTF-8 bytes, has no whitespace, uses JSON string
 escaping, and permits only nonnegative safe integers as numeric data. No
-Unicode normalization is applied. Claims and axioms are unique names sorted by
-UTF-8 bytes. Base64 is canonical and padded. Metadata and original export
+Unicode normalization is applied. Unpaired Unicode surrogates are rejected.
+Claims and axioms are unique names sorted by UTF-8 bytes. Base64 is canonical
+and padded, including zero unused padding bits. Metadata and original export
 indices do not affect model identities. Ambiguous dotted name components and
 numeric string name components are rejected rather than conflated with Lean's
 numeric name constructor. Export metadata records format 3.1.0; checker semantics

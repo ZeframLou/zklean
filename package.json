@@ -33,6 +33,7 @@
     "README.md",
     "SPEC.md",
     "docs/ENCODING.md",
+    "docs/USAGE.md",
     "examples/lean/Inventory.lean",
     "examples/lean/V1.lean"
   ]

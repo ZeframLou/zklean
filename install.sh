@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-repository="${ZKLEAN_REPOSITORY:-ZeframLou/zklean}"
+repository="${ZKLEAN_REPOSITORY:-ZeframLou/zklean-dist}"
 version="${ZKLEAN_VERSION:-latest}"
 prefix="${ZKLEAN_PREFIX:-$HOME/.local}"
 
@@ -45,6 +45,20 @@ cp "$temporary/zklean/libexec/lean4export" "$prefix/libexec/lean4export"
 cp "$temporary/zklean/share/zklean/verifier.json" "$prefix/share/zklean/verifier.json"
 chmod 755 "$prefix/bin/zklean" "$prefix/libexec/zklean-native" "$prefix/libexec/lean4export"
 chmod 644 "$prefix/libexec/zklean-guest" "$prefix/share/zklean/verifier.json"
+
+# The upstream proving key is too large to duplicate in every CLI release.
+# Pin its exact archive and install it automatically; verification needs no key.
+circuit_digest=6cbc2c155c41001e81efd81119bd3d4f32313fcd3184df383d50225315b73104
+circuit_root="$prefix/share/zklean/circuits/groth16/v5.0.0"
+if [ ! -f "$circuit_root/.archive-sha256" ] || [ "$(cat "$circuit_root/.archive-sha256")" != "$circuit_digest" ]; then
+  echo "Downloading SP1 Groth16 proving data (2.9 GB)…"
+  circuit_url="${ZKLEAN_CIRCUIT_URL:-https://sp1-circuits.s3-us-east-2.amazonaws.com/v5.0.0-groth16.tar.gz}"
+  curl -fsSL "$circuit_url" -o "$temporary/groth16.tar.gz"
+  printf '%s  %s\n' "$circuit_digest" "$temporary/groth16.tar.gz" | sha256sum -c -
+  mkdir -p "$circuit_root"
+  tar -xzf "$temporary/groth16.tar.gz" -C "$circuit_root"
+  printf '%s\n' "$circuit_digest" > "$circuit_root/.archive-sha256"
+fi
 
 if [ "${ZKLEAN_SKIP_LEAN:-0}" != 1 ]; then
   elan_home="${ELAN_HOME:-$HOME/.elan}"

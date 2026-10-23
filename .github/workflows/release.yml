@@ -45,22 +45,46 @@ jobs:
       - run: cargo build --release --locked -p zklean-native --features prover
       - run: bun run build:verifier
       - run: bash scripts/setup-exporter.sh
-      - run: bun run check
+      - run: ZKLEAN_LAKE="$(command -v lake)" ZKLEAN_GUEST_ELF="$PWD/crates/guest/target/elf-compilation/riscv32im-succinct-zkvm-elf/release/zklean-guest" bun run check
       - run: cargo build --release --locked -p zklean-native --features prover,execute
       - run: bun scripts/check-proof-fixture.ts "$PWD/crates/guest/target/elf-compilation/riscv32im-succinct-zkvm-elf/release/zklean-guest"
       - run: bun scripts/export-examples.ts .tooling/lean4export/.lake/build/bin/lean4export
       - run: git diff --exit-code -- tests/fixtures/*.ndjson
       - run: bash scripts/package-release.sh dist
-      - name: Test installation and bundled tools
-        env:
-          ZKLEAN_SKIP_LEAN: '1'
-        run: |
-          ZKLEAN_PREFIX="$RUNNER_TEMP/zklean" ZKLEAN_RELEASE_BASE="file://$PWD/dist" sh install.sh
-          "$RUNNER_TEMP/zklean/bin/zklean" verify --certificate tests/fixtures/identity.certificate.json
-          "$RUNNER_TEMP/zklean/bin/zklean" check --project examples/lean --module Identity --claims Demo.identity
+      - run: cp tests/fixtures/identity.certificate.json dist/identity.certificate.json
       - uses: actions/upload-artifact@v4
         with:
           name: zklean-linux-x64
           path: |
             dist/zklean-linux-x64.tar.gz
             dist/zklean-linux-x64.tar.gz.sha256
+            dist/install.sh
+            dist/README.md
+            dist/SPEC.md
+            dist/docs/
+            dist/examples/
+            dist/identity.certificate.json
+
+  clean-install:
+    needs: linux-x64
+    runs-on: ubuntu-22.04
+    container: ubuntu:22.04
+    steps:
+      - name: Install base operating-system tools
+        run: apt-get update && apt-get install -y --no-install-recommends ca-certificates curl tar gzip zstd libgcc-s1
+      - uses: actions/download-artifact@v4
+        with:
+          name: zklean-linux-x64
+          path: release
+      - name: Install archive and check real Lean source
+        env:
+          ZKLEAN_PREFIX: /tmp/zklean-install
+          ELAN_HOME: /tmp/zklean-elan
+        run: |
+          ZKLEAN_RELEASE_BASE="file://$PWD/release" sh release/install.sh
+          export PATH="/tmp/zklean-install/bin:/tmp/zklean-elan/bin:$PATH"
+          zklean doctor
+          zklean verify --certificate release/identity.certificate.json
+          zklean pin --out /tmp/installed-verifier.json
+          zklean init --project /tmp/installed-contract
+          zklean check --project /tmp/installed-contract --module V1 --claims Inventory.reservation_safe --axioms propext

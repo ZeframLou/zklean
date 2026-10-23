@@ -8,6 +8,17 @@ use sp1_sdk::{HashableKey, Prover, ProverClient, SP1Stdin};
 use zklean_core::commitment;
 
 pub fn run(command: &str, input: &str) -> Result<Value> {
+    // Installed archives keep the upstream proving data beside the bundled
+    // tools. An explicit developer override still takes precedence.
+    if std::env::var_os("SP1_GROTH16_CIRCUIT_PATH").is_none() {
+        let installed = std::env::current_exe()?
+            .parent()
+            .context("executable directory required")?
+            .join("../share/zklean/circuits/groth16");
+        if installed.is_dir() {
+            std::env::set_var("SP1_GROTH16_CIRCUIT_PATH", installed);
+        }
+    }
     // Groth16 wraps SP1's production recursion circuit.
     // Never honor inherited development settings that disable VK verification.
     std::env::set_var("VERIFY_VK", "true");

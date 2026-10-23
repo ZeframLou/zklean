@@ -20,15 +20,15 @@ enables SP1's production VK checks and uses fixed recursion/core shapes.
 The SDK's recursion key map is omitted from its crates.io source package.
 `scripts/prepare-sp1.sh` fetches it from the pinned GitHub source release and
 checks the exact SHA-256 required by SP1's build script. This is a public
-verification-key map. Local Groth16 proving also downloads SP1's production
-circuit artifacts on first use; verification uses the circuit key embedded in
+verification-key map. The CLI installer and `scripts/setup-circuits.sh` download
+checksum-pinned SP1 production circuit artifacts; verification uses the circuit key embedded in
 the upstream crate and downloads nothing. The native gnark backend is linked
 into the prover, so recipients and CLI users do not need Go or Docker.
 
 See README.md for commands and docs/ENCODING.md for the wire profile.
 SPEC.md is the normative experimental protocol specification.
 
-Tagged releases contain a compiled Bun CLI, native verifier/prover, guest ELF,
+Prepared release archives contain a compiled Bun CLI, native verifier/prover, guest ELF,
 verifier profile, and lean4export in one checksum-pinned archive. `install.sh`
 installs that archive and automatically installs the pinned Lean toolchain through
 `elan`. Tool discovery is relative to the CLI or `ELAN_HOME`, so ordinary commands
