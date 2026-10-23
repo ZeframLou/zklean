@@ -1,32 +1,31 @@
 # ZKLean & HTTPV
 
-## Motivation
+An API update can break the assumptions your application relies on. For example,
+a payment client may depend on a transfer API rejecting unauthorized requests.
+An update that allows those requests invalidates that assumption.
 
-A client's correctness proof may assume that a remote transfer API rejects
-unauthorized requests. If the API changes that behavior, the assumption no
-longer holds. Clients need a way to obtain a dependency's formal specification
-and check whether its guarantees still satisfy their assumptions.
+ZKLean and HTTPV let clients verify an API's advertised guarantees and check
+whether updates still meet their requirements.
 
-**ZKLean uses SP1 to generate succinct proofs of Lean specifications.** Clients
-can verify them without downloading and checking the original Lean proof terms.
-Each certificate contains the specifications, the axioms they rely on, and the
-succinct proof.
+## Check specifications cheaply
 
-**HTTPV lets clients discover and monitor the specifications advertised by API
-endpoints.** When an API's specification changes, a client can reuse its own
-correctness proof if the new guarantees still establish its assumptions.
+1. **Prove the specification in Lean.** Use Lean to describe the API's behavior
+   mathematically and prove properties of that model under stated assumptions
+   (axioms). This mathematical argument is the formal verification proof.
+2. **Make verification succinct with SP1.** ZKLean checks the Lean argument and
+   uses SP1 to produce a small cryptographic proof that the check succeeded.
+   Clients verify this proof without downloading and rechecking the original
+   Lean argument.
+3. **Check API compatibility with HTTPV.** Servers publish their specifications
+   and cryptographic proofs over HTTPS. Clients verify them, check whether the
+   specifications imply their requirements, and periodically recheck for changes.
 
-## Goals
+Compatibility requires matching formal definitions and either an exact match
+or a separately verified Lean argument establishing the implication.
 
-- Keep proof verification inexpensive even when the original Lean proofs are large.
-- Expose the exact formal definitions and axioms behind every certified statement.
-- Detect changes to advertised API specifications and verify compatibility with client requirements.
-- Distinguish compatible, incompatible, and unverifiable dependencies so applications can choose how to respond.
-- Integrate with existing HTTP applications without changing ordinary requests.
+## What clients still trust
 
-## Security assumptions
-
-Verification relies on the soundness of Nanoda's Lean proof checker and SP1, a verifier key pinned by the client, and explicitly permitted axioms. HTTPS authenticates the advertised specification, and clients trust providers to implement and deploy the behavior it describes. HTTPV does not attest to deployed code or prove that individual responses satisfy that specification.
+Clients verify the mathematical claims themselves, but must trust the server to deploy matching code and honor the specification in every response. HTTPV cannot detect a server violating that specification or changing behavior without updating its advertisement. Each client chooses which axioms to trust and what to do when compatibility cannot be verified.
 
 ## Install
 
@@ -34,26 +33,13 @@ Verification relies on the soundness of Nanoda's Lean proof checker and SP1, a v
 curl -fsSL https://raw.githubusercontent.com/ZeframLou/zklean/main/install.sh | sh
 ```
 
-The installer sets up ZKLean and its Lean toolchain on Linux x86-64.
-Run `zklean doctor` to check the installation.
+The installer sets up ZKLean and its dependencies on Linux x86-64.
 
-## Prove and verify a specification
+## Try it
 
-The [transfer example](examples/lean/V1.lean) models `POST /transfer` and proves
-that a successful transfer requires authorization:
-
-```lean
-namespace Transfer
-
-def POST_transfer (authorized : Bool) : Bool := authorized
-
-theorem transfer_safe (authorized : Bool) :
-    POST_transfer authorized = true → authorized = true := fun h => h
-
-end Transfer
-```
-
-Generate a certificate for that theorem, then verify it:
+The [transfer example](examples/lean/V1.lean) models an API that rejects
+unauthorized transfers and proves that property. Generate a certificate
+containing its specification, axioms, and SP1 proof, then verify it:
 
 ```sh
 git clone https://github.com/ZeframLou/zklean.git
@@ -65,39 +51,13 @@ zklean prove --project examples/lean --module V1 \
 zklean verify --certificate transfer.certificate.json
 ```
 
-`prove` builds the Lean module, checks its proof with Nanoda inside SP1, and
-writes a certificate. `verify` checks the resulting SP1 proof and axiom policy;
-success returns `"status": "verified"` and exit code zero.
+Successful verification returns `"status": "verified"`. Generating the SP1 proof
+runs locally and can take minutes and several gigabytes of RAM; clients can reuse
+the resulting certificate.
 
-Proving runs locally and can take several minutes and multiple gigabytes of RAM.
-The same certificate can be distributed to many clients and verified without the
-original Lean proof terms.
+For your own project, change the directory, module, and theorem names. No axioms
+are permitted by default; pass `--axioms A,B` to `prove` and `verify` to allow them.
 
-For your own specifications, replace the project directory, module, and theorem
-names. No axioms are permitted by default; use `--axioms A,B` when generating
-and verifying a certificate to explicitly allow them. Use `zklean check` with
-the same project, module, and claims to check a Lean proof without generating
-an SP1 proof.
-
-## Check an API dependency
-
-Suppose a client requires the transfer API to reject unauthorized requests.
-An update that adds a guarantee while preserving this requirement is compatible;
-an update that allows unauthorized transfers breaks the client's assumption.
-
-HTTPV retrieves the endpoint's advertised certificate over HTTPS, verifies its
-proof and permitted axioms, then checks whether the certified guarantees imply
-the client's requirement. Compatibility requires an exact match under the same
-formal definitions or a separately verified Lean proof of the implication.
-A valid proof of a different specification does not establish compatibility.
-
-Clients can periodically recheck dependencies and apply their own failure policy,
-such as blocking requests or switching providers. Polling observes advertised
-specifications; it cannot detect behavior changes behind an unchanged advertisement
-or guarantee stability between checks.
-
-The [Bun client and server example](examples/upgrades.ts) demonstrates compatible
-and incompatible API upgrades and a Lean proof of compatibility. See
-[SPEC.md](SPEC.md) for the protocol and integration APIs,
-[Encoding](docs/ENCODING.md) for proof formats and privacy properties, and
-[Development](docs/DEVELOPMENT.md) for source builds and tests.
+See the [HTTPV client and server example](examples/upgrades.ts),
+[protocol specification](SPEC.md), [proof formats](docs/ENCODING.md), and
+[source build instructions](docs/DEVELOPMENT.md).
