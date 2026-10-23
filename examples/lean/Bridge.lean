@@ -1,16 +1,16 @@
-import Init
+import Inventory
 
-namespace Transfer
-
-def POST_transfer (authorized : Bool) : Bool := authorized
+namespace Inventory
 
 /-- The independently verified remote guarantee is an assumption for this proof. -/
-axiom transfer_safe (authorized : Bool) :
-    POST_transfer authorized = true → authorized = true
+axiom reservation_safe (available requested remaining : Nat) :
+    POST_reservations available requested = some remaining →
+      0 < requested ∧ requested ≤ available ∧ remaining + requested = available
 
-end Transfer
+end Inventory
 
-/-- A bridge derives the client's requirement from the authenticated guarantee. -/
-theorem Client.requires_auth (authorized : Bool) :
-    Transfer.POST_transfer authorized = true → authorized = true :=
-  Transfer.transfer_safe authorized
+/-- Derive the checkout client's requirement from the authenticated guarantee. -/
+theorem Client.stock_conserved (available requested remaining : Nat) :
+    Inventory.POST_reservations available requested = some remaining →
+      0 < requested ∧ requested ≤ available ∧ remaining + requested = available :=
+  Inventory.reservation_safe available requested remaining

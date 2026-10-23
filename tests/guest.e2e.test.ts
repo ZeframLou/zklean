@@ -31,7 +31,7 @@ test.skipIf(!elfPath)(
       input: await input("v1"),
     })) as { cycles: number; statement: { axioms: string[] } };
     expect(result.cycles).toBeGreaterThan(0);
-    expect(result.statement.axioms).toEqual([]);
+    expect(result.statement.axioms).toEqual(["propext"]);
   },
   300_000,
 );
@@ -39,15 +39,15 @@ test.skipIf(!elfPath)(
 test.skipIf(!elfPath)(
   "the real SP1 guest rejects invalid proofs and forbidden axioms",
   async () => {
-    const invalid = await input("v1");
-    invalid.export = invalid.export.replace('"value":73', '"value":0');
+    const invalid = await input("identity", ["Demo.identity"]);
+    invalid.export = invalid.export.replace('"value":6', '"value":0');
     await expect(
       runNative(binary, "execute", { elfPath, input: invalid }),
     ).rejects.toThrow("guest execution failed");
     await expect(
       runNative(binary, "execute", {
         elfPath,
-        input: await input("axioms", ["Transfer.assumed_safe"]),
+        input: await input("axioms", ["Inventory.assumed_safe"]),
       }),
     ).rejects.toThrow("guest execution failed");
     const ambiguous = await input("identity", ["Demo.identity"]);

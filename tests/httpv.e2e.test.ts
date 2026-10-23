@@ -5,7 +5,7 @@ import { afterAll, beforeAll, expect, test } from "bun:test";
 import { createHTTPV, DiscoveryError } from "../src/client.ts";
 import { canonical, encodeBase64, readModel, sha256 } from "../src/encoding.ts";
 import { MEDIA_TYPE, methodName } from "../src/server.ts";
-import { requirements, testAuthority } from "./helpers.ts";
+import { inventoryAxioms, requirements, testAuthority } from "./helpers.ts";
 import type { Certificate, Monitor, VerificationResult } from "../src/types.ts";
 
 const authority = testAuthority();
@@ -14,7 +14,7 @@ let current: Certificate;
 let discoveryCount = 0;
 const adapter = createHTTPV().serve({
   routes: {
-    "POST /transfer": () => {
+    "POST /reservations": () => {
       discoveryCount++;
       return current;
     },
@@ -26,20 +26,20 @@ const adapter = createHTTPV().serve({
     }),
 });
 const server = Bun.serve({ hostname: "127.0.0.1", port: 0, ...adapter });
-const url = `http://127.0.0.1:${server.port}/transfer`;
+const url = `http://127.0.0.1:${server.port}/reservations`;
 const local = { method: "POST", allowInsecureHttp: true };
 
 beforeAll(async () => {
   v1 = await authority.issue("v1");
   v2 = await authority.issue("v2", [
-    "Transfer.transfer_safe",
-    "Transfer.authorized_succeeds",
+    "Inventory.reservation_safe",
+    "Inventory.valid_request_succeeds",
   ]);
   v3 = await authority.issue("v3");
   bridge = await authority.issue(
     "bridge",
-    ["Client.requires_auth"],
-    ["Transfer.transfer_safe"],
+    ["Client.stock_conserved"],
+    ["Inventory.reservation_safe"],
   );
   current = v1;
 }, 300_000);
@@ -50,9 +50,10 @@ test("live OPTIONS discovery authenticates resource/method and preserves normal 
   current = v1;
   const certificate = await httpv.query(url, local);
   expect(certificate).toEqual(v1);
-  expect((await httpv.verify(certificate, { allowedAxioms: [] })).status).toBe(
-    "verified",
-  );
+  expect(
+    (await httpv.verify(certificate, { allowedAxioms: inventoryAxioms }))
+      .status,
+  ).toBe("verified");
   const response = await fetch(url, {
     method: "OPTIONS",
     headers: { Accept: `${MEDIA_TYPE}; q=1` },
@@ -77,7 +78,7 @@ test("live OPTIONS discovery authenticates resource/method and preserves normal 
     httpv.query(url, { ...local, method: "GET" }),
   ).rejects.toMatchObject({ reason: "missing-certificate" });
   await expect(
-    httpv.query(url.replace("transfer", "other"), local),
+    httpv.query(url.replace("reservations", "other"), local),
   ).rejects.toBeInstanceOf(DiscoveryError);
   await expect(httpv.query(url, { method: "POST" })).rejects.toThrow("HTTPS");
   expect(methodName("patch")).toBe("patch");
@@ -96,7 +97,7 @@ test("compatible upgrade adds claims; changed definitions with identical names f
         await httpv.checkCompatibility({
           certificate: remote,
           requirements: required,
-          allowedAxioms: [],
+          allowedAxioms: inventoryAxioms,
           mode: "exact",
         })
       ).status,
@@ -104,14 +105,14 @@ test("compatible upgrade adds claims; changed definitions with identical names f
   }
   current = v3;
   const remote = await httpv.query(url, local);
-  expect((await httpv.verify(remote, { allowedAxioms: [] })).status).toBe(
-    "verified",
-  );
+  expect(
+    (await httpv.verify(remote, { allowedAxioms: inventoryAxioms })).status,
+  ).toBe("verified");
   expect(
     await httpv.checkCompatibility({
       certificate: remote,
       requirements: required,
-      allowedAxioms: [],
+      allowedAxioms: inventoryAxioms,
       mode: "exact",
     }),
   ).toMatchObject({ status: "incompatible", reason: "requirements-not-met" });
@@ -119,7 +120,7 @@ test("compatible upgrade adds claims; changed definitions with identical names f
     await httpv.checkCompatibility({
       certificate: remote,
       requirements: required,
-      allowedAxioms: [],
+      allowedAxioms: inventoryAxioms,
     }),
   ).toMatchObject({ status: "unknown", reason: "missing-derivation" });
 });
@@ -131,7 +132,7 @@ test("a separately checked Lean bridge establishes the client requirement", asyn
     await httpv.checkCompatibility({
       certificate: v1,
       requirements: required,
-      allowedAxioms: [],
+      allowedAxioms: inventoryAxioms,
     }),
   ).toMatchObject({ status: "unknown", reason: "missing-derivation" });
   expect(
@@ -139,7 +140,7 @@ test("a separately checked Lean bridge establishes the client requirement", asyn
       certificate: v1,
       requirements: required,
       derivation: bridge,
-      allowedAxioms: [],
+      allowedAxioms: inventoryAxioms,
     }),
   ).toMatchObject({ status: "verified", reason: "derivation" });
   expect(
@@ -147,7 +148,7 @@ test("a separately checked Lean bridge establishes the client requirement", asyn
       certificate: v1,
       requirements: required,
       derivation: bridge,
-      allowedAxioms: [],
+      allowedAxioms: inventoryAxioms,
       mode: "exact",
     }),
   ).toMatchObject({ status: "incompatible", reason: "requirements-not-met" });
@@ -156,7 +157,7 @@ test("a separately checked Lean bridge establishes the client requirement", asyn
       certificate: v2,
       requirements: required,
       derivation: bridge,
-      allowedAxioms: [],
+      allowedAxioms: inventoryAxioms,
     }),
   ).toMatchObject({ status: "verified", reason: "derivation" });
   expect(
@@ -164,7 +165,7 @@ test("a separately checked Lean bridge establishes the client requirement", asyn
       certificate: v3,
       requirements: required,
       derivation: bridge,
-      allowedAxioms: [],
+      allowedAxioms: inventoryAxioms,
     }),
   ).toMatchObject({ status: "unknown", reason: "invalid-derivation" });
   expect(
@@ -172,17 +173,17 @@ test("a separately checked Lean bridge establishes the client requirement", asyn
       certificate: v1,
       requirements: required,
       derivation: v1,
-      allowedAxioms: [],
+      allowedAxioms: inventoryAxioms,
     }),
   ).toMatchObject({ status: "unknown", reason: "invalid-derivation" });
 });
 
 test("cached verification enforces new axiom policies and detects statement tampering", async () => {
   const httpv = createHTTPV({ backend: authority.backend });
-  const axioms = ["Trusted.authorization", "Trusted.evidence"];
+  const axioms = ["Trusted.evidence", "Trusted.stock_policy"];
   const certificate = await authority.issue(
     "axioms",
-    ["Transfer.assumed_safe"],
+    ["Inventory.assumed_safe"],
     axioms,
   );
   expect(
@@ -193,27 +194,32 @@ test("cached verification enforces new axiom policies and detects statement tamp
     (await httpv.verify(certificate, { allowedAxioms: axioms })).status,
   ).toBe("verified");
   expect(authority.calls).toBe(calls);
-  expect((await httpv.verify(certificate, { allowedAxioms: [] })).reason).toBe(
-    "forbidden-axiom",
-  );
   expect(
-    (await httpv.verify({ ...certificate, axioms: [] }, { allowedAxioms: [] }))
+    (await httpv.verify(certificate, { allowedAxioms: inventoryAxioms }))
       .reason,
+  ).toBe("forbidden-axiom");
+  expect(
+    (
+      await httpv.verify(
+        { ...certificate, axioms: [] },
+        { allowedAxioms: inventoryAxioms },
+      )
+    ).reason,
   ).toBe("invalid-certificate");
   expect(
     (await createHTTPV().verify(certificate, { allowedAxioms: axioms })).reason,
   ).toBe("verifier-unavailable");
   const model = readModel(v1.specs);
-  delete model.declarations["Transfer.POST_transfer"];
+  delete model.declarations["Inventory.POST_reservations"];
   const unresolved = {
     ...v1,
     specs: { ...v1.specs, declarations: encodeBase64(canonical(model)) },
   };
-  expect((await httpv.verify(unresolved, { allowedAxioms: [] })).reason).toBe(
-    "invalid-certificate",
-  );
+  expect(
+    (await httpv.verify(unresolved, { allowedAxioms: inventoryAxioms })).reason,
+  ).toBe("invalid-certificate");
   const malformed = readModel(v1.specs);
-  Object.assign(malformed.declarations["Transfer.transfer_safe"]!.thm!, {
+  Object.assign(malformed.declarations["Inventory.reservation_safe"]!.thm!, {
     junk: true,
   });
   expect(
@@ -226,7 +232,7 @@ test("cached verification enforces new axiom policies and detects statement tamp
             declarations: encodeBase64(canonical(malformed)),
           },
         },
-        { allowedAxioms: [] },
+        { allowedAxioms: inventoryAxioms },
       )
     ).reason,
   ).toBe("invalid-certificate");
@@ -236,9 +242,9 @@ test("a client snapshots its verifier trust profile", async () => {
   let rejectedCalls = 0;
   const options = { backend: authority.backend };
   const httpv = createHTTPV(options);
-  expect((await httpv.verify(v1, { allowedAxioms: [] })).status).toBe(
-    "verified",
-  );
+  expect(
+    (await httpv.verify(v1, { allowedAxioms: inventoryAxioms })).status,
+  ).toBe("verified");
   options.backend = {
     identity: "test:replacement",
     async verify() {
@@ -246,12 +252,13 @@ test("a client snapshots its verifier trust profile", async () => {
       return false;
     },
   };
-  expect((await httpv.verify(v1, { allowedAxioms: [] })).status).toBe(
-    "verified",
-  );
+  expect(
+    (await httpv.verify(v1, { allowedAxioms: inventoryAxioms })).status,
+  ).toBe("verified");
   expect(rejectedCalls).toBe(0);
   expect(
-    (await createHTTPV(options).verify(v1, { allowedAxioms: [] })).reason,
+    (await createHTTPV(options).verify(v1, { allowedAxioms: inventoryAxioms }))
+      .reason,
   ).toBe("invalid-certificate");
   expect(rejectedCalls).toBe(1);
 });
@@ -265,6 +272,7 @@ test("watch refreshes advertisements, emits transitions, contains callback failu
     url,
     ...local,
     requirements: { format: "httpv/requirements/1", specs: v1.specs },
+    allowedAxioms: inventoryAxioms,
     mode: "exact",
     interval: 60_000,
     onChange(result) {
@@ -307,6 +315,7 @@ test("a change callback can request and await a follow-up refresh", async () => 
     url,
     ...local,
     requirements: { format: "httpv/requirements/1", specs: v1.specs },
+    allowedAxioms: inventoryAxioms,
     mode: "exact",
     interval: 60_000,
     async onChange() {
@@ -350,9 +359,10 @@ test("periodic polling reports an unavailable dependency and honors external can
       reject(new Error("watch did not poll"));
     }, 2000);
     monitor = client.watch({
-      url: "https://example.test/transfer",
+      url: "https://example.test/reservations",
       method: "POST",
       requirements: { format: "httpv/requirements/1", specs: v1.specs },
+      allowedAxioms: inventoryAxioms,
       interval: 10,
       signal: controller.signal,
       onChange(result) {
@@ -381,7 +391,7 @@ test("discovery rejects redirects, malformed media, oversized and malformed cert
     },
   });
   await expect(
-    client.query("https://example.test/transfer", { method: "POST" }),
+    client.query("https://example.test/reservations", { method: "POST" }),
   ).rejects.toMatchObject({ reason: "invalid-certificate" });
   await new Promise((resolve) => setTimeout(resolve, 0));
   expect(captured[0]).toMatchObject({
@@ -394,7 +404,7 @@ test("discovery rejects redirects, malformed media, oversized and malformed cert
     fetch: async () => Response.json({ certificates: { POST: v1 } }),
   });
   await expect(
-    bad.query("https://example.test/transfer", { method: "POST" }),
+    bad.query("https://example.test/reservations", { method: "POST" }),
   ).rejects.toMatchObject({ reason: "missing-certificate" });
 });
 
@@ -404,7 +414,7 @@ test("caller mutation during verification cannot substitute a different public m
   const result = httpv.checkCompatibility({
     certificate: supplied,
     requirements: { format: "httpv/requirements/1", specs: v1.specs },
-    allowedAxioms: [],
+    allowedAxioms: inventoryAxioms,
     mode: "exact",
   });
   supplied.specs = structuredClone(v1.specs);
@@ -414,10 +424,10 @@ test("caller mutation during verification cannot substitute a different public m
 test("identical proposition syntax cannot hide a redefined operation", async () => {
   const redefined = await authority.issue("changed-definition");
   const originalType = readModel(v1.specs).declarations[
-    "Transfer.transfer_safe"
+    "Inventory.reservation_safe"
   ]!.thm!.type;
   expect(
-    readModel(redefined.specs).declarations["Transfer.transfer_safe"]!.thm!
+    readModel(redefined.specs).declarations["Inventory.reservation_safe"]!.thm!
       .type,
   ).toBe(originalType);
   const httpv = createHTTPV({ backend: authority.backend });
@@ -425,7 +435,7 @@ test("identical proposition syntax cannot hide a redefined operation", async () 
     await httpv.checkCompatibility({
       certificate: redefined,
       requirements: { format: "httpv/requirements/1", specs: v1.specs },
-      allowedAxioms: [],
+      allowedAxioms: inventoryAxioms,
       mode: "exact",
     }),
   ).toMatchObject({ status: "incompatible" });
@@ -434,7 +444,7 @@ test("identical proposition syntax cannot hide a redefined operation", async () 
       certificate: redefined,
       requirements: await requirements(),
       derivation: bridge,
-      allowedAxioms: [],
+      allowedAxioms: inventoryAxioms,
     }),
   ).toMatchObject({ status: "unknown", reason: "invalid-derivation" });
 });
@@ -450,11 +460,11 @@ test("file advertisements refresh in place and stale Lean requirement sidecars f
     hostname: "127.0.0.1",
     port: 0,
     ...httpv.serve({
-      routes: { "POST /transfer": path, "inspect /transfer": path },
+      routes: { "POST /reservations": path, "inspect /reservations": path },
       fetch: () => new Response("ordinary"),
     }),
   });
-  const target = `http://127.0.0.1:${fileServer.port}/transfer`;
+  const target = `http://127.0.0.1:${fileServer.port}/reservations`;
   try {
     expect(await httpv.query(target, local)).toEqual(v1);
     expect(await httpv.query(target, { ...local, method: "inspect" })).toEqual(
@@ -488,7 +498,7 @@ test("file advertisements refresh in place and stale Lean requirement sidecars f
         await httpv.checkCompatibility({
           certificate: v1,
           requirements: leanPath,
-          allowedAxioms: [],
+          allowedAxioms: inventoryAxioms,
         })
       ).status,
     ).toBe("verified");
@@ -498,7 +508,7 @@ test("file advertisements refresh in place and stale Lean requirement sidecars f
         await httpv.checkCompatibility({
           certificate: v1,
           requirements: leanPath,
-          allowedAxioms: [],
+          allowedAxioms: inventoryAxioms,
         })
       ).reason,
     ).toBe("requirements-unavailable");

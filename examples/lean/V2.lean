@@ -1,8 +1,11 @@
 import V1
 
-namespace Transfer
+namespace Inventory
 
-/-- An upgrade advertises an additional guarantee while preserving the old one. -/
-theorem authorized_succeeds : POST_transfer true = true := rfl
+/-- The upgrade also guarantees that every valid reservation succeeds. -/
+theorem valid_request_succeeds (available requested : Nat)
+    (positive : 0 < requested) (fits : requested ≤ available) :
+    POST_reservations available requested = some (available - requested) :=
+  ite_eq_left ⟨positive, fits⟩
 
-end Transfer
+end Inventory

@@ -13,33 +13,32 @@ beforeAll(buildNative, 300_000);
 
 test("Nanoda checks a Lean export and produces a canonical proof-free closed model", async () => {
   const value = await checked("v1");
-  expect(value.axioms).toEqual([]);
+  expect(value.axioms).toEqual(["propext"]);
   const text = Buffer.from(decodeBase64(value.specs.declarations)).toString();
   expect(canonical(JSON.parse(text))).toBe(text);
   const model = readModel(value.specs);
   expect(model.format).toBe("lean4/kernel/2");
-  expect(model.declarations["Transfer.transfer_safe"]!.thm).not.toHaveProperty(
-    "value",
-  );
-  expect(model.declarations["Transfer.POST_transfer"]).toBeDefined();
-  expect(model.declarations).toHaveProperty("Bool");
+  expect(
+    model.declarations["Inventory.reservation_safe"]!.thm,
+  ).not.toHaveProperty("value");
+  expect(model.declarations["Inventory.POST_reservations"]).toBeDefined();
+  expect(model.declarations).toHaveProperty("Nat");
   const originalNodes = (await input("v1")).export
     .split("\n")
     .filter((line) => /"i[nel]":/.test(line)).length;
   expect(Object.keys(model.nodes).length).toBeLessThan(originalNodes);
-  expect(
-    Object.values(model.declarations).filter((entry) => "inductive" in entry),
-  ).toHaveLength(2);
-  expect(
-    Object.values(model.declarations).filter(
-      (entry) => "inductiveMember" in entry,
-    ),
-  ).toHaveLength(5);
+  expect(model.declarations["Option"]!.inductive).toBeDefined();
+  expect(model.declarations["Option.some"]).toEqual({
+    inductiveMember: { group: "Option" },
+  });
+  expect(model.declarations["Option.rec"]).toEqual({
+    inductiveMember: { group: "Option" },
+  });
 });
 
 test("invalid proof terms, missing claims, and axiom claims are rejected", async () => {
-  const request = await input("v1");
-  request.export = request.export.replace('"value":73', '"value":0');
+  const request = await input("identity", ["Demo.identity"]);
+  request.export = request.export.replace('"value":6', '"value":0');
   await expect(runNative(binary, "check", request)).rejects.toThrow();
   await expect(
     runNative(binary, "check", {
@@ -70,7 +69,7 @@ test("invalid proof terms, missing claims, and axiom claims are rejected", async
       await input(
         "axioms",
         ["Trusted.evidence"],
-        ["Trusted.authorization", "Trusted.evidence"],
+        ["Trusted.evidence", "Trusted.stock_policy"],
       ),
     ),
   ).rejects.toThrow();
@@ -87,8 +86,8 @@ test("computational definitions retain embedded evidence without standalone theo
 });
 
 test("reports the exact used axioms, including their public declarations", async () => {
-  const claims = ["Transfer.assumed_safe"];
-  const allowed = ["Trusted.authorization", "Trusted.evidence"];
+  const claims = ["Inventory.assumed_safe"];
+  const allowed = ["Trusted.evidence", "Trusted.stock_policy"];
   await expect(
     runNative(binary, "check", await input("axioms", claims)),
   ).rejects.toThrow();
@@ -131,7 +130,7 @@ test("native and TypeScript use identical authenticated statement bytes", async 
   );
   // Pinned cross-language vector also guards accidental encoding changes.
   expect(statementCommitment({ ...value, proof: "base64:AA==" })).toBe(
-    "e1839229e34aaa3ece4238a52480a10d8772fe8d581fae784b4bb29497ccdf8b",
+    "b0c3e5826e5ca0f8f3b51da955b86bb9b1a132c59f569372119e508623366ed5",
   );
 });
 

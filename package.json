@@ -5,7 +5,8 @@
   "description": "Verified Lean contracts over HTTP for Bun",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./zklean": "./src/zklean.ts"
   },
   "bin": {
     "zklean": "./src/cli.ts"

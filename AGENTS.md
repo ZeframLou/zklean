@@ -10,4 +10,5 @@
 - Write for developers new to formal verification and cryptographic proofs. Explain those concepts separately before using them as shared vocabulary.
 - Describe security through the client–server trust boundary: what clients verify and what server behavior they must still trust. Keep the README's security section to one paragraph of at most three sentences.
 - Document the intended release installation with one curl command; keep CI artifact handling in contributor documentation.
+- Keep ZKLean's proving and local verification independent of HTTPV. HTTPV consumes certificates through a configured verifier and does not invoke a prover or the ZKLean CLI.
 - Apply [GOV.UK's clear language guidance](https://guidance.publishing.service.gov.uk/writing-to-gov-uk-standards/writing-guidelines/clear-language/), its [structure guidance](https://guidance.publishing.service.gov.uk/writing-to-gov-uk-standards/writing-guidelines/clear-structure/), and [Google's audience guidance](https://developers.google.com/tech-writing/one/audience): explain terms on first use, put useful information first, and remove repetition.

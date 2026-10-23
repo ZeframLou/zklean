@@ -1,8 +1,11 @@
 import { generateKeyPairSync, sign, verify } from "node:crypto";
 import { resolve } from "node:path";
 import { canonical, encodeBase64, statement } from "../src/encoding.ts";
+import { inventoryAxioms } from "../examples/inventory.ts";
 import { runNative } from "../src/native.ts";
 import type { Certificate, ProofBackend, Requirements } from "../src/types.ts";
+
+export { inventoryAxioms };
 
 export const root = resolve(import.meta.dir, "..");
 export const binary = resolve(root, "target/release/zklean-native");
@@ -18,8 +21,8 @@ export function buildNative(): Promise<void> {
 }
 export async function input(
   module: string,
-  claims = ["Transfer.transfer_safe"],
-  allowedAxioms: string[] = [],
+  claims = ["Inventory.reservation_safe"],
+  allowedAxioms: string[] = inventoryAxioms,
 ) {
   return {
     export: await Bun.file(
@@ -85,6 +88,6 @@ export async function requirements(): Promise<Requirements> {
   return (await runNative(
     binary,
     "requirements",
-    await input("requirements", ["Client.requires_auth"]),
+    await input("requirements", ["Client.stock_conserved"]),
   )) as Requirements;
 }

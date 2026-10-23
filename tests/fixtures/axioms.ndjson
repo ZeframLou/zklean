@@ -1,12 +1,12 @@
 {"meta":{"exporter":{"name":"lean4export","version":"3.1.0"},"format":{"version":"3.1.0"},"lean":{"githash":"c9afcddf514a6772bd4d649f7cfc04eff0b9f15e","version":"4.36.0-rc1"}}}
 {"in":1,"str":{"pre":0,"str":"Trusted"}}
-{"in":2,"str":{"pre":1,"str":"authorization"}}
+{"in":2,"str":{"pre":1,"str":"stock_policy"}}
 {"ie":0,"sort":0}
 {"axiom":{"isUnsafe":false,"levelParams":[],"name":2,"type":0}}
 {"in":3,"str":{"pre":1,"str":"evidence"}}
 {"const":{"name":2,"us":[]},"ie":1}
 {"axiom":{"isUnsafe":false,"levelParams":[],"name":3,"type":1}}
-{"in":4,"str":{"pre":0,"str":"Transfer"}}
+{"in":4,"str":{"pre":0,"str":"Inventory"}}
 {"in":5,"str":{"pre":4,"str":"assumed_safe"}}
 {"const":{"name":3,"us":[]},"ie":2}
 {"thm":{"all":[5],"levelParams":[],"name":5,"type":1,"value":2}}

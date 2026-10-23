@@ -1,12 +1,18 @@
-import Init
+import Inventory
 
-namespace Transfer
+namespace Inventory
 
-/-- Formal operation for POST /transfer: true means an authorized request. -/
-def POST_transfer (authorized : Bool) : Bool := authorized
+/-- A successful reservation is positive, fits in stock, and conserves units. -/
+theorem reservation_safe (available requested remaining : Nat) :
+    POST_reservations available requested = some remaining →
+      0 < requested ∧ requested ≤ available ∧ remaining + requested = available := by
+  intro h
+  unfold POST_reservations at h
+  split at h
+  next valid =>
+    have same := Option.some.inj h
+    subst remaining
+    exact ⟨valid.1, valid.2, Nat.sub_add_cancel valid.2⟩
+  next => contradiction
 
-/-- A successful transfer requires authorization. -/
-theorem transfer_safe (authorized : Bool) :
-    POST_transfer authorized = true → authorized = true := fun h => h
-
-end Transfer
+end Inventory

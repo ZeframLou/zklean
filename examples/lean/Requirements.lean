@@ -1,11 +1,6 @@
-import Init
+import Inventory
 
-namespace Transfer
-
-def POST_transfer (authorized : Bool) : Bool := authorized
-
-end Transfer
-
-/-- The client's assumption, deliberately named independently of the provider. -/
-axiom Client.requires_auth (authorized : Bool) :
-    Transfer.POST_transfer authorized = true → authorized = true
+/-- A checkout client requires accepted quantities to be fully backed by stock. -/
+axiom Client.stock_conserved (available requested remaining : Nat) :
+    Inventory.POST_reservations available requested = some remaining →
+      0 < requested ∧ requested ≤ available ∧ remaining + requested = available

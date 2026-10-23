@@ -1,7 +1,7 @@
 import { beforeAll, expect, test } from "bun:test";
 import { resolve } from "node:path";
 import { createHTTPV } from "../src/client.ts";
-import { nativeBackend } from "../src/native.ts";
+import { createVerifier, nativeBackend } from "httpv/zklean";
 import { sha256, statementCommitment } from "../src/encoding.ts";
 import { binary, buildNative } from "./helpers.ts";
 import type { Certificate } from "../src/types.ts";
@@ -20,7 +20,14 @@ test("the unmodified SP1 SDK verifies a locally generated compressed STARK certi
     verifierKey: trusted.verifierKey,
     verificationKey: trusted.verificationKey,
   };
+  const verifier = createVerifier({ backend: nativeBackend(config) });
   const httpv = createHTTPV({ backend: nativeBackend(config) });
+  expect(
+    await verifier.verify(certificate, { allowedAxioms: [] }),
+  ).toMatchObject({
+    status: "verified",
+    reason: "valid",
+  });
   // This fixture exercises a full public-value digest with nonzero high bits.
   const digest = sha256(Buffer.from(statementCommitment(certificate), "hex"));
   expect(parseInt(digest.slice(0, 2), 16) & 0xe0).not.toBe(0);

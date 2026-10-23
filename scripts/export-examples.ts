@@ -1,38 +1,49 @@
 /** Regenerate committed Lean export fixtures from the pinned source exporter. */
 import { resolve } from "node:path";
 import { main } from "../src/cli.ts";
+import { inventoryAxioms } from "../examples/inventory.ts";
 
 export const examples = [
-  { module: "V1", file: "v1", claims: ["Transfer.transfer_safe"], axioms: [] },
+  {
+    module: "V1",
+    file: "v1",
+    claims: ["Inventory.reservation_safe"],
+    axioms: inventoryAxioms,
+  },
   {
     module: "V2",
     file: "v2",
-    claims: ["Transfer.transfer_safe", "Transfer.authorized_succeeds"],
+    claims: ["Inventory.reservation_safe", "Inventory.valid_request_succeeds"],
+    axioms: inventoryAxioms,
+  },
+  {
+    module: "V3",
+    file: "v3",
+    claims: ["Inventory.reservation_safe"],
     axioms: [],
   },
-  { module: "V3", file: "v3", claims: ["Transfer.transfer_safe"], axioms: [] },
   {
     module: "Requirements",
     file: "requirements",
-    claims: ["Client.requires_auth"],
+    claims: ["Client.stock_conserved"],
     axioms: [],
   },
   {
     module: "Bridge",
     file: "bridge",
-    claims: ["Client.requires_auth"],
-    axioms: ["Transfer.transfer_safe"],
+    claims: ["Client.stock_conserved"],
+    axioms: ["Inventory.reservation_safe"],
   },
   {
     module: "Axioms",
     file: "axioms",
-    claims: ["Transfer.assumed_safe"],
-    axioms: ["Trusted.authorization", "Trusted.evidence"],
+    claims: ["Inventory.assumed_safe"],
+    axioms: ["Trusted.evidence", "Trusted.stock_policy"],
   },
   {
     module: "ChangedDefinition",
     file: "changed-definition",
-    claims: ["Transfer.transfer_safe"],
+    claims: ["Inventory.reservation_safe"],
     axioms: [],
   },
   {

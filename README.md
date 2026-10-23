@@ -1,33 +1,40 @@
-# ZKLean & HTTPV
+# ZKLean and HTTPV
 
-An API update can break the assumptions your application relies on. For example,
-a payment client may depend on a transfer API rejecting unauthorized requests.
-An update that allows those requests invalidates that assumption.
+**ZKLean** is a command-line tool for checking Lean mathematical specifications
+and making the results inexpensive for others to verify.
 
-ZKLean and HTTPV let clients verify an API's advertised guarantees and check
-whether updates still meet their requirements.
+**HTTPV** is a separate HTTP protocol and TypeScript library for discovering
+API specifications and checking whether they meet a client's requirements.
+ZKLean works without an HTTP server; HTTPV uses certificates generated separately.
 
-## Check specifications cheaply
+## Why this matters
 
-1. **Prove the specification in Lean.** Use Lean to describe the API's behavior
-   mathematically and prove properties of that model under stated assumptions
-   (axioms). This mathematical argument is the formal verification proof.
-2. **Make verification succinct with SP1.** ZKLean checks the Lean argument and
-   uses SP1 to produce a small cryptographic proof that the check succeeded.
-   Clients verify this proof without downloading and rechecking the original
-   Lean argument.
-3. **Check API compatibility with HTTPV.** Servers publish their specifications
-   and cryptographic proofs over HTTPS. Clients verify them, check whether the
-   specifications imply their requirements, and periodically recheck for changes.
+A checkout service needs inventory reservations to be backed by available stock.
+If its supplier starts accepting backorders, that assumption no longer holds.
+Clients need to check whether an API's advertised guarantees still meet their
+requirements after an update.
 
-Compatibility requires matching formal definitions and either an exact match
-or a separately verified Lean argument establishing the implication.
+## How ZKLean works
+
+Lean expresses the inventory rules mathematically. A formal verification proof
+establishes that the modeled reservation operation obeys those rules.
+
+ZKLean checks that mathematical argument and uses SP1 to produce a small
+cryptographic proof that the check succeeded. Recipients verify this evidence
+without downloading and rechecking the original Lean argument.
+
+## How HTTPV works
+
+HTTPV can discover these certificates over HTTPS and periodically check whether
+the advertised guarantees still satisfy a client's requirements. Compatibility
+needs an exact match under the same definitions or a separately verified Lean
+argument establishing the implication.
 
 ## What clients still trust
 
-Clients verify the mathematical claims themselves, but must trust the server to deploy matching code and honor the specification in every response. HTTPV cannot detect a server violating that specification or changing behavior without updating its advertisement. Each client chooses which axioms to trust and what to do when compatibility cannot be verified.
+Clients verify the mathematical claims themselves, but must trust the server to deploy matching code and honor the specification in every response. HTTPV cannot detect a server violating that specification or changing behavior without updating its advertisement. Each client chooses which axioms (assumptions) to trust and what to do when compatibility cannot be verified.
 
-## Install
+## Install ZKLean
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/ZeframLou/zklean/main/install.sh | sh
@@ -35,29 +42,31 @@ curl -fsSL https://raw.githubusercontent.com/ZeframLou/zklean/main/install.sh | 
 
 The installer sets up ZKLean and its dependencies on Linux x86-64.
 
-## Try it
+## Certify an inventory reservation
 
-The [transfer example](examples/lean/V1.lean) models an API that rejects
-unauthorized transfers and proves that property. Generate a certificate
-containing its specification, axioms, and SP1 proof, then verify it:
+The [inventory example](examples/lean/Inventory.lean) models a reservation for
+one product. Successful reservations must have a positive quantity, fit within
+available stock, and leave `remaining + reserved = original stock`.
+
+Generate a certificate for that guarantee, then verify it locally:
 
 ```sh
 git clone https://github.com/ZeframLou/zklean.git
 cd zklean
 
 zklean prove --project examples/lean --module V1 \
-  --claims Transfer.transfer_safe --out transfer.certificate.json
+  --claims Inventory.reservation_safe --axioms propext --out reservation.json
 
-zklean verify --certificate transfer.certificate.json
+zklean verify --certificate reservation.json --axioms propext
 ```
 
+The example permits `propext`, an axiom used by Lean's arithmetic library.
 Successful verification returns `"status": "verified"`. Generating the SP1 proof
-runs locally and can take minutes and several gigabytes of RAM; clients can reuse
-the resulting certificate.
+runs locally and can take minutes and several gigabytes of RAM; recipients can
+reuse the resulting certificate.
 
-For your own project, change the directory, module, and theorem names. No axioms
-are permitted by default; pass `--axioms A,B` to `prove` and `verify` to allow them.
+For your own project, change the directory, module, and theorem names. Only the
+axioms explicitly allowed with `--axioms` are accepted.
 
-See the [HTTPV client and server example](examples/upgrades.ts),
-[protocol specification](SPEC.md), [proof formats](docs/ENCODING.md), and
-[source build instructions](docs/DEVELOPMENT.md).
+See [HTTPV integration](docs/HTTPV.md), the [protocol specification](SPEC.md),
+[proof formats](docs/ENCODING.md), and [source build instructions](docs/DEVELOPMENT.md).

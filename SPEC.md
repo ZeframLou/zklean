@@ -12,6 +12,9 @@ This document specifies two complementary protocols:
 
 Together, they enable **compositional formal verification across independently maintained software components**, even when remote dependencies change over time.
 
+ZKLean is independently usable for any Lean specification, without HTTPV or an HTTP server.
+HTTPV consumes certificates generated separately and uses a client-configured verifier; discovery and compatibility checking do not invoke the ZKLean CLI or a prover.
+
 ## 1. Motivation
 
 Formal verification traditionally assumes that a program's dependencies have known, stable behavior. This assumption breaks down in distributed systems.
@@ -101,7 +104,7 @@ One succinct certificate covers the entire specification set.
   "format": "zklean/1",
   "specs": {
     "declarations": "base64:...",
-    "claims": ["Transfer.transfer_safe"]
+    "claims": ["Inventory.reservation_safe"]
   },
   "axioms": ["propext", "Quot.sound"],
   "proof": "base64:..."
@@ -163,7 +166,7 @@ HTTPV uses the existing HTTP `OPTIONS` method and requires no changes to ordinar
 A client requests endpoint certificates using:
 
 ```http
-OPTIONS /transfer HTTP/1.1
+OPTIONS /reservations HTTP/1.1
 Host: example.com
 Accept: application/httpv+json
 Cache-Control: no-cache
@@ -182,7 +185,7 @@ Cache-Control: no-store
       "format": "zklean/1",
       "specs": {
         "declarations": "base64:...",
-        "claims": ["Transfer.transfer_safe"]
+        "claims": ["Inventory.reservation_safe"]
       },
       "axioms": ["propext", "Quot.sound"],
       "proof": "base64:..."
@@ -315,7 +318,7 @@ The project MUST provide a TypeScript library targeting Bun, with client and ser
 import { HTTPV } from "httpv";
 
 const certificate = await HTTPV.query(
-  "https://example.com/transfer",
+  "https://example.com/reservations",
   { method: "POST" }
 );
 
@@ -340,7 +343,7 @@ The compatibility API MUST validate both the remote certificate and a formal der
 
 ```typescript
 const monitor = HTTPV.watch({
-  url: "https://example.com/transfer",
+  url: "https://example.com/reservations",
   method: "POST",
   requirements: "./specs/remote.lean",
   interval: 60_000,
@@ -364,7 +367,7 @@ import { HTTPV } from "httpv";
 
 const app = HTTPV.serve({
   routes: {
-    "POST /transfer": "./certs/transfer.json"
+    "POST /reservations": "./certs/reservations.json"
   },
   fetch: existingHandler
 });

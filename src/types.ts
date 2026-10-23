@@ -95,9 +95,11 @@ export interface ServeOptions {
   >;
   fetch: Handler;
 }
-export interface ClientOptions {
+export interface VerifierOptions {
   backend?: ProofBackend;
-  fetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
   cacheSize?: number;
+}
+export interface ClientOptions extends VerifierOptions {
+  fetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
   maxResponseBytes?: number;
 }

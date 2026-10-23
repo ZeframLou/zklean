@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 import { version } from "../package.json";
 import { nativeBackend, runNative } from "./native.ts";
 import { parseCertificate } from "./encoding.ts";
-import { createHTTPV } from "./client.ts";
+import { createVerifier } from "./verifier.ts";
 import { createSourceManifest } from "./compatibility.ts";
 import { exportModule, findTools, nativeOptions } from "./tooling.ts";
 import type { ProveInput } from "./native.ts";
@@ -168,7 +168,7 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
     const certificate = parseCertificate(
       await Bun.file(required("certificate")).json(),
     );
-    result = await createHTTPV({
+    result = await createVerifier({
       backend: nativeBackend(await nativeOptions(tools, false)),
     }).verify(certificate, { allowedAxioms: list(optional("axioms")) });
     if ((result as { status: string }).status !== "verified")

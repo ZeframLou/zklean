@@ -2,11 +2,11 @@ import {
   Cache,
   MAX_CERTIFICATE_BYTES,
   canonical,
-  certificateId,
   modelId,
   object,
   parseCertificate,
 } from "./encoding.ts";
+import { createVerifier } from "./verifier.ts";
 import { exactMatch, loadRequirements, validBridge } from "./compatibility.ts";
 import { discoveryHandler, MEDIA_TYPE, methodName } from "./server.ts";
 import type {
@@ -17,7 +17,6 @@ import type {
   QueryOptions,
   ServeOptions,
   VerificationResult,
-  VerifyOptions,
   WatchOptions,
 } from "./types.ts";
 
@@ -36,8 +35,7 @@ export class DiscoveryError extends Error {
 /** Instances scope all trust configuration and caches to one application. */
 export function createHTTPV(options: ClientOptions = {}) {
   const transport = options.fetch ?? globalThis.fetch;
-  const backend = options.backend;
-  const verified = new Cache<boolean>(options.cacheSize ?? 128);
+  const { verify } = createVerifier(options);
   const compatible = new Cache<boolean>(options.cacheSize ?? 128);
   const maxBytes = options.maxResponseBytes ?? MAX_CERTIFICATE_BYTES;
   if (!Number.isSafeInteger(maxBytes) || maxBytes < 1)
@@ -163,55 +161,6 @@ export function createHTTPV(options: ClientOptions = {}) {
     } catch (error) {
       if (error instanceof DiscoveryError) throw error;
       throw new DiscoveryError("unavailable", String(error));
-    }
-  }
-
-  async function verify(
-    value: unknown,
-    policy: VerifyOptions,
-  ): Promise<VerificationResult> {
-    let certificate: Certificate;
-    try {
-      certificate = parseCertificate(value);
-    } catch (error) {
-      return {
-        status: "unknown",
-        reason: "invalid-certificate",
-        detail: String(error),
-      };
-    }
-    const identity = {
-      certificateId: certificateId(certificate),
-      modelId: modelId(certificate.specs),
-    };
-    // Always apply the caller's current policy, including on a cache hit.
-    if (
-      !Array.isArray(policy.allowedAxioms) ||
-      certificate.axioms.some((a) => !policy.allowedAxioms.includes(a))
-    ) {
-      return { ...identity, status: "unknown", reason: "forbidden-axiom" };
-    }
-    if (!backend)
-      return { ...identity, status: "unknown", reason: "verifier-unavailable" };
-    try {
-      const cacheKey = `${backend.identity}\0${identity.certificateId}`;
-      if (!verified.get(cacheKey)) {
-        if (!(await backend.verify(certificate)))
-          return {
-            ...identity,
-            status: "unknown",
-            reason: "invalid-certificate",
-          };
-        verified.set(cacheKey, true);
-      }
-      return { ...identity, status: "verified", reason: "valid" };
-    } catch (error) {
-      return {
-        ...identity,
-        status: "unknown",
-        reason: "verifier-unavailable",
-        detail: String(error),
-      };
     }
   }
 

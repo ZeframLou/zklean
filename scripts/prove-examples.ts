@@ -24,7 +24,7 @@ for (const example of examples.filter((e) =>
 }
 const requirements = await runNative(config.binary, "requirements", {
   export: await Bun.file("tests/fixtures/requirements.ndjson").text(),
-  claims: ["Client.requires_auth"],
+  claims: ["Client.stock_conserved"],
   allowedAxioms: [],
 });
 await Bun.write(

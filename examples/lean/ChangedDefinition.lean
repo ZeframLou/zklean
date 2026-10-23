@@ -1,14 +1,15 @@
 import Init
 
-namespace Transfer
+namespace Inventory
 
-/-- A different operation with the same signature: reject every transfer. -/
-def POST_transfer (authorized : Bool) : Bool := false
+/-- A service that rejects all requests has a different operation definition. -/
+def POST_reservations (_available _requested : Nat) : Option Nat := none
 
-/-- The type has the same syntax as V1, but POST_transfer has a different body. -/
-theorem transfer_safe (authorized : Bool) :
-    POST_transfer authorized = true → authorized = true := by
+/-- The same proposition syntax as V1, but interpreted under different behavior. -/
+theorem reservation_safe (available requested remaining : Nat) :
+    POST_reservations available requested = some remaining →
+      0 < requested ∧ requested ≤ available ∧ remaining + requested = available := by
   intro h
-  exact Bool.noConfusion h
+  cases h
 
-end Transfer
+end Inventory
