@@ -79,5 +79,37 @@ theorem Client.stock_conserved (available requested remaining : Nat) :
       await rm(directory, { recursive: true, force: true });
     }
   },
+  300_000,
+);
+
+test.skipIf(!process.env.ZKLEAN_LAKE)(
+  "import rejects a pre-existing declaration with a different proposition",
+  async () => {
+    const statement = await checked("identity", ["Demo.identity"]);
+    const directory = await mkdtemp(join(tmpdir(), "zklean-import-collision-"));
+    try {
+      await Bun.write(
+        join(directory, "lean-toolchain"),
+        "leanprover/lean4:v4.36.0-rc1\n",
+      );
+      await Bun.write(join(directory, "lakefile.toml"), 'name = "Collision"\n');
+      await Bun.write(
+        join(directory, "Remote.lean"),
+        leanModule({ ...statement, proof: "base64:AA==" }).replace(
+          "import Lean",
+          "import Lean\naxiom Demo.identity : False",
+        ),
+      );
+      await expect(
+        runLake(directory, process.env.ZKLEAN_LAKE!, [
+          "env",
+          "lean",
+          "Remote.lean",
+        ]),
+      ).rejects.toThrow("ZKLean import collision: Demo.identity");
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  },
   60_000,
 );

@@ -16,6 +16,26 @@ export function leanModule(certificate: Certificate, inspect = false): string {
     "-- Certified statements are assumptions here; the bridge must be certified separately.",
     "set_option maxRecDepth 10000",
     "set_option maxHeartbeats 10000000",
+    "",
+    "-- The pinned exporter erases metadata such as Lean's borrowed annotations.",
+    "private partial def zkleanKernelExpr (e : Lean.Expr) : Lean.Expr :=",
+    "  e.replace fun | .mdata _ body => some (zkleanKernelExpr body) | _ => none",
+    "private def zkleanPublicInfo (info : Lean.ConstantInfo) : Lean.ConstantInfo :=",
+    "  let type := zkleanKernelExpr info.type",
+    "  match info with",
+    "  | .axiomInfo v => .axiomInfo { v with type }",
+    "  | .thmInfo v => .axiomInfo { name := v.name, levelParams := v.levelParams, type, isUnsafe := false }",
+    "  | .defnInfo v => .defnInfo { v with type, value := zkleanKernelExpr v.value, all := [v.name] }",
+    "  | .opaqueInfo v => .opaqueInfo { v with type, value := zkleanKernelExpr v.value, all := [v.name] }",
+    "  | .inductInfo v => .inductInfo { v with type, isReflexive := false }",
+    "  | .ctorInfo v => .ctorInfo { v with type }",
+    "  | .recInfo v => .recInfo { v with type, rules := v.rules.map fun r => { r with rhs := zkleanKernelExpr r.rhs } }",
+    "  | .quotInfo v => .quotInfo { v with type }",
+    "private def zkleanRequire (expected : Lean.ConstantInfo) : Lean.Elab.TermElabM Unit := do",
+    '  let some actual := (← Lean.getEnv).find? expected.name | Lean.throwError "missing imported declaration"',
+    "  unless zkleanPublicInfo actual == expected do",
+    '    Lean.throwError m!"ZKLean import collision: {expected.name}"',
+    "",
     "open Lean Elab in",
     "run_elab do",
     ...(inspect ? ["  let originalEnv ← getEnv"] : []),
@@ -205,6 +225,68 @@ export function leanModule(certificate: Certificate, inspect = false): string {
     active.delete(name);
   };
   certificate.specs.claims.forEach(emit);
+  // Lean already contains core declarations. Reusing a name is safe only when
+  // its complete public kernel content agrees with the authenticated model.
+  // Check new declarations too: the kernel may generate recursors and members.
+  for (const declaration of Object.values(model.declarations)) {
+    if (declaration.inductiveMember) continue;
+    const entries: [string, Record<string, unknown>][] = declaration.inductive
+      ? ["types", "ctors", "recs"].flatMap((kind) =>
+          (declaration.inductive![kind] as Record<string, unknown>[]).map(
+            (data) => [kind, data] as [string, Record<string, unknown>],
+          ),
+        )
+      : Object.entries(declaration);
+    for (const [kind, data] of entries) {
+      const tags: Record<string, string> = {
+        thm: "axiomInfo",
+        axiom: "axiomInfo",
+        def: "defnInfo",
+        opaque: "opaqueInfo",
+        quot: "quotInfo",
+        types: "inductInfo",
+        ctors: "ctorInfo",
+        recs: "recInfo",
+      };
+      const fields = Object.entries(data)
+        .filter(([key]) => !["name", "levelParams", "type"].includes(key))
+        .map(([key, value]) => {
+          let expected: string;
+          if (["value", "induct"].includes(key)) expected = ref(value);
+          else if (["all", "ctors"].includes(key)) expected = list(value);
+          else if (key === "rules")
+            expected = `[${(value as Record<string, unknown>[])
+              .map(
+                (rule) =>
+                  `{ ctor := ${ref(rule.ctor)}, nfields := ${rule.nfields}, rhs := ${ref(rule.rhs)} }`,
+              )
+              .join(", ")}]`;
+          else if (key === "hints")
+            expected =
+              typeof value === "string"
+                ? `.${value}`
+                : `.regular ${(value as { regular: number }).regular}`;
+          else if (key === "safety") expected = `.${value}`;
+          else expected = String(value);
+          return `${key} := ${expected}`;
+        });
+      if (kind === "thm") fields.push("isUnsafe := false");
+      if (kind === "types") fields.push("isReflexive := false");
+      if (kind === "quot") {
+        const display = kernelName(model, data.name as string);
+        const tag: Record<string, string> = {
+          Quot: "type",
+          "Quot.mk": "ctor",
+          "Quot.lift": "lift",
+          "Quot.ind": "ind",
+        };
+        fields.push(`kind := .${tag[display]}`);
+      }
+      lines.push(
+        `  zkleanRequire (.${tags[kind]} { ${header(data)}${fields.length ? `, ${fields.join(", ")}` : ""} })`,
+      );
+    }
+  }
   if (inspect) {
     for (const name of Object.keys(model.declarations).sort()) {
       const decl = model.declarations[name]!;
