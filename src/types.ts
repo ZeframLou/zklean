@@ -10,13 +10,13 @@ export interface Certificate {
   proof: string;
 }
 export interface Requirements {
-  format: "httpv/requirements/1";
+  format: "zklean/requirements/1";
   specs: Specs;
   /** Required for a .lean sidecar; binds every source/build dependency. */
   sourceManifest?: SourceManifest;
 }
 export interface SourceManifest {
-  format: "httpv/source-manifest/1";
+  format: "zklean/source-manifest/1";
   /** Paths are relative to the primary Lean source. */
   files: Record<string, string>;
 }
@@ -32,20 +32,12 @@ export interface ProofBackend {
   readonly identity: string;
   verify(certificate: Certificate): Promise<boolean>;
 }
-export type Status = "verified" | "incompatible" | "unknown";
+export type Status = "verified" | "unknown";
 export type Reason =
   | "valid"
-  | "exact-match"
-  | "derivation"
-  | "requirements-not-met"
   | "invalid-certificate"
   | "forbidden-axiom"
-  | "unavailable"
-  | "missing-certificate"
-  | "verifier-unavailable"
-  | "requirements-unavailable"
-  | "missing-derivation"
-  | "invalid-derivation";
+  | "verifier-unavailable";
 export interface VerificationResult {
   status: Status;
   reason: Reason;
@@ -58,48 +50,7 @@ export interface VerificationResult {
 export interface VerifyOptions {
   allowedAxioms: readonly string[];
 }
-export interface CompatibilityOptions extends VerifyOptions {
-  certificate: unknown;
-  requirements: Requirements | string;
-  derivation?: unknown;
-  /** Exact comparison is decidable. Semantic checking requires a derivation. */
-  mode?: "exact" | "implication";
-}
-export interface QueryOptions {
-  method: string;
-  signal?: AbortSignal;
-  timeout?: number;
-  /** HTTP is accepted only when explicitly enabled for local development. */
-  allowInsecureHttp?: boolean;
-}
-export interface WatchOptions extends QueryOptions {
-  url: string;
-  requirements: Requirements | string;
-  allowedAxioms?: readonly string[];
-  interval: number;
-  derivation?: unknown;
-  mode?: "exact" | "implication";
-  onChange(result: VerificationResult): void | Promise<void>;
-  onError?(error: unknown): void | Promise<void>;
-}
-export interface Monitor {
-  stop(): void;
-  refresh(): Promise<VerificationResult>;
-  readonly current: VerificationResult | undefined;
-}
-export type Handler = (request: Request) => Response | Promise<Response>;
-export interface ServeOptions {
-  routes: Record<
-    string,
-    Certificate | string | (() => Certificate | Promise<Certificate>)
-  >;
-  fetch: Handler;
-}
 export interface VerifierOptions {
   backend?: ProofBackend;
   cacheSize?: number;
-}
-export interface ClientOptions extends VerifierOptions {
-  fetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
-  maxResponseBytes?: number;
 }

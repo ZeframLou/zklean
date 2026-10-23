@@ -1,7 +1,7 @@
-name = "HTTPVExamples"
+name = "ZKLeanExamples"
 version = "0.1.0"
-defaultTargets = ["HTTPVExamples"]
+defaultTargets = ["ZKLeanExamples"]
 
 [[lean_lib]]
-name = "HTTPVExamples"
-roots = ["Inventory", "V1", "V2", "V3", "Requirements", "Bridge", "Axioms", "ChangedDefinition", "Identity", "ProofData"]
+name = "ZKLeanExamples"
+roots = ["Inventory", "V1", "Axioms", "Identity", "ProofData"]

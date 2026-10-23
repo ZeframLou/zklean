@@ -9,6 +9,7 @@ properties of that model under stated assumptions.
 ZKLean runs its checker inside [SP1](https://github.com/succinctlabs/sp1), a system
 for generating cryptographic proofs of program execution. The resulting small
 **cryptographic proof** certifies that the checker accepted the Lean argument.
+A certificate bundles this proof with the specification and its assumptions.
 
 ## Trust model
 
@@ -48,15 +49,11 @@ reuse the resulting certificate.
 For your own project, change the directory, module, and theorem names. Only the
 axioms explicitly allowed with `--axioms` are accepted.
 
-## HTTPV: check remote API guarantees
+## Related project
 
-[HTTPV](docs/HTTPV.md) is a separate HTTP protocol and TypeScript library for
-discovering API specifications, checking compatibility with client requirements,
-and monitoring changes. It consumes certificates generated separately.
+[HTTPV](https://github.com/ZeframLou/httpv) is a separate HTTP protocol and
+TypeScript library for discovering API specifications and checking whether they
+satisfy a client's requirements.
 
-For example, a checkout client requires inventory reservations to be backed by
-stock. HTTPV lets it detect when a supplier advertises a new contract allowing
-backorders and decide whether to block requests or switch suppliers.
-
-See the [protocol specification](SPEC.md),
-[proof formats](docs/ENCODING.md), and [source build instructions](docs/DEVELOPMENT.md).
+See the [certificate specification](SPEC.md), [proof formats](docs/ENCODING.md),
+and [source build instructions](docs/DEVELOPMENT.md).

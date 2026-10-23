@@ -1,11 +1,22 @@
-export { HTTPV, createHTTPV, DiscoveryError } from "./client.ts";
-export { discoveryHandler, MEDIA_TYPE } from "./server.ts";
+/** Public API for local Lean model handling, proving, and verification. */
+export { createVerifier } from "./verifier.ts";
+export { nativeBackend, runNative } from "./native.ts";
 export {
-  canonical,
-  certificateId,
-  modelId,
-  statementCommitment,
   parseCertificate,
   readModel,
+  certificateId,
+  modelId,
 } from "./encoding.ts";
-export type * from "./types.ts";
+export type { NativeOptions, ProveInput } from "./native.ts";
+export type {
+  Certificate,
+  Specs,
+  Requirements,
+  SourceManifest,
+  PublicModel,
+  ProofBackend,
+  VerifierOptions,
+  VerifyOptions,
+  VerificationResult,
+} from "./types.ts";
+export { createSourceManifest, loadRequirements } from "./requirements.ts";

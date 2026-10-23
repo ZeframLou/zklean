@@ -4,18 +4,14 @@ The `.ndjson` files are actual lean4export 3.1.0 output from `examples/lean` wit
 Lean v4.36.0-rc1 and exporter commit df81913eee5519d5a88ae5b0fd701b5298cc29ab.
 Regenerate with `bun scripts/export-examples.ts PATH_TO_LEAN4EXPORT`.
 
-Fixtures include valid proofs, explicit axiom assumptions, a valid compatibility
-bridge, and changed types/definitions behind identical names. Negative tests
-also corrupt proof terms and request absent/axiom declarations as claims.
+Fixtures include valid proofs and explicit axiom assumptions. Negative tests
+corrupt proof terms and request absent or axiom declarations as claims.
 Negative tests reject unknown fields, multiple variant tags, and duplicate JSON
 keys (including escaped keys) before the checker and model projection can diverge.
 `proof-data.ndjson` covers a computational definition containing embedded evidence;
 that evidence is retained while standalone theorem bodies are excluded.
 
-The HTTP transport E2E tests check these exports with the real Nanoda checker,
-then sign statements with a test-only Ed25519 authority. That adapter is confined
-to `tests/helpers.ts`; the production native backend only accepts SP1 compressed
-STARK proofs. `guest.e2e.test.ts` executes the real compiled SP1 guest when
+`guest.e2e.test.ts` executes the real compiled SP1 guest when
 `ZKLEAN_GUEST_ELF` is provided.
 
 `identity.certificate.json` is a **real locally generated SP1 compressed STARK

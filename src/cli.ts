@@ -5,7 +5,7 @@ import { version } from "../package.json";
 import { nativeBackend, runNative } from "./native.ts";
 import { parseCertificate } from "./encoding.ts";
 import { createVerifier } from "./verifier.ts";
-import { createSourceManifest } from "./compatibility.ts";
+import { createSourceManifest } from "./requirements.ts";
 import { exportModule, findTools, nativeOptions } from "./tooling.ts";
 import type { ProveInput } from "./native.ts";
 

@@ -1,9 +1,9 @@
 # Implementation and trust boundary
 
-The TypeScript package supplies HTTPV discovery, verification policy, compatibility,
-monitoring, and a Bun server adapter. The Rust workspace supplies the shared
-Nanoda checker, offline SDK-based compressed STARK verifier and local SP1 CPU
-prover/executor. `crates/guest` is built with the SP1 toolchain.
+The TypeScript package provides certificate decoding, model snapshots, verifier
+policy, and the CLI. The Rust workspace supplies the shared Nanoda checker,
+offline compressed STARK verifier, and local SP1 CPU prover and executor.
+`crates/guest` is built with the SP1 toolchain.
 
 Nanoda is pinned and vendored; see `vendor/nanoda/UPSTREAM.md`. SP1 is pinned to
 5.2.4 and used without source modifications. Verification calls its upstream

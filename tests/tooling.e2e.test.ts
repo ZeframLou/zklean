@@ -2,10 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "bun:test";
-import {
-  createSourceManifest,
-  loadRequirements,
-} from "../src/compatibility.ts";
+import { createSourceManifest, loadRequirements } from "../src/requirements.ts";
 
 const lake = process.env.ZKLEAN_LAKE;
 
@@ -58,9 +55,9 @@ test.skipIf(!lake)(
         join(import.meta.dir, "fixtures/identity.certificate.json"),
       ).json();
       await Bun.write(
-        `${source}.httpv.json`,
+        `${source}.zklean.json`,
         JSON.stringify({
-          format: "httpv/requirements/1",
+          format: "zklean/requirements/1",
           specs,
           sourceManifest: manifest,
         }),
