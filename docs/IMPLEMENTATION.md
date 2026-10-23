@@ -9,6 +9,10 @@ Nanoda is pinned and vendored; see `vendor/nanoda/UPSTREAM.md`. SP1 is pinned to
 5.2.4 and used without source modifications. Verification calls its upstream
 SDK with a trusted guest key and pinned fingerprint. A deployment builds the
 guest and pins its SHA-256 and SP1 key digest.
+The guest build stages a fresh source snapshot at a canonical temporary path:
+Cargo includes local package paths in crate identities, so arbitrary checkout
+paths otherwise produce different program layouts and verifier keys. Clean builds
+from separate checkouts must match before a proof fixture is regenerated.
 Certificates cannot select a verifier identity. The production verifier accepts
 neither development signatures nor mock SP1 proofs. Proof generation forcibly
 enables SP1's production VK checks and uses fixed recursion/core shapes.

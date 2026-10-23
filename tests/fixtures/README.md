@@ -7,6 +7,10 @@ Regenerate with `bun scripts/export-examples.ts PATH_TO_LEAN4EXPORT`.
 Fixtures include valid proofs, explicit axiom assumptions, a valid compatibility
 bridge, and changed types/definitions behind identical names. Negative tests
 also corrupt proof terms and request absent/axiom declarations as claims.
+Negative tests reject unknown fields, multiple variant tags, and duplicate JSON
+keys (including escaped keys) before the checker and model projection can diverge.
+`proof-data.ndjson` covers a computational definition containing embedded evidence;
+that evidence is retained while standalone theorem bodies are excluded.
 
 The HTTP transport E2E tests check these exports with the real Nanoda checker,
 then sign statements with a test-only Ed25519 authority. That adapter is confined
