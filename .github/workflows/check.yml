@@ -38,6 +38,8 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: '1.4.4'
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
       - name: Install pinned Lean
         run: |
           curl -fsSL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -o /tmp/elan-init.sh
@@ -45,8 +47,12 @@ jobs:
           echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
       - run: bun install --frozen-lockfile
       - run: bash scripts/setup-exporter.sh
+      - run: bash scripts/prepare-sp1.sh
+      - run: cargo build --release --locked -p zklean-native
       - run: bun scripts/export-examples.ts .tooling/lean4export/.lake/build/bin/lean4export
       - run: git diff --exit-code -- tests/fixtures/*.ndjson
+      - run: bun scripts/pin-axioms.ts
+      - run: git diff --exit-code -- src/axioms.json
       - run: ZKLEAN_LAKE="$(command -v lake)" bun test tests/tooling.e2e.test.ts
 
   guest:

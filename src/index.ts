@@ -20,3 +20,9 @@ export type {
   VerificationResult,
 } from "./types.ts";
 export { createSourceManifest, loadRequirements } from "./requirements.ts";
+export {
+  declarationIdentity,
+  publicContext,
+  requirementsFor,
+} from "./context.ts";
+export { checkAxioms } from "./policy.ts";

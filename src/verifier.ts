@@ -1,4 +1,5 @@
 import { Cache, certificateId, modelId, parseCertificate } from "./encoding.ts";
+import { checkAxioms } from "./policy.ts";
 import type {
   Certificate,
   VerificationResult,
@@ -10,6 +11,24 @@ import type {
 export function createVerifier(options: VerifierOptions = {}) {
   const backend = options.backend;
   const verified = new Cache<boolean>(options.cacheSize ?? 128);
+  const pending = new Map<string, Promise<boolean>>();
+  const limit = options.maxConcurrency ?? 2;
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 128)
+    throw new Error("invalid verification concurrency");
+  let active = 0;
+  const waiters: (() => void)[] = [];
+  const execute = async (certificate: Certificate): Promise<boolean> => {
+    if (active >= limit)
+      await new Promise<void>((resolve) => waiters.push(resolve));
+    else active++;
+    try {
+      return await backend!.verify(certificate);
+    } finally {
+      const next = waiters.shift();
+      if (next) next();
+      else active--;
+    }
+  };
 
   async function verify(
     value: unknown,
@@ -30,18 +49,23 @@ export function createVerifier(options: VerifierOptions = {}) {
       modelId: modelId(certificate.specs),
     };
     // Always apply the caller's current policy, including on a cache hit.
-    if (
-      !Array.isArray(policy.allowedAxioms) ||
-      certificate.axioms.some((a) => !policy.allowedAxioms.includes(a))
-    ) {
-      return { ...identity, status: "unknown", reason: "forbidden-axiom" };
-    }
+    const policyError = checkAxioms(certificate, policy);
+    if (policyError)
+      return { ...identity, status: "unknown", reason: policyError };
     if (!backend)
       return { ...identity, status: "unknown", reason: "verifier-unavailable" };
     try {
       const cacheKey = `${backend.identity}\0${identity.certificateId}`;
       if (!verified.get(cacheKey)) {
-        if (!(await backend.verify(certificate)))
+        let task = pending.get(cacheKey);
+        if (!task) {
+          if (pending.size >= limit * 8)
+            return { ...identity, status: "unknown", reason: "verifier-busy" };
+          task = Promise.resolve().then(() => execute(certificate));
+          pending.set(cacheKey, task);
+          void task.finally(() => pending.delete(cacheKey)).catch(() => {});
+        }
+        if (!(await task))
           return {
             ...identity,
             status: "unknown",

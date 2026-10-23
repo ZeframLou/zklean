@@ -1,5 +1,6 @@
 import { dirname, join, resolve } from "node:path";
 import type { NativeOptions } from "./native.ts";
+import { runLake } from "./lean.ts";
 
 export interface ToolOverrides {
   binary?: string | undefined;
@@ -146,36 +147,11 @@ export async function exportModule(options: {
   )
     throw new Error("invalid Lean module name");
   const cwd = resolve(options.project);
-  const env = {
-    ...process.env,
-    ELAN_TOOLCHAIN: "leanprover/lean4:v4.36.0-rc1",
-  };
-  const build = Bun.spawn([options.tools.lake, "build", options.module], {
-    cwd,
-    env,
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-  const [buildCode, buildOutput, buildErrors] = await Promise.all([
-    build.exited,
-    new Response(build.stdout).text(),
-    new Response(build.stderr).text(),
+  await runLake(cwd, options.tools.lake, ["build", options.module]);
+  return runLake(cwd, options.tools.lake, [
+    "env",
+    options.tools.exporter,
+    options.module,
+    ...(options.claims.length ? ["--", ...options.claims] : []),
   ]);
-  if (buildCode !== 0)
-    throw new Error(
-      `Lean module build failed:\n${`${buildOutput}\n${buildErrors}`.trim().slice(-4000)}`,
-    );
-  const child = Bun.spawn(
-    [
-      options.tools.lake,
-      "env",
-      options.tools.exporter,
-      options.module,
-      ...(options.claims.length ? ["--", ...options.claims] : []),
-    ],
-    { cwd, env, stdout: "pipe", stderr: "inherit" },
-  );
-  const output = await new Response(child.stdout).text();
-  if ((await child.exited) !== 0) throw new Error("lean4export failed");
-  return output;
 }

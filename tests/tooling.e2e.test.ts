@@ -7,6 +7,68 @@ import { createSourceManifest, loadRequirements } from "../src/requirements.ts";
 const lake = process.env.ZKLEAN_LAKE;
 
 test.skipIf(!lake)(
+  "requirements resolve srcDir and reject stale transitive source edits before a rebuild",
+  async () => {
+    const directory = await mkdtemp(join(tmpdir(), "zklean-srcdir-"));
+    try {
+      await Bun.write(
+        join(directory, "lakefile.toml"),
+        'name = "SourceLayout"\n[[lean_lib]]\nname = "SourceLayout"\nsrcDir = "src"\nroots = ["Base", "Remote"]\n',
+      );
+      await Bun.write(
+        join(directory, "lean-toolchain"),
+        "leanprover/lean4:v4.36.0-rc1\n",
+      );
+      const imported = join(directory, "src/Base.lean");
+      await Bun.write(
+        imported,
+        "prelude\ndef Base.marker : Prop := ∀ P : Prop, P → P\n",
+      );
+      const source = join(directory, "src/Remote.lean");
+      await Bun.write(
+        source,
+        "prelude\nimport Base\naxiom Remote.required : Base.marker\n",
+      );
+      const child = Bun.spawn(
+        [
+          process.execPath,
+          "src/cli.ts",
+          "requirements",
+          "--project",
+          directory,
+          "--module",
+          "Remote",
+          "--claims",
+          "Remote.required",
+          "--out",
+          `${source}.zklean.json`,
+        ],
+        {
+          stdout: "pipe",
+          stderr: "pipe",
+          env: { ...process.env, ZKLEAN_LAKE: lake! },
+        },
+      );
+      const stderr = await new Response(child.stderr).text();
+      if ((await child.exited) !== 0) throw new Error(stderr);
+      const snapshot = await Bun.file(`${source}.zklean.json`).json();
+      expect(snapshot.sourceManifest.files["Base.lean"]).toMatch(
+        /^[0-9a-f]{64}$/,
+      );
+      await expect(loadRequirements(source)).resolves.toHaveProperty("specs");
+      await Bun.write(
+        imported,
+        "prelude\ndef Base.marker : Prop := ∀ P : Prop, P\n",
+      );
+      await expect(loadRequirements(source)).rejects.toThrow("stale");
+    } finally {
+      await rm(directory, { recursive: true });
+    }
+  },
+  60_000,
+);
+
+test.skipIf(!lake)(
   "Lean manifests detect transitive source and toolchain changes",
   async () => {
     const directory = await mkdtemp(join(tmpdir(), "zklean-manifest-"));

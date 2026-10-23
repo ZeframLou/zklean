@@ -3,11 +3,14 @@ import { parseArgs } from "node:util";
 import { resolve } from "node:path";
 import { version } from "../package.json";
 import { nativeBackend, runNative } from "./native.ts";
-import { parseCertificate } from "./encoding.ts";
+import { canonical, parseCertificate } from "./encoding.ts";
 import { createVerifier } from "./verifier.ts";
 import { createSourceManifest } from "./requirements.ts";
 import { exportModule, findTools, nativeOptions } from "./tooling.ts";
 import type { ProveInput } from "./native.ts";
+import { resolveLeanSource } from "./lean.ts";
+import { checkAxioms } from "./policy.ts";
+import type { Certificate, VerifyOptions } from "./types.ts";
 
 const help = `ZKLean — check and certify Lean contracts
 
@@ -23,6 +26,7 @@ const help = `ZKLean — check and certify Lean contracts
 The installer supplies the prover/verifier, guest, exporter, and pinned Lean.
 Every source command also accepts --export FILE instead of --project/--module.
 Advanced overrides: --config, --binary, --elf, --lake, and --exporter.
+Custom axioms require --axiom-policy FILE containing reviewed declaration fingerprints.
 `;
 
 const list = (value: string | undefined) =>
@@ -51,6 +55,7 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
         "export",
         "claims",
         "axioms",
+        "axiom-policy",
         "source",
         "config",
         "certificate",
@@ -114,6 +119,16 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
   }
 
   const claims = list(optional("claims"));
+  const policy: VerifyOptions = {
+    allowedAxioms: list(optional("axioms")),
+    ...(optional("axiom-policy")
+      ? { axiomPins: await Bun.file(required("axiom-policy")).json() }
+      : {}),
+  };
+  const enforcePolicy = (statement: Pick<Certificate, "specs" | "axioms">) => {
+    const reason = checkAxioms(statement, policy);
+    if (reason) throw new Error(`axiom policy rejected the model: ${reason}`);
+  };
   const exported = async (): Promise<{
     text: string;
     source: string | undefined;
@@ -123,12 +138,22 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
       return { text: await Bun.file(path).text(), source: optional("source") };
     const project = resolve(required("project"));
     const module = required("module");
-    return {
-      text: await exportModule({ project, module, claims, tools }),
-      source:
-        optional("source") ??
-        resolve(project, `${module.replaceAll(".", "/")}.lean`),
-    };
+    const source =
+      optional("source") ??
+      (await resolveLeanSource(project, module, tools.lake ?? "lake"));
+    const before =
+      command === "requirements"
+        ? await createSourceManifest(source, tools.lake, false)
+        : undefined;
+    const text = await exportModule({ project, module, claims, tools });
+    if (before) {
+      const after = await createSourceManifest(source, tools.lake, false);
+      if (canonical(before) !== canonical(after))
+        throw new Error(
+          "Lean sources changed during export; retry requirements generation",
+        );
+    }
+    return { text, source };
   };
 
   if (command === "export") {
@@ -147,6 +172,9 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
       allowedAxioms: list(optional("axioms")),
     };
     if (command === "prove") {
+      enforcePolicy(
+        (await runNative(tools.binary, "check", input)) as Certificate,
+      );
       console.error(
         "Generating a local compressed STARK proof; this may take several minutes…",
       );
@@ -155,6 +183,7 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
       );
     } else {
       result = await runNative(tools.binary, command, input);
+      if (command === "check") enforcePolicy(result as Certificate);
       if (command === "requirements" && source.source) {
         Object.assign(result as object, {
           sourceManifest: await createSourceManifest(
@@ -170,7 +199,7 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
     );
     result = await createVerifier({
       backend: nativeBackend(await nativeOptions(tools, false)),
-    }).verify(certificate, { allowedAxioms: list(optional("axioms")) });
+    }).verify(certificate, policy);
     if ((result as { status: string }).status !== "verified")
       process.exitCode = 1;
   } else {

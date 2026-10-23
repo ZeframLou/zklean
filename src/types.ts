@@ -37,6 +37,9 @@ export type Reason =
   | "valid"
   | "invalid-certificate"
   | "forbidden-axiom"
+  | "unpinned-axiom"
+  | "axiom-mismatch"
+  | "verifier-busy"
   | "verifier-unavailable";
 export interface VerificationResult {
   status: Status;
@@ -49,8 +52,12 @@ export interface VerificationResult {
 }
 export interface VerifyOptions {
   allowedAxioms: readonly string[];
+  /** Fingerprints of reviewed custom axioms and their complete resolved context. */
+  axiomPins?: Readonly<Record<string, string>>;
 }
 export interface VerifierOptions {
   backend?: ProofBackend;
   cacheSize?: number;
+  /** Bound expensive independent backend checks; identical checks share a slot. */
+  maxConcurrency?: number;
 }

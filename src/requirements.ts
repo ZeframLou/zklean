@@ -1,6 +1,7 @@
 import { object, parseSpecs, readModel, sha256 } from "./encoding.ts";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import type { Requirements, SourceManifest } from "./types.ts";
+import { runLake } from "./lean.ts";
 
 async function hashFile(path: string): Promise<string> {
   return sha256(new Uint8Array(await Bun.file(path).arrayBuffer()));
@@ -25,6 +26,7 @@ async function projectRoot(source: string): Promise<string> {
 export async function createSourceManifest(
   source: string,
   lake = "lake",
+  includeArtifacts = true,
 ): Promise<SourceManifest> {
   const sourcePath = resolve(source);
   const root = await projectRoot(sourcePath);
@@ -38,51 +40,40 @@ export async function createSourceManifest(
     const path = join(root, name);
     if (await Bun.file(path).exists()) paths.add(path);
   }
-  // --deps reports direct imports. Follow project/package sources recursively;
-  // keep binary artifacts as well so build output and toolchain changes fail closed.
+  // Lean resolves sources itself: .olean paths do not reveal a library's srcDir.
   const pending = [sourcePath];
   const visited = new Set<string>();
   while (pending.length) {
-    const current = pending.pop()!;
-    if (visited.has(current)) continue;
-    visited.add(current);
-    const child = Bun.spawn(
-      [lake, "env", "lean", "--deps", relative(root, current)],
-      {
-        cwd: root,
-        env: {
-          ...process.env,
-          ELAN_TOOLCHAIN: "leanprover/lean4:v4.36.0-rc1",
-        },
-        stdout: "pipe",
-        stderr: "pipe",
-      },
+    const batch = pending.splice(0, 8).filter((path) => {
+      if (visited.has(path)) return false;
+      visited.add(path);
+      return true;
+    });
+    await Promise.all(
+      batch.map(async (current) => {
+        const sources = await runLake(root, lake, [
+          "env",
+          "lean",
+          "--src-deps",
+          relative(root, current),
+        ]);
+        for (const line of sources.split(/\r?\n/).filter(Boolean)) {
+          const path = resolve(root, line);
+          paths.add(path);
+          pending.push(path);
+        }
+        if (includeArtifacts) {
+          const artifacts = await runLake(root, lake, [
+            "env",
+            "lean",
+            "--deps",
+            relative(root, current),
+          ]);
+          for (const line of artifacts.split(/\r?\n/).filter(Boolean))
+            paths.add(resolve(root, line));
+        }
+      }),
     );
-    const [code, stdout, stderr] = await Promise.all([
-      child.exited,
-      new Response(child.stdout).text(),
-      new Response(child.stderr).text(),
-    ]);
-    if (code !== 0)
-      throw new Error(
-        `could not resolve Lean dependencies: ${stderr.slice(-2000)}`,
-      );
-    for (const line of stdout.split(/\r?\n/).filter(Boolean)) {
-      const artifact = resolve(root, line);
-      paths.add(artifact);
-      const marker = "/.lake/build/lib/lean/";
-      const normalized = artifact.replaceAll("\\", "/");
-      const index = normalized.lastIndexOf(marker);
-      if (index < 0 || !normalized.endsWith(".olean")) continue;
-      const candidate = join(
-        normalized.slice(0, index),
-        `${normalized.slice(index + marker.length, -".olean".length)}.lean`,
-      );
-      if (await Bun.file(candidate).exists()) {
-        paths.add(candidate);
-        pending.push(candidate);
-      }
-    }
   }
   const base = dirname(sourcePath);
   const files: Record<string, string> = {};
