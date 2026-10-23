@@ -4,3 +4,5 @@ target/
 .env
 *.elf
 examples/generated/
+.lake/
+.tooling/

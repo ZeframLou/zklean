@@ -6,6 +6,7 @@ edition = "2021"
 [features]
 default = []
 sp1 = ["dep:sp1-sdk"]
+execute = ["dep:sp1-core-executor"]
 
 [dependencies]
 anyhow.workspace = true
@@ -15,4 +16,8 @@ base64.workspace = true
 sha2.workspace = true
 zklean-core = { path = "../core" }
 sp1-sdk = { version = "=5.2.4", optional = true, default-features = false }
-sp1-verifier = "=5.2.4"
+sp1-verifier = { version = "=5.2.4", features = ["compressed"] }
+sp1-core-executor = { version = "=5.2.4", optional = true }
+sp1-stark = "=5.2.4"
+bincode = "1.3"
+hex = "0.4"

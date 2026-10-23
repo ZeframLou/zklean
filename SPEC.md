@@ -126,7 +126,7 @@ All security-relevant values MUST use deterministic, versioned encoding and be c
 
 Verification MUST use a trusted, pinned SP1 verifier identity rather than one arbitrarily supplied by a certificate.
 
-The initial implementation SHOULD use SP1's Groth16 proof format.
+The initial implementation SHOULD use SP1's compressed STARK proof format. Groth16 MAY be supported by a separately pinned verifier profile.
 
 ### 3.4. Verification API
 

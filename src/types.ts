@@ -27,10 +27,18 @@ export interface ProofBackend {
 }
 export type Status = "verified" | "incompatible" | "unknown";
 export type Reason =
-  | "valid" | "exact-match" | "derivation" | "requirements-not-met"
-  | "invalid-certificate" | "forbidden-axiom" | "unavailable"
-  | "missing-certificate" | "verifier-unavailable" | "requirements-unavailable"
-  | "missing-derivation" | "invalid-derivation";
+  | "valid"
+  | "exact-match"
+  | "derivation"
+  | "requirements-not-met"
+  | "invalid-certificate"
+  | "forbidden-axiom"
+  | "unavailable"
+  | "missing-certificate"
+  | "verifier-unavailable"
+  | "requirements-unavailable"
+  | "missing-derivation"
+  | "invalid-derivation";
 export interface VerificationResult {
   status: Status;
   reason: Reason;
@@ -40,7 +48,9 @@ export interface VerificationResult {
   modelId?: string;
   detail?: string;
 }
-export interface VerifyOptions { allowedAxioms: readonly string[] }
+export interface VerifyOptions {
+  allowedAxioms: readonly string[];
+}
 export interface CompatibilityOptions extends VerifyOptions {
   certificate: unknown;
   requirements: Requirements | string;
@@ -72,12 +82,15 @@ export interface Monitor {
 }
 export type Handler = (request: Request) => Response | Promise<Response>;
 export interface ServeOptions {
-  routes: Record<string, Certificate | string | (() => Certificate | Promise<Certificate>)>;
+  routes: Record<
+    string,
+    Certificate | string | (() => Certificate | Promise<Certificate>)
+  >;
   fetch: Handler;
 }
 export interface ClientOptions {
   backend?: ProofBackend;
-  fetch?: typeof globalThis.fetch;
+  fetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
   cacheSize?: number;
   maxResponseBytes?: number;
 }
