@@ -22,6 +22,7 @@ export type {
 export { createSourceManifest, loadRequirements } from "./requirements.ts";
 export {
   declarationIdentity,
+  contextMatches,
   publicContext,
   requirementsFor,
 } from "./context.ts";

@@ -66,8 +66,7 @@ export function publicContext(
 
 /** Compare kernel structure while ignoring bound-variable display annotations.
  * This is conservative structural equality, not a general equivalence checker. */
-export function declarationIdentity(model: PublicModel, name: string): string {
-  const context = publicContext(model, [name]);
+function normalizeDeclarations(context: PublicModel): Record<string, unknown> {
   const memo = new Map<string, string>();
   const rewrite = (value: unknown): unknown => {
     if (typeof value === "string" && Object.hasOwn(context.nodes, value)) {
@@ -117,7 +116,27 @@ export function declarationIdentity(model: PublicModel, name: string): string {
       return [key, rewrite(declaration)];
     }),
   );
-  return sha256(`zklean/declaration/1\0${canonical(resolved)}`);
+  return resolved;
+}
+
+export function declarationIdentity(model: PublicModel, name: string): string {
+  return sha256(
+    `zklean/declaration/1\0${canonical(normalizeDeclarations(publicContext(model, [name])))}`,
+  );
+}
+
+/** Match every required declaration in one shared, alpha-normalized context. */
+export function contextMatches(
+  actual: PublicModel,
+  required: PublicModel,
+): boolean {
+  const left = normalizeDeclarations(actual);
+  const right = normalizeDeclarations(required);
+  return Object.keys(right).every(
+    (name) =>
+      Object.hasOwn(left, name) &&
+      canonical(left[name]) === canonical(right[name]),
+  );
 }
 
 export function requirementsFor(specs: Specs): Requirements {
