@@ -1,13 +1,11 @@
 # ZKLean
 
-An inventory service must never reserve more stock than it has. Lean can establish
-this for a model of the reservation logic using a mathematical argument called a
-**formal proof**.
+ZKLean is a command-line tool that makes Lean specifications inexpensive to
+verify without downloading and rechecking their original mathematical arguments.
 
-**ZKLean is a CLI for generating succinct cryptographic proofs of Lean
-specifications.** It uses SP1 to produce a small proof that the original
-mathematical argument passed the checker. Recipients verify this cryptographic
-evidence without downloading and rechecking the original Lean argument.
+Lean describes software behavior mathematically. A **formal proof** establishes
+properties of that model under stated assumptions. ZKLean checks this argument
+and uses SP1 to produce a small **cryptographic proof** that the check succeeded.
 
 Certificate generation and verification run locally. HTTPV is optional.
 
