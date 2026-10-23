@@ -264,8 +264,7 @@ export function validateModel(model: PublicModel): void {
         uint(item[key], 0xffff);
       refs(item.all, "name");
       refs(item.ctors, "name");
-      for (const key of ["isRec", "isUnsafe"])
-        boolean(item[key]);
+      for (const key of ["isRec", "isUnsafe"]) boolean(item[key]);
     }
     for (const value of data.ctors) {
       const item = header(value, [
