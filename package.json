@@ -1,6 +1,7 @@
 {
   "name": "httpv",
-  "version": "0.2.0",
+  "version": "0.1.0",
+  "private": true,
   "description": "Verified Lean contracts over HTTP for Bun",
   "type": "module",
   "exports": {

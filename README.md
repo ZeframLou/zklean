@@ -13,26 +13,20 @@ compressed proofs are verified through its upstream SDK.
 
 ## Install
 
-The Linux x86-64 release includes the CLI, lean4export, the checked guest, the
-CPU prover, and the offline verifier. The same command installs the pinned Lean
-toolchain through `elan` when it is not already present:
+ZKLean is a work in progress at **0.1.0**. No release is published yet. The
+packaging workflow builds a Linux x86-64 archive as a CI artifact, containing
+the CLI, lean4export, the checked guest, the CPU prover, and the offline verifier.
+Download and extract the CI artifact into `dist`, or build it from source below,
+then install with one command:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/ZeframLou/zklean/v0.2.0/install.sh | sh
+ZKLEAN_RELEASE_BASE="file://$PWD/dist" sh install.sh
 ```
 
-The installer verifies the release checksum and writes to `~/.local` by default.
+The installer verifies the archive checksum and writes to `~/.local` by default.
+It installs the pinned Lean toolchain through `elan` when it is not already present.
 Set `ZKLEAN_PREFIX` to choose another location. Set `ZKLEAN_SKIP_LEAN=1` for a
 verification-only installation. Run `zklean doctor` to see the resolved tools.
-
-While this repository is private, use an authenticated GitHub CLI session:
-
-```sh
-gh api 'repos/ZeframLou/zklean/contents/install.sh?ref=v0.2.0' --jq .content | base64 -d | sh
-```
-
-The installer uses that session to download private release assets. The anonymous
-`curl` command becomes available if the repository is made public.
 
 ## Certify a Lean module
 
@@ -65,7 +59,7 @@ but requires no network, Docker, Rust, Bun, SP1 installation, or proving account
 ## Build from source
 
 Contributors need Bun 1.4.4, stable Rust, SP1 5.2.4, Rust 1.91.1 for its guest compiler,
-and Lean 4.36.0-rc1. The release workflow packages these dependencies so end users
+and Lean 4.36.0-rc1. The packaging workflow bundles the runtime tools so end users
 do not install them separately.
 
 ```sh
@@ -75,6 +69,7 @@ bash scripts/build-guest.sh
 cargo build --release --locked -p zklean-native --features execute
 bash scripts/setup-exporter.sh
 bun run check
+bash scripts/package-release.sh dist
 ```
 
 `prepare-sp1.sh` installs the checksum-pinned public recursion-key map from the

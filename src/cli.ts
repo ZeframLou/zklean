@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import { parseArgs } from "node:util";
 import { resolve } from "node:path";
+import { version } from "../package.json";
 import { nativeBackend, runNative } from "./native.ts";
 import { parseCertificate } from "./encoding.ts";
 import { createHTTPV } from "./client.ts";
@@ -34,7 +35,7 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
     return;
   }
   if (command === "--version" || command === "version") {
-    console.log("zklean 0.2.0");
+    console.log(`zklean ${version}`);
     return;
   }
   const { values } = parseArgs({

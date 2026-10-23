@@ -1,10 +1,15 @@
-name: Release
+name: Package
 on:
   push:
-    tags: ['v*']
+    branches: ['**']
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: package-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   linux-x64:
@@ -46,8 +51,9 @@ jobs:
           ZKLEAN_PREFIX="$RUNNER_TEMP/zklean" ZKLEAN_RELEASE_BASE="file://$PWD/dist" sh install.sh
           "$RUNNER_TEMP/zklean/bin/zklean" verify --certificate tests/fixtures/identity.certificate.json
           "$RUNNER_TEMP/zklean/bin/zklean" check --project examples/lean --module Identity --claims Demo.identity
-      - uses: softprops/action-gh-release@v2
+      - uses: actions/upload-artifact@v4
         with:
-          files: |
+          name: zklean-linux-x64
+          path: |
             dist/zklean-linux-x64.tar.gz
             dist/zklean-linux-x64.tar.gz.sha256
