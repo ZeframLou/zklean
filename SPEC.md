@@ -116,7 +116,7 @@ Fields:
 - `axioms`: Exact list of axioms relied upon by the checked proofs.
 - `proof`: Succinct SP1 proof.
 
-**The `specs` field MUST contain everything necessary to interpret the formal model**, including the relevant dependency closure of definitions, types, and axiom declarations. It MUST exclude proof terms and unrelated declarations.
+**The `specs` field MUST contain everything necessary to interpret the formal model**, including the relevant dependency closure of definitions, types, and axiom declarations. It MUST exclude standalone theorem bodies and unrelated declarations. Proof subexpressions inside computational definitions MAY remain when they are part of the exact declaration needed to interpret the model; proof profiles MUST state whether they provide witness privacy.
 
 Lean's built-in semantics are fixed by the trusted proof-checker implementation. The public model MUST NOT rely on unresolved or unauthenticated external definitions.
 

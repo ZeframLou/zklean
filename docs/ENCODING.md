@@ -12,7 +12,7 @@ canonical JSON. Its decoded schema is:
 
 ```json
 {
-  "format": "lean4/kernel/1",
+  "format": "lean4/kernel/2",
   "declarations": { "Namespace.claim": { "thm": { "name": "<hash>", "levelParams": [], "type": "<hash>" } } },
   "nodes": { "<sha256>": { "sort": "<level-hash>" } }
 }
@@ -34,7 +34,8 @@ proposition-valued definition/opaque bodies become `thm` declarations containing
 only `name`, `levelParams`, and `type`. Their proof bodies and nodes reachable
 only from those bodies are excluded. Actual axioms retain `axiom` declarations.
 Axioms used only by private proof terms still have public declarations and types.
-Mutual inductive groups are indivisible and shared by their declared names.
+Mutual inductive groups are indivisible. The lexicographically first member stores
+the group once; other declared names use an `inductiveMember` reference to it.
 
 Deserialization resolves Name/Level/Expr hashes in `nodes`, then constant name
 hashes against `declarations`. `readModel` checks hashes, typed references,
@@ -95,10 +96,10 @@ Neither identity depends on arbitrary input JSON property order.
 ## Requirements and compatibility
 
 Requirements are local JSON `{format:"httpv/requirements/1",specs}` snapshots.
-A `.lean` path resolves to `<path>.httpv.json` and requires `sourceSha256` matching
-that source file. Regenerate snapshots whenever imported sources or toolchains
-change; the direct-source digest alone cannot detect edits to imported files.
-The self-contained snapshot is what the client actually trusts.
+A `.lean` path resolves to `<path>.httpv.json` and requires an
+`httpv/source-manifest/1` containing the primary source, imported sources, Lake
+project files, and toolchain artifacts. Every recorded digest is checked before
+the snapshot is used. The self-contained snapshot is what the client trusts.
 
 Exact matching requires every requested claim to be certified and its complete
 resolved public context to match. Extra remote claims are permitted. Under

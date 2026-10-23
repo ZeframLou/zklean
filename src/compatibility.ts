@@ -27,7 +27,8 @@ async function projectRoot(source: string): Promise<string> {
     )
       return directory;
     const parent = dirname(directory);
-    if (parent === directory) throw new Error("Lean source is not inside a Lake project");
+    if (parent === directory)
+      throw new Error("Lean source is not inside a Lake project");
     directory = parent;
   }
 }
@@ -49,10 +50,17 @@ export async function createSourceManifest(
     new Response(child.stderr).text(),
   ]);
   if (code !== 0)
-    throw new Error(`could not resolve Lean dependencies: ${stderr.slice(-2000)}`);
+    throw new Error(
+      `could not resolve Lean dependencies: ${stderr.slice(-2000)}`,
+    );
 
   const paths = new Set<string>([sourcePath]);
-  for (const name of ["lean-toolchain", "lakefile.toml", "lakefile.lean", "lake-manifest.json"]) {
+  for (const name of [
+    "lean-toolchain",
+    "lakefile.toml",
+    "lakefile.lean",
+    "lake-manifest.json",
+  ]) {
     const path = join(root, name);
     if (await Bun.file(path).exists()) paths.add(path);
   }
@@ -64,7 +72,10 @@ export async function createSourceManifest(
     let dependency = artifact;
     if (index >= 0 && normalized.endsWith(".olean")) {
       const base = normalized.slice(0, index);
-      const module = normalized.slice(index + marker.length + 1, -".olean".length);
+      const module = normalized.slice(
+        index + marker.length + 1,
+        -".olean".length,
+      );
       const candidate = join(base, `${module}.lean`);
       if (await Bun.file(candidate).exists()) dependency = candidate;
     }
@@ -94,7 +105,12 @@ async function validateSourceManifest(
   if (!Object.hasOwn(files, sourceName) || Object.keys(files).length === 0)
     throw new Error("source manifest does not include the Lean source");
   for (const [path, expected] of Object.entries(files)) {
-    if (!path || isAbsolute(path) || typeof expected !== "string" || !/^[0-9a-f]{64}$/.test(expected))
+    if (
+      !path ||
+      isAbsolute(path) ||
+      typeof expected !== "string" ||
+      !/^[0-9a-f]{64}$/.test(expected)
+    )
       throw new Error("invalid Lean source manifest entry");
     if ((await hashFile(resolve(dirname(source), path))) !== expected)
       throw new Error("Lean requirements sidecar is stale; regenerate it");
@@ -109,13 +125,18 @@ export async function loadRequirements(
     const isLean = input.endsWith(".lean");
     value = await Bun.file(isLean ? `${input}.httpv.json` : input).json();
     if (isLean) {
-      await validateSourceManifest(resolve(input), object(value).sourceManifest);
+      await validateSourceManifest(
+        resolve(input),
+        object(value).sourceManifest,
+      );
     }
   }
   const r = object(value);
   if (
     r.format !== "httpv/requirements/1" ||
-    Object.keys(r).some((k) => !["format", "specs", "sourceManifest"].includes(k))
+    Object.keys(r).some(
+      (k) => !["format", "specs", "sourceManifest"].includes(k),
+    )
   ) {
     throw new Error("invalid requirements format");
   }

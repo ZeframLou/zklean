@@ -21,3 +21,9 @@ proving needs no S3 artifacts or proving network.
 
 See README.md for commands and docs/ENCODING.md for the wire profile.
 SPEC.md is the normative experimental protocol specification.
+
+Tagged releases contain a compiled Bun CLI, native verifier/prover, guest ELF,
+verifier profile, Lean toolchain, and lean4export in one checksum-pinned archive.
+`install.sh` installs that archive under a single prefix. Tool discovery is relative
+to the CLI executable, so ordinary commands require no environment variables or
+configuration files.

@@ -1,0 +1,40 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  linux-x64:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3.11'
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install pinned Lean
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -o /tmp/elan-init.sh
+          sh /tmp/elan-init.sh -y --default-toolchain leanprover/lean4:v4.36.0-rc1
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Install pinned SP1 toolchain
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/succinctlabs/sp1/v5.2.4/sp1up/sp1up -o /tmp/sp1up
+          bash /tmp/sp1up --version v5.2.4
+          echo "$HOME/.sp1/bin" >> "$GITHUB_PATH"
+      - run: rustup toolchain install 1.91.1 --profile minimal
+      - run: bun install --frozen-lockfile
+      - run: bash scripts/prepare-sp1.sh
+      - run: bash scripts/build-guest.sh
+      - run: cargo build --release --locked -p zklean-native
+      - run: bash scripts/setup-exporter.sh
+      - run: bash scripts/package-release.sh dist
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/zklean-linux-x64.tar.gz
+            dist/zklean-linux-x64.tar.gz.sha256

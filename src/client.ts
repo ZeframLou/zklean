@@ -61,11 +61,7 @@ export function createHTTPV(options: ClientOptions = {}) {
       throw new DiscoveryError("unavailable", "invalid discovery URL");
     const method = methodName(queryOptions.method);
     const timeout = queryOptions.timeout ?? 10_000;
-    if (
-      !Number.isSafeInteger(timeout) ||
-      timeout < 1 ||
-      timeout > 0x7fffffff
-    )
+    if (!Number.isSafeInteger(timeout) || timeout < 1 || timeout > 0x7fffffff)
       throw new Error("invalid timeout");
     const signal = AbortSignal.any([
       AbortSignal.timeout(timeout),
@@ -254,7 +250,11 @@ export function createHTTPV(options: ClientOptions = {}) {
       return { ...result, reason: "exact-match" };
     }
     if (input.mode === "exact")
-      return { ...result, status: "incompatible", reason: "requirements-not-met" };
+      return {
+        ...result,
+        status: "incompatible",
+        reason: "requirements-not-met",
+      };
     if (input.derivation === undefined) {
       return { ...result, status: "unknown", reason: "missing-derivation" };
     }

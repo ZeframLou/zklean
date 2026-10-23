@@ -39,7 +39,11 @@ function variant(value: unknown): [string, unknown] {
   return entries[0]!;
 }
 function uint(value: unknown, max = Number.MAX_SAFE_INTEGER): number {
-  if (!Number.isSafeInteger(value) || (value as number) < 0 || (value as number) > max)
+  if (
+    !Number.isSafeInteger(value) ||
+    (value as number) < 0 ||
+    (value as number) > max
+  )
     throw new Error("invalid kernel integer");
   return value as number;
 }
@@ -175,7 +179,10 @@ export function validateModel(model: PublicModel): void {
     throw new Error("unsupported kernel node");
   };
 
-  const header = (value: unknown, fields: string[]): Record<string, unknown> => {
+  const header = (
+    value: unknown,
+    fields: string[],
+  ): Record<string, unknown> => {
     const data = exact(value, fields);
     ref(data.name, "name");
     refs(data.levelParams, "name");
@@ -236,12 +243,25 @@ export function validateModel(model: PublicModel): void {
   };
   const visitInductive = (value: unknown): void => {
     const data = exact(value, ["types", "ctors", "recs"]);
-    if (!Array.isArray(data.types) || !Array.isArray(data.ctors) || !Array.isArray(data.recs))
+    if (
+      !Array.isArray(data.types) ||
+      !Array.isArray(data.ctors) ||
+      !Array.isArray(data.recs)
+    )
       throw new Error("invalid inductive group");
     for (const value of data.types) {
       const item = header(value, [
-        "name", "levelParams", "type", "numParams", "numIndices", "all", "ctors",
-        "numNested", "isRec", "isUnsafe", "isReflexive",
+        "name",
+        "levelParams",
+        "type",
+        "numParams",
+        "numIndices",
+        "all",
+        "ctors",
+        "numNested",
+        "isRec",
+        "isUnsafe",
+        "isReflexive",
       ]);
       for (const key of ["numParams", "numIndices", "numNested"])
         uint(item[key], 0xffff);
@@ -252,7 +272,13 @@ export function validateModel(model: PublicModel): void {
     }
     for (const value of data.ctors) {
       const item = header(value, [
-        "name", "levelParams", "type", "induct", "cidx", "numParams", "numFields",
+        "name",
+        "levelParams",
+        "type",
+        "induct",
+        "cidx",
+        "numParams",
+        "numFields",
         "isUnsafe",
       ]);
       constant(item.induct);
@@ -262,8 +288,17 @@ export function validateModel(model: PublicModel): void {
     }
     for (const value of data.recs) {
       const item = header(value, [
-        "name", "levelParams", "type", "all", "numParams", "numIndices", "numMotives",
-        "numMinors", "rules", "k", "isUnsafe",
+        "name",
+        "levelParams",
+        "type",
+        "all",
+        "numParams",
+        "numIndices",
+        "numMotives",
+        "numMinors",
+        "rules",
+        "k",
+        "isUnsafe",
       ]);
       refs(item.all, "name");
       for (const key of ["numParams", "numIndices", "numMotives", "numMinors"])

@@ -1,6 +1,6 @@
 {
   "name": "httpv",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Verified Lean contracts over HTTP for Bun",
   "type": "module",
   "exports": {
@@ -15,7 +15,8 @@
     "check": "bun run typecheck && bun test",
     "example": "bun examples/upgrades.ts",
     "format": "prettier --write src tests/*.ts scripts/*.ts examples/*.ts package.json tsconfig.json",
-    "format:check": "prettier --check src tests/*.ts scripts/*.ts examples/*.ts package.json tsconfig.json"
+    "format:check": "prettier --check src tests/*.ts scripts/*.ts examples/*.ts package.json tsconfig.json",
+    "compile": "bun build --compile src/cli.ts --outfile dist/zklean"
   },
   "devDependencies": {
     "@types/bun": "1.3.11",

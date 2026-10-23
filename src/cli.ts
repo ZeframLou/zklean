@@ -2,25 +2,28 @@
 import { parseArgs } from "node:util";
 import { resolve } from "node:path";
 import { nativeBackend, runNative } from "./native.ts";
-import { parseCertificate, sha256 } from "./encoding.ts";
+import { parseCertificate } from "./encoding.ts";
 import { createHTTPV } from "./client.ts";
-import type { NativeOptions, ProveInput } from "./native.ts";
+import { createSourceManifest } from "./compatibility.ts";
+import { exportModule, findTools, nativeOptions } from "./tooling.ts";
+import type { ProveInput } from "./native.ts";
 
-const help = `ZKLean — Lean export, certificates, and HTTPV requirements
+const help = `ZKLean — check and certify Lean contracts
 
-  zklean export --project DIR --module NAME --exporter PATH --out FILE [--claims A,B]
-  zklean check --export FILE --claims A,B [--axioms A,B] [--out FILE]
-  zklean requirements --export FILE --claims A,B --out FILE [--source FILE.lean]
-  zklean pin --elf FILE --out CONFIG [--binary PATH]
-  zklean prove --export FILE --claims A,B --config FILE --out FILE [--axioms A,B]
-  zklean verify --certificate FILE --config FILE [--axioms A,B]
+  zklean prove --project DIR --module NAME --claims A,B --out CERT.json
+  zklean verify --certificate CERT.json [--axioms A,B]
+  zklean requirements --project DIR --module NAME --claims A,B --out FILE.json
+  zklean check --project DIR --module NAME --claims A,B [--axioms A,B]
 
-Native commands accept --binary PATH (default: target/release/zklean-native).
-Config JSON pins binary, verificationKey, verifierKey, optional ELF pins and timeout.
-Export runs 'lake build MODULE' and lean4export in the specified Lake project.
-A .lean requirement uses a generated FILE.lean.httpv.json sidecar bound to its
-source SHA-256; --source writes that binding. No command infers axiom trust.
+  zklean export --project DIR --module NAME --out FILE.ndjson [--claims A,B]
+  zklean pin --out PROFILE.json [--elf FILE]
+  zklean doctor
+
+Installed releases include the native prover/verifier, guest, Lean, and exporter.
+Every source command also accepts --export FILE instead of --project/--module.
+Advanced overrides: --config, --binary, --elf, --lake, and --exporter.
 `;
+
 const list = (value: string | undefined) =>
   value ? value.split(",").filter(Boolean) : [];
 
@@ -28,6 +31,10 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
   const command = args[0];
   if (!command || command === "--help" || command === "help") {
     console.log(help);
+    return;
+  }
+  if (command === "--version" || command === "version") {
+    console.log("zklean 0.2.0");
     return;
   }
   const { values } = parseArgs({
@@ -38,6 +45,7 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
         "project",
         "module",
         "exporter",
+        "lake",
         "out",
         "export",
         "claims",
@@ -47,7 +55,7 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
         "certificate",
         "binary",
         "elf",
-      ].map((k) => [k, { type: "string" as const }]),
+      ].map((key) => [key, { type: "string" as const }]),
     ),
   });
   const required = (name: string): string => {
@@ -58,91 +66,119 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
   };
   const optional = (name: string) =>
     typeof values[name] === "string" ? (values[name] as string) : undefined;
-  let result: unknown;
-  if (command === "pin") {
-    const elfPath = resolve(required("elf"));
-    const binary = resolve(
-      optional("binary") ?? "target/release/zklean-native",
+  const tools = await findTools({
+    binary: optional("binary"),
+    elf: optional("elf"),
+    exporter: optional("exporter"),
+    lake: optional("lake"),
+    config: optional("config"),
+  });
+
+  if (command === "doctor") {
+    const entries = await Promise.all(
+      Object.entries(tools).map(async ([name, path]) => ({
+        name,
+        path: path ?? null,
+        available: path ? await Bun.file(path).exists() : false,
+      })),
     );
-    const identity = await runNative(binary, "identity", { elfPath });
+    console.log(
+      JSON.stringify(
+        Object.fromEntries(entries.map((v) => [v.name, v])),
+        null,
+        2,
+      ),
+    );
+    return;
+  }
+
+  if (command === "pin") {
+    const elfPath = tools.elf ?? resolve(required("elf"));
+    const identity = (await runNative(tools.binary, "identity", {
+      elfPath,
+    })) as object;
     await Bun.write(
       required("out"),
-      `${JSON.stringify({ binary, elfPath, ...(identity as object) }, null, 2)}\n`,
+      `${JSON.stringify(
+        {
+          format: "zklean/verifier-profile/1",
+          sp1Version: "5.2.4",
+          ...identity,
+        },
+        null,
+        2,
+      )}\n`,
     );
     return;
   }
-  if (command === "export") {
-    const cwd = resolve(required("project"));
+
+  const claims = list(optional("claims"));
+  const exported = async (): Promise<{
+    text: string;
+    source: string | undefined;
+  }> => {
+    const path = optional("export");
+    if (path)
+      return { text: await Bun.file(path).text(), source: optional("source") };
+    const project = resolve(required("project"));
     const module = required("module");
-    if (
-      !/^[A-Za-z_][A-Za-z0-9_'.]*(?:\.[A-Za-z_][A-Za-z0-9_']*)*$/.test(module)
-    )
-      throw new Error("invalid Lean module name");
-    const build = Bun.spawn(["lake", "build", module], {
-      cwd,
-      stdout: "inherit",
-      stderr: "inherit",
-    });
-    if ((await build.exited) !== 0) throw new Error("Lean module build failed");
-    const claims = list(optional("claims"));
-    const child = Bun.spawn(
-      [
-        "lake",
-        "env",
-        resolve(required("exporter")),
-        module,
-        ...(claims.length ? ["--", ...claims] : []),
-      ],
-      { cwd, stdout: "pipe", stderr: "inherit" },
-    );
-    const output = await new Response(child.stdout).text();
-    if ((await child.exited) !== 0) throw new Error("lean4export failed");
-    await Bun.write(required("out"), output);
+    return {
+      text: await exportModule({ project, module, claims, tools }),
+      source:
+        optional("source") ??
+        resolve(project, `${module.replaceAll(".", "/")}.lean`),
+    };
+  };
+
+  if (command === "export") {
+    const result = await exported();
+    await Bun.write(required("out"), result.text);
     return;
   }
+
+  let result: unknown;
   if (["check", "requirements", "prove"].includes(command)) {
+    if (claims.length === 0) throw new Error("--claims is required");
+    const source = await exported();
     const input: ProveInput = {
-      export: await Bun.file(required("export")).text(),
-      claims: list(required("claims")),
+      export: source.text,
+      claims,
       allowedAxioms: list(optional("axioms")),
     };
     if (command === "prove") {
-      const config = (await Bun.file(
-        required("config"),
-      ).json()) as NativeOptions;
-      result = await nativeBackend(config).prove(input);
-    } else {
-      result = await runNative(
-        optional("binary") ?? "target/release/zklean-native",
-        command,
+      result = await nativeBackend(await nativeOptions(tools, true)).prove(
         input,
       );
-      if (command === "requirements" && optional("source")) {
+    } else {
+      result = await runNative(tools.binary, command, input);
+      if (command === "requirements" && source.source) {
         Object.assign(result as object, {
-          sourceSha256: sha256(
-            new Uint8Array(await Bun.file(required("source")).arrayBuffer()),
+          sourceManifest: await createSourceManifest(
+            source.source,
+            tools.lake ?? "lake",
           ),
         });
       }
     }
   } else if (command === "verify") {
-    const config = (await Bun.file(required("config")).json()) as NativeOptions;
     const certificate = parseCertificate(
       await Bun.file(required("certificate")).json(),
     );
-    result = await createHTTPV({ backend: nativeBackend(config) }).verify(
-      certificate,
-      { allowedAxioms: list(optional("axioms")) },
-    );
+    result = await createHTTPV({
+      backend: nativeBackend(await nativeOptions(tools, false)),
+    }).verify(certificate, { allowedAxioms: list(optional("axioms")) });
     if ((result as { status: string }).status !== "verified")
       process.exitCode = 1;
-  } else throw new Error(`unknown command: ${command}\n${help}`);
+  } else {
+    throw new Error(`unknown command: ${command}\n${help}`);
+  }
   const text = `${JSON.stringify(result, null, 2)}\n`;
   if (optional("out")) await Bun.write(required("out"), text);
   else process.stdout.write(text);
 }
+
 if (import.meta.main)
   main().catch((error) => {
-    console.error(error.message);
+    console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;
   });

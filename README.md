@@ -11,99 +11,65 @@ CPU prover, and an offline verifier with pinned production recursion keys.
 specifies the wire profile and compatibility rules. SP1 is used unmodified;
 compressed proofs are verified through its upstream SDK.
 
-## Build and test
+## Install
 
-Install Bun 1.3+ and stable Rust, then:
+The release is self-contained on Linux x86-64. It includes the CLI, Lean,
+lean4export, the checked guest, the CPU prover, and the offline verifier:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/ZeframLou/zklean/main/install.sh | sh
+```
+
+The installer verifies the release checksum and writes to `~/.local` by default.
+Set `ZKLEAN_PREFIX` to choose another location. Run `zklean doctor` to see the
+resolved bundled tools.
+
+## Certify a Lean module
+
+No intermediate export or verifier configuration is needed:
+
+```sh
+zklean prove --project ./my-lean-project --module Contracts.Transfer \
+  --claims Transfer.transfer_safe --out transfer.certificate.json
+
+zklean verify --certificate transfer.certificate.json
+```
+
+`prove` builds the module with the bundled pinned Lean toolchain, exports the
+requested closure, checks it with Nanoda inside SP1, creates a local compressed
+STARK proof, verifies that proof, and writes the certificate. Add trusted axioms
+explicitly with `--axioms A,B`; ZKLean never infers axiom trust.
+
+Create a client requirement snapshot with its transitive source manifest:
+
+```sh
+zklean requirements --project ./my-lean-project --module Client.Requirements \
+  --claims Client.requires_auth --out Client.Requirements.lean.httpv.json
+```
+
+`zklean check` performs the fast kernel check without proving. `zklean export`
+and `--export FILE` remain available for build pipelines that want intermediate
+artifacts. CPU proving is substantially heavier than checking or verification,
+but requires no network, Docker, Rust, Bun, SP1 installation, or proving account.
+
+## Build from source
+
+Contributors need Bun, stable Rust, SP1 5.2.4, Rust 1.91.1 for its guest compiler,
+and Lean 4.36.0-rc1. The release workflow packages these dependencies so end users
+do not install them separately.
 
 ```sh
 bun install --frozen-lockfile
 bash scripts/prepare-sp1.sh
-cargo build --release --locked -p zklean-native
-bun run check
-cargo fmt --check -p zklean-core -p zklean-native
-```
-
-The default tests start a real Bun HTTP server and invoke the real Nanoda checker
-on committed lean4export fixtures. Transport tests use an explicitly injected,
-test-only signing authority; production code has no mock backend. Cryptographic
-regression tests independently verify the locally generated compressed STARK
-fixture and reject tampering. Guest execution and full proving are separate
-checks because they need the SP1 toolchain and more resources.
-
-## Build the guest and local prover
-
-Install SP1's `cargo-prove` **v5.2.4** and its `succinct-1.91.1` compiler using
-[SP1's installation instructions](https://github.com/succinctlabs/sp1/tree/v5.2.4/sp1up).
-Install Rust 1.91.1 as well: Cargo and the guest compiler must agree on supported
-compiler flags.
-
-```sh
-rustup toolchain install 1.91.1 --profile minimal
-bash scripts/prepare-sp1.sh
 bash scripts/build-guest.sh
 cargo build --release --locked -p zklean-native --features execute
-bun src/cli.ts pin \
-  --elf crates/guest/target/elf-compilation/riscv32im-succinct-zkvm-elf/release/zklean-guest \
-  --out examples/generated/verifier.json
-```
-
-`prepare-sp1.sh` retrieves the public recursion VK map from the pinned **GitHub
-source release** and validates the SDK's exact SHA-256. No S3 access, Docker,
-Groth16 ceremony artifacts, or remote proving account is needed. The prover
-always uses the CPU backend and enables production VK verification.
-
-Pin and distribute the generated configuration through the client's trusted
-release process. A certificate never supplies the trusted guest key. Verification
-uses `binary`, the trusted serialized `verificationKey`, and its `verifierKey`
-fingerprint; a local prover additionally needs the ELF path and SHA-256. Never
-copy a verifier key out of an untrusted certificate.
-
-Prove and independently verify a small axiom-free theorem locally:
-
-```sh
-bun src/cli.ts prove --export tests/fixtures/identity.ndjson \
-  --claims Demo.identity --config examples/generated/verifier.json \
-  --out examples/generated/identity.json
-bun src/cli.ts verify --certificate examples/generated/identity.json \
-  --config examples/generated/verifier.json
-```
-
-CPU proving is substantially heavier than checking or verification. The prover
-uses small shards and one shard per batch to limit memory. The unchanged SP1 SDK
-verifies the proof and authenticated public values before publishing a certificate.
-
-Run the real guest's success and rejection tests:
-
-```sh
-ZKLEAN_GUEST_ELF="$PWD/crates/guest/target/elf-compilation/riscv32im-succinct-zkvm-elf/release/zklean-guest" \
-  bun test tests/guest.e2e.test.ts
-```
-
-## Export a Lean project
-
-Install [elan/Lean](https://github.com/leanprover/elan). The exporter and example
-project pin Lean **v4.36.0-rc1**, and the exporter source is pinned by commit:
-
-```sh
 bash scripts/setup-exporter.sh
-bun src/cli.ts export --project examples/lean --module V1 \
-  --exporter .tooling/lean4export/.lake/build/bin/lean4export \
-  --claims Transfer.transfer_safe --out examples/generated/transfer.ndjson
-bun src/cli.ts check --export examples/generated/transfer.ndjson \
-  --claims Transfer.transfer_safe
+bun run check
 ```
 
-`check` validates proofs and prints the public statement; it does **not** create
-an SP1 certificate. Use `prove` to produce a transferable certificate. Axioms must
-be explicitly listed with `--axioms A,B`; they are never inferred as trusted.
-Proof terms are omitted from the public formal model. The public model contains types,
-definitions, certified proposition types, and all actually used axiom declarations.
-
-Regenerate the committed export fixtures from their Lean sources with:
-
-```sh
-bun scripts/export-examples.ts .tooling/lean4export/.lake/build/bin/lean4export
-```
+`prepare-sp1.sh` installs the checksum-pinned public recursion-key map from the
+SP1 GitHub source release. SP1 itself is used unmodified. `scripts/package-release.sh`
+builds the self-contained archive used by the one-command installer.
 
 ## Client integration
 
@@ -134,18 +100,19 @@ verification until a configured instance is used. `verify` checks certificate
 validity and axiom policy; `checkCompatibility` additionally checks the client's
 requirements. Certificate validity alone does not imply compatibility.
 
-Create a requirement snapshot from its Lean export:
+Create a requirement snapshot directly from its Lean module:
 
 ```sh
-bun src/cli.ts requirements --export tests/fixtures/requirements.ndjson \
-  --claims Client.requires_auth --source examples/lean/Requirements.lean \
+zklean requirements --project examples/lean --module Requirements \
+  --claims Client.requires_auth \
   --out examples/lean/Requirements.lean.httpv.json
 ```
 
-A `.lean` path loads its `.httpv.json` sidecar and checks the direct source digest.
-Regenerate sidecars when imported sources or toolchains change. JSON requirement
-snapshots can be passed directly. The snapshot contains the complete resolved
-formal model; matching names with different definitions is insufficient.
+A `.lean` path loads its `.httpv.json` sidecar and verifies every source, project
+file, imported module, and toolchain artifact recorded when it was generated.
+JSON requirement snapshots can be passed directly. The snapshot contains the
+complete resolved formal model; matching names with different definitions is
+insufficient.
 
 Exact matching accepts a certified claim with an identical resolved context.
 For other implications, supply a bridge certificate. The Lean bridge may assume

@@ -7,14 +7,7 @@ export function methodName(method: string): string {
     throw new Error("invalid HTTP method");
   const upper = method.toUpperCase();
   // Fetch normalizes standard methods. Extension methods remain case-sensitive.
-  return [
-    "DELETE",
-    "GET",
-    "HEAD",
-    "OPTIONS",
-    "POST",
-    "PUT",
-  ].includes(upper)
+  return ["DELETE", "GET", "HEAD", "OPTIONS", "POST", "PUT"].includes(upper)
     ? upper
     : method;
 }
