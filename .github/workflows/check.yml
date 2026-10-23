@@ -20,6 +20,8 @@ jobs:
       - run: bash scripts/prepare-sp1.sh
       - run: cargo fmt --check -p zklean-core -p zklean-native
       - run: cargo clippy --locked -p zklean-native -- -D warnings
+      # Compile outside Bun's test-hook timeout on cold runners.
+      - run: cargo build --release --locked -p zklean-native
       - run: bun run check
       - run: bun run compile
 
@@ -39,6 +41,7 @@ jobs:
       - run: bash scripts/setup-exporter.sh
       - run: bun scripts/export-examples.ts .tooling/lean4export/.lake/build/bin/lean4export
       - run: git diff --exit-code -- tests/fixtures/*.ndjson
+      - run: ZKLEAN_LAKE="$(command -v lake)" bun test tests/tooling.e2e.test.ts
 
   guest:
     runs-on: ubuntu-latest
@@ -58,6 +61,7 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bash scripts/build-guest.sh
       - run: bash scripts/prepare-sp1.sh
+      - run: cargo build --release --locked -p zklean-native --features execute
       - run: ZKLEAN_GUEST_ELF="$PWD/crates/guest/target/elf-compilation/riscv32im-succinct-zkvm-elf/release/zklean-guest" bun test tests/guest.e2e.test.ts
       - run: bun scripts/check-proof-fixture.ts "$PWD/crates/guest/target/elf-compilation/riscv32im-succinct-zkvm-elf/release/zklean-guest"
       - run: cargo check --locked -p zklean-native --features execute

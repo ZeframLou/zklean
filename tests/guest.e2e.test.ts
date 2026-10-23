@@ -50,6 +50,14 @@ test.skipIf(!elfPath)(
         input: await input("axioms", ["Transfer.assumed_safe"]),
       }),
     ).rejects.toThrow("guest execution failed");
+    const ambiguous = await input("identity", ["Demo.identity"]);
+    ambiguous.export = ambiguous.export.replace(
+      '"body":3',
+      '"body":3,"body":1',
+    );
+    await expect(
+      runNative(binary, "execute", { elfPath, input: ambiguous }),
+    ).rejects.toThrow("guest execution failed");
   },
   300_000,
 );

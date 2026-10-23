@@ -2,7 +2,7 @@ import { parseCertificate } from "./encoding.ts";
 import type { Certificate, ProofBackend } from "./types.ts";
 
 export interface ProveInput {
-  /** NDJSON emitted by the pinned lean4export. Proof terms are excluded from the public model. */
+  /** NDJSON emitted by the pinned exporter. Standalone theorem bodies are private. */
   export: string;
   claims: string[];
   allowedAxioms: string[];

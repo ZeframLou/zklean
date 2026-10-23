@@ -43,7 +43,8 @@ cp "$temporary/zklean/libexec/zklean-native" "$prefix/libexec/zklean-native"
 cp "$temporary/zklean/libexec/zklean-guest" "$prefix/libexec/zklean-guest"
 cp "$temporary/zklean/libexec/lean4export" "$prefix/libexec/lean4export"
 cp "$temporary/zklean/share/zklean/verifier.json" "$prefix/share/zklean/verifier.json"
-chmod +x "$prefix/bin/zklean" "$prefix/libexec/zklean-native" "$prefix/libexec/lean4export"
+chmod 755 "$prefix/bin/zklean" "$prefix/libexec/zklean-native" "$prefix/libexec/lean4export"
+chmod 644 "$prefix/libexec/zklean-guest" "$prefix/share/zklean/verifier.json"
 
 if [ "${ZKLEAN_SKIP_LEAN:-0}" != 1 ]; then
   elan_home="${ELAN_HOME:-$HOME/.elan}"

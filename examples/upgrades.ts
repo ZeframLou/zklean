@@ -1,11 +1,12 @@
 import { resolve } from "node:path";
 import { createHTTPV, nativeBackend, parseCertificate } from "../src/index.ts";
-import type { NativeOptions } from "../src/native.ts";
+import { findTools, nativeOptions } from "../src/tooling.ts";
 
 const generated = resolve(import.meta.dir, "generated");
-const config = (await Bun.file(
-  `${generated}/verifier.json`,
-).json()) as NativeOptions;
+const config = await nativeOptions(
+  await findTools({ config: `${generated}/verifier.json` }),
+  false,
+);
 const httpv = createHTTPV({ backend: nativeBackend(config) });
 const versions = await Promise.all(
   ["v1", "v2", "v3"].map(async (name) =>

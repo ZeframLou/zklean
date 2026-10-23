@@ -21,6 +21,9 @@ bun src/cli.ts pin \
   --elf "$root/libexec/zklean-guest" \
   --out "$root/share/zklean/verifier.json"
 
+chmod 755 "$root/bin/zklean" "$root/libexec/zklean-native" "$root/libexec/lean4export"
+chmod 644 "$root/libexec/zklean-guest" "$root/share/zklean/verifier.json"
+
 tar -czf "$output/$archive" -C "$stage" zklean
 (cd "$output" && sha256sum "$archive" > "$archive.sha256")
 echo "Created $output/$archive"

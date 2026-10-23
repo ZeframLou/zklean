@@ -19,7 +19,7 @@ const help = `ZKLean — check and certify Lean contracts
   zklean pin --out PROFILE.json [--elf FILE]
   zklean doctor
 
-Installed releases include the native prover/verifier, guest, Lean, and exporter.
+The installer supplies the prover/verifier, guest, exporter, and pinned Lean.
 Every source command also accepts --export FILE instead of --project/--module.
 Advanced overrides: --config, --binary, --elf, --lake, and --exporter.
 `;
@@ -146,6 +146,9 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
       allowedAxioms: list(optional("axioms")),
     };
     if (command === "prove") {
+      console.error(
+        "Generating a local compressed STARK proof; this may take several minutes…",
+      );
       result = await nativeBackend(await nativeOptions(tools, true)).prove(
         input,
       );

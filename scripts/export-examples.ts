@@ -41,6 +41,12 @@ export const examples = [
     claims: ["Demo.identity"],
     axioms: [],
   },
+  {
+    module: "ProofData",
+    file: "proof-data",
+    claims: ["Demo.checked_true"],
+    axioms: [],
+  },
 ];
 if (import.meta.main) {
   const exporter = process.argv[2];

@@ -45,7 +45,7 @@ zklean prove --project ./my-lean-project --module Contracts.Transfer \
 zklean verify --certificate transfer.certificate.json
 ```
 
-`prove` builds the module with the bundled pinned Lean toolchain, exports the
+`prove` builds the module with the pinned Lean toolchain, exports the
 requested closure, checks it with Nanoda inside SP1, creates a local compressed
 STARK proof, verifies that proof, and writes the certificate. Add trusted axioms
 explicitly with `--axioms A,B`; ZKLean never infers axiom trust.

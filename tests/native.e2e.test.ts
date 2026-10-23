@@ -76,6 +76,16 @@ test("invalid proof terms, missing claims, and axiom claims are rejected", async
   ).rejects.toThrow();
 });
 
+test("computational definitions retain embedded evidence without standalone theorem bodies", async () => {
+  const statement = await checked("proof-data", ["Demo.checked_true"]);
+  const model = readModel(statement.specs);
+  expect(model.declarations["Demo.checked"]!.def!.value).toBeString();
+  expect(model.declarations["Demo.checked_true"]!.thm).not.toHaveProperty(
+    "value",
+  );
+  expect(model.declarations["Demo.CheckedValue"]).toBeDefined();
+});
+
 test("reports the exact used axioms, including their public declarations", async () => {
   const claims = ["Transfer.assumed_safe"];
   const allowed = ["Trusted.authorization", "Trusted.evidence"];

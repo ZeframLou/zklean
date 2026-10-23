@@ -1,11 +1,12 @@
 /** Offline generation for the live upgrade example. Each proof runs locally. */
 import { nativeBackend, runNative } from "../src/native.ts";
 import { examples } from "./export-examples.ts";
-import type { NativeOptions } from "../src/native.ts";
+import { findTools, nativeOptions } from "../src/tooling.ts";
+import { main } from "../src/cli.ts";
 
-const config = (await Bun.file(
-  process.argv[2] ?? "examples/generated/verifier.json",
-).json()) as NativeOptions;
+const profile = process.argv[2] ?? "examples/generated/verifier.json";
+if (!(await Bun.file(profile).exists())) await main(["pin", "--out", profile]);
+const config = await nativeOptions(await findTools({ config: profile }), true);
 const backend = nativeBackend(config);
 for (const example of examples.filter((e) =>
   ["v1", "v2", "v3", "bridge"].includes(e.file),
