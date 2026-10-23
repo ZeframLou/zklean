@@ -24,8 +24,16 @@ fi
 
 temporary="$(mktemp -d)"
 trap 'rm -rf "$temporary"' EXIT HUP INT TERM
-curl -fsSL "$base/$asset" -o "$temporary/$asset"
-curl -fsSL "$base/$asset.sha256" -o "$temporary/$asset.sha256"
+if [ -z "${ZKLEAN_RELEASE_BASE:-}" ] && command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+  if [ "$version" = latest ]; then
+    gh release download --repo "$repository" --pattern "$asset" --pattern "$asset.sha256" --dir "$temporary"
+  else
+    gh release download "$version" --repo "$repository" --pattern "$asset" --pattern "$asset.sha256" --dir "$temporary"
+  fi
+else
+  curl -fsSL "$base/$asset" -o "$temporary/$asset"
+  curl -fsSL "$base/$asset.sha256" -o "$temporary/$asset.sha256"
+fi
 (cd "$temporary" && sha256sum -c "$asset.sha256")
 tar -xzf "$temporary/$asset" -C "$temporary"
 

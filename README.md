@@ -18,12 +18,21 @@ CPU prover, and the offline verifier. The same command installs the pinned Lean
 toolchain through `elan` when it is not already present:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/ZeframLou/zklean/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/ZeframLou/zklean/v0.2.0/install.sh | sh
 ```
 
 The installer verifies the release checksum and writes to `~/.local` by default.
 Set `ZKLEAN_PREFIX` to choose another location. Set `ZKLEAN_SKIP_LEAN=1` for a
 verification-only installation. Run `zklean doctor` to see the resolved tools.
+
+While this repository is private, use an authenticated GitHub CLI session:
+
+```sh
+gh api 'repos/ZeframLou/zklean/contents/install.sh?ref=v0.2.0' --jq .content | base64 -d | sh
+```
+
+The installer uses that session to download private release assets. The anonymous
+`curl` command becomes available if the repository is made public.
 
 ## Certify a Lean module
 
@@ -55,7 +64,7 @@ but requires no network, Docker, Rust, Bun, SP1 installation, or proving account
 
 ## Build from source
 
-Contributors need Bun, stable Rust, SP1 5.2.4, Rust 1.91.1 for its guest compiler,
+Contributors need Bun 1.4.4, stable Rust, SP1 5.2.4, Rust 1.91.1 for its guest compiler,
 and Lean 4.36.0-rc1. The release workflow packages these dependencies so end users
 do not install them separately.
 
