@@ -34,17 +34,24 @@ pub struct Statement {
 
 /// Nanoda panics on malformed proofs. In the guest that aborts execution and no
 /// proof can be produced. Native callers should execute this in a child process.
-pub fn check(input: &ProveInput) -> Result<Statement> {
+pub fn check(input: &ProveInput) -> Result<Statement> { process(input, true) }
+
+/// Export a locally trusted requirement model without asserting its derivability.
+pub fn requirements(input: &ProveInput) -> Result<Specs> { Ok(process(input, false)?.specs) }
+
+fn process(input: &ProveInput, require_proofs: bool) -> Result<Statement> {
     ensure!(!input.claims.is_empty(), "at least one claim is required");
     let mut export = Export::parse(&input.export)?;
     let claims: BTreeSet<_> = input.claims.iter().cloned().collect();
     ensure!(claims.len() == input.claims.len(), "duplicate claims");
     for name in &claims {
-        ensure!(export.kind(name)? == "thm", "claim must name a theorem: {name}");
+        ensure!(!require_proofs || export.kind(name)? == "thm", "claim must name a theorem: {name}");
     }
     // Check the entire supplied environment: no unauthenticated external state.
+    let mut permitted = input.allowed_axioms.clone();
+    if !require_proofs { permitted.extend(input.claims.clone()); }
     let config: Config = serde_json::from_value(serde_json::json!({
-        "permitted_axioms": input.allowed_axioms,
+        "permitted_axioms": permitted,
         "unpermitted_axiom_hard_error": false,
         "num_threads": 1, "nat_extension": true, "string_extension": true,
         "print_axioms": false
@@ -56,25 +63,24 @@ pub fn check(input: &ProveInput) -> Result<Statement> {
     for name in &claims {
         let mut found = false;
         for d in checked.declars.values() {
-            if let Declar::Theorem { info, .. } = d {
-                let rendered = checked.with_ctx(|ctx| render_name(ctx, info.name));
-                if &rendered == name {
-                    ensure!(checked.with_tc_and_declar(*info, |tc| tc.is_prop(info.ty).0),
-                        "claim is not a proposition");
-                    found = true;
-                }
+            let info = *d.info();
+            let rendered = checked.with_ctx(|ctx| render_name(ctx, info.name));
+            if &rendered == name {
+                ensure!(checked.with_tc_and_declar(info, |tc| tc.is_prop(info.ty).0),
+                    "claim is not a proposition");
+                found = true;
             }
         }
         ensure!(found, "claim missing from checked environment");
     }
     for d in checked.declars.values() {
         let info = *d.info();
-        if checked.with_tc_and_declar(info, |tc| tc.is_prop(info.ty).0) {
+        if matches!(d, Declar::Theorem { .. } | Declar::Definition { .. } | Declar::Opaque { .. }) && checked.with_tc_and_declar(info, |tc| tc.is_prop(info.ty).0) {
             export.proof_names.insert(checked.with_ctx(|ctx| render_name(ctx, info.name)));
         }
     }
     let axioms = export.axioms(&claims)?;
-    if let Some(name) = axioms.iter().find(|n| !input.allowed_axioms.contains(n)) {
+    if let Some(name) = axioms.iter().find(|n| !permitted.contains(n)) {
         bail!("forbidden axiom: {name}");
     }
     let model = export.public_model(&claims)?;
@@ -100,7 +106,7 @@ pub fn commitment(statement: &Statement) -> [u8; 32] {
     hash.finalize().into()
 }
 
-fn render_name(ctx: &nanoda_lib::util::TcCtx<'_, '_>, name: nanoda_lib::util::NamePtr<'_>) -> String {
+fn render_name<'t, 'p>(ctx: &nanoda_lib::util::TcCtx<'t, 'p>, name: nanoda_lib::util::NamePtr<'t>) -> String {
     use nanoda_lib::name::Name;
     match ctx.read_name(name) {
         Name::Anon => String::new(),
