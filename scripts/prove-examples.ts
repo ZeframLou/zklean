@@ -1,6 +1,5 @@
 /** Offline generation for the live upgrade example. Each proof runs locally. */
 import { nativeBackend, runNative } from "../src/native.ts";
-import { sha256 } from "../src/encoding.ts";
 import { examples } from "./export-examples.ts";
 import type { NativeOptions } from "../src/native.ts";
 
@@ -22,7 +21,6 @@ for (const example of examples.filter((e) =>
     `${JSON.stringify(certificate, null, 2)}\n`,
   );
 }
-const source = Bun.file("examples/lean/Requirements.lean");
 const requirements = await runNative(config.binary, "requirements", {
   export: await Bun.file("tests/fixtures/requirements.ndjson").text(),
   claims: ["Client.requires_auth"],
@@ -30,5 +28,5 @@ const requirements = await runNative(config.binary, "requirements", {
 });
 await Bun.write(
   "examples/generated/requirements.json",
-  `${JSON.stringify({ ...(requirements as object), sourceSha256: sha256(new Uint8Array(await source.arrayBuffer())) }, null, 2)}\n`,
+  `${JSON.stringify(requirements, null, 2)}\n`,
 );

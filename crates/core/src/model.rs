@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -24,7 +25,7 @@ use Table::*;
 
 pub struct Export {
     nodes: BTreeMap<(Table, u64), Value>,
-    declarations: BTreeMap<String, (String, Value)>,
+    declarations: BTreeMap<String, (String, Arc<Value>)>,
     /// Proposition-valued definitions and opaques are also proof terms.
     pub proof_names: BTreeSet<String>,
 }
@@ -39,7 +40,7 @@ impl Export {
         let mut declarations = Vec::new();
         for (line, text) in text.lines().enumerate() {
             let mut row: Value =
-                serde_json::from_str(text).with_context(|| format!("export line {}", line + 1))?;
+                crate::json::parse(text).with_context(|| format!("export line {}", line + 1))?;
             validate_export_row(&row, line == 0)
                 .with_context(|| format!("export line {}", line + 1))?;
             let obj = row.as_object_mut().context("expected object")?;
@@ -80,6 +81,7 @@ impl Export {
             } else {
                 vec![integer(&data["name"])?]
             };
+            let data = Arc::new(data.clone());
             for index in names {
                 let name = out.name(index)?;
                 ensure!(

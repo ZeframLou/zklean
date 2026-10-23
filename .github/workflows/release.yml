@@ -32,7 +32,18 @@ jobs:
       - run: bash scripts/build-guest.sh
       - run: cargo build --release --locked -p zklean-native
       - run: bash scripts/setup-exporter.sh
+      - run: bun run check
+      - run: bun scripts/check-proof-fixture.ts "$PWD/crates/guest/target/elf-compilation/riscv32im-succinct-zkvm-elf/release/zklean-guest"
+      - run: bun scripts/export-examples.ts .tooling/lean4export/.lake/build/bin/lean4export
+      - run: git diff --exit-code -- tests/fixtures/*.ndjson
       - run: bash scripts/package-release.sh dist
+      - name: Test installation and bundled tools
+        env:
+          ZKLEAN_SKIP_LEAN: '1'
+        run: |
+          ZKLEAN_PREFIX="$RUNNER_TEMP/zklean" ZKLEAN_RELEASE_BASE="file://$PWD/dist" sh install.sh
+          "$RUNNER_TEMP/zklean/bin/zklean" verify --certificate tests/fixtures/identity.certificate.json
+          "$RUNNER_TEMP/zklean/bin/zklean" check --project examples/lean --module Identity --claims Demo.identity
       - uses: softprops/action-gh-release@v2
         with:
           files: |

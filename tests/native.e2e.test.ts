@@ -92,6 +92,25 @@ test("reports the exact used axioms, including their public declarations", async
   expect(extra).toEqual(value);
 });
 
+test("duplicate JSON keys cannot substitute an unchecked proposition", async () => {
+  const request = await input("identity", ["Demo.identity"]);
+  // Nanoda used to select the first forallE (P → P), while Value selected
+  // the second (P). That certified ∀ P, P using a proof of ∀ P, P → P.
+  const original =
+    '"forallE":{"binderInfo":"default","body":3,"name":3,"type":0}';
+  const falseType =
+    '"forallE":{"binderInfo":"default","body":1,"name":3,"type":0}';
+  const exports = [
+    request.export.replace(original, `${original},${falseType}`),
+    request.export.replace('"body":3', '"body":3,"body":1'),
+    request.export.replace('"body":3', '"body":3,"bo\\u0064y":1'),
+  ];
+  for (const value of exports)
+    await expect(
+      runNative(binary, "check", { ...request, export: value }),
+    ).rejects.toThrow("duplicate JSON key");
+});
+
 test("native and TypeScript use identical authenticated statement bytes", async () => {
   const value = await checked("v1");
   const native = (await runNative(binary, "commitment", value)) as {

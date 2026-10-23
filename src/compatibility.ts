@@ -40,28 +40,6 @@ export async function createSourceManifest(
 ): Promise<SourceManifest> {
   const sourcePath = resolve(source);
   const root = await projectRoot(sourcePath);
-  const child = Bun.spawn(
-    [lake, "env", "lean", "--deps", relative(root, sourcePath)],
-    {
-      cwd: root,
-      env: {
-        ...process.env,
-        ELAN_TOOLCHAIN: "leanprover/lean4:v4.36.0-rc1",
-      },
-      stdout: "pipe",
-      stderr: "pipe",
-    },
-  );
-  const [code, stdout, stderr] = await Promise.all([
-    child.exited,
-    new Response(child.stdout).text(),
-    new Response(child.stderr).text(),
-  ]);
-  if (code !== 0)
-    throw new Error(
-      `could not resolve Lean dependencies: ${stderr.slice(-2000)}`,
-    );
-
   const paths = new Set<string>([sourcePath]);
   for (const name of [
     "lean-toolchain",
@@ -72,22 +50,51 @@ export async function createSourceManifest(
     const path = join(root, name);
     if (await Bun.file(path).exists()) paths.add(path);
   }
-  for (const line of stdout.split(/\r?\n/).filter(Boolean)) {
-    const artifact = resolve(line);
-    const marker = `${join(".lake", "build", "lib", "lean")}/`;
-    const normalized = artifact.replaceAll("\\", "/");
-    const index = normalized.lastIndexOf(`/${marker}`);
-    let dependency = artifact;
-    if (index >= 0 && normalized.endsWith(".olean")) {
-      const base = normalized.slice(0, index);
-      const module = normalized.slice(
-        index + marker.length + 1,
-        -".olean".length,
+  // --deps reports direct imports. Follow project/package sources recursively;
+  // keep binary artifacts as well so build output and toolchain changes fail closed.
+  const pending = [sourcePath];
+  const visited = new Set<string>();
+  while (pending.length) {
+    const current = pending.pop()!;
+    if (visited.has(current)) continue;
+    visited.add(current);
+    const child = Bun.spawn(
+      [lake, "env", "lean", "--deps", relative(root, current)],
+      {
+        cwd: root,
+        env: {
+          ...process.env,
+          ELAN_TOOLCHAIN: "leanprover/lean4:v4.36.0-rc1",
+        },
+        stdout: "pipe",
+        stderr: "pipe",
+      },
+    );
+    const [code, stdout, stderr] = await Promise.all([
+      child.exited,
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+    ]);
+    if (code !== 0)
+      throw new Error(
+        `could not resolve Lean dependencies: ${stderr.slice(-2000)}`,
       );
-      const candidate = join(base, `${module}.lean`);
-      if (await Bun.file(candidate).exists()) dependency = candidate;
+    for (const line of stdout.split(/\r?\n/).filter(Boolean)) {
+      const artifact = resolve(root, line);
+      paths.add(artifact);
+      const marker = "/.lake/build/lib/lean/";
+      const normalized = artifact.replaceAll("\\", "/");
+      const index = normalized.lastIndexOf(marker);
+      if (index < 0 || !normalized.endsWith(".olean")) continue;
+      const candidate = join(
+        normalized.slice(0, index),
+        `${normalized.slice(index + marker.length, -".olean".length)}.lean`,
+      );
+      if (await Bun.file(candidate).exists()) {
+        paths.add(candidate);
+        pending.push(candidate);
+      }
     }
-    paths.add(dependency);
   }
   const base = dirname(sourcePath);
   const files: Record<string, string> = {};

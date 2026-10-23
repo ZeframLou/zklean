@@ -1,4 +1,5 @@
 //! Shared checked computation. The SP1 guest and native diagnostics run this code.
+mod json;
 mod model;
 pub use model::{Export, PublicModel};
 
