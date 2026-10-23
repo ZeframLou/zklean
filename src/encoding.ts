@@ -98,7 +98,7 @@ export function readModel(specs: Specs): PublicModel {
   const text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
   const model = object(JSON.parse(text));
   keys(model, ["format", "declarations", "nodes"]);
-  if (model.format !== "lean4/kernel/1" || canonical(model) !== text)
+  if (model.format !== "lean4/kernel/2" || canonical(model) !== text)
     throw new Error("noncanonical public model");
   const declarations = object(model.declarations);
   const nodes = object(model.nodes);

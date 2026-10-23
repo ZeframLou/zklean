@@ -17,6 +17,7 @@ test("Nanoda checks a Lean export and produces a canonical proof-free closed mod
   const text = Buffer.from(decodeBase64(value.specs.declarations)).toString();
   expect(canonical(JSON.parse(text))).toBe(text);
   const model = readModel(value.specs);
+  expect(model.format).toBe("lean4/kernel/2");
   expect(model.declarations["Transfer.transfer_safe"]!.thm).not.toHaveProperty(
     "value",
   );
@@ -26,6 +27,14 @@ test("Nanoda checks a Lean export and produces a canonical proof-free closed mod
     .split("\n")
     .filter((line) => /"i[nel]":/.test(line)).length;
   expect(Object.keys(model.nodes).length).toBeLessThan(originalNodes);
+  expect(
+    Object.values(model.declarations).filter((entry) => "inductive" in entry),
+  ).toHaveLength(2);
+  expect(
+    Object.values(model.declarations).filter(
+      (entry) => "inductiveMember" in entry,
+    ),
+  ).toHaveLength(5);
 });
 
 test("invalid proof terms, missing claims, and axiom claims are rejected", async () => {
@@ -38,6 +47,22 @@ test("invalid proof terms, missing claims, and axiom claims are rejected", async
       claims: ["Missing.claim"],
     }),
   ).rejects.toThrow();
+  const unknownField = await input("v1");
+  unknownField.export = unknownField.export.replace(
+    '"binderInfo":"default","body":',
+    '"binderInfo":"default","junk":true,"body":',
+  );
+  await expect(runNative(binary, "check", unknownField)).rejects.toThrow(
+    "unexpected fields",
+  );
+  const multipleVariants = await input("v1");
+  multipleVariants.export = multipleVariants.export.replace(
+    '{"ie":0,"sort":1}',
+    '{"ie":0,"sort":1,"bvar":0}',
+  );
+  await expect(runNative(binary, "check", multipleVariants)).rejects.toThrow(
+    "one variant",
+  );
   await expect(
     runNative(
       binary,
@@ -77,7 +102,7 @@ test("native and TypeScript use identical authenticated statement bytes", async 
   );
   // Pinned cross-language vector also guards accidental encoding changes.
   expect(statementCommitment({ ...value, proof: "base64:AA==" })).toBe(
-    "21f1fe0468c4347c288b8c9339896a015f463b99bc6d987cb3fa953f5608fa1d",
+    "b07a76dd9e8bf5ef0732639f5902095fa91e46d62b3d7797e2451d38092b1596",
   );
 });
 

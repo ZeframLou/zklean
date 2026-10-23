@@ -14,9 +14,6 @@ export function methodName(method: string): string {
     "OPTIONS",
     "POST",
     "PUT",
-    "PATCH",
-    "CONNECT",
-    "TRACE",
   ].includes(upper)
     ? upper
     : method;

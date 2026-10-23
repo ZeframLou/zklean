@@ -40,6 +40,8 @@ impl Export {
         for (line, text) in text.lines().enumerate() {
             let mut row: Value =
                 serde_json::from_str(text).with_context(|| format!("export line {}", line + 1))?;
+            validate_export_row(&row, line == 0)
+                .with_context(|| format!("export line {}", line + 1))?;
             let obj = row.as_object_mut().context("expected object")?;
             if line == 0 {
                 ensure!(
@@ -74,20 +76,7 @@ impl Export {
                 "unknown declaration kind"
             );
             let names: Vec<u64> = if kind == "inductive" {
-                ["types", "ctors", "recs"]
-                    .iter()
-                    .map(|k| {
-                        data[*k]
-                            .as_array()
-                            .context("inductive entries")?
-                            .iter()
-                            .map(|d| integer(&d["name"]))
-                            .collect::<Result<Vec<_>>>()
-                    })
-                    .collect::<Result<Vec<_>>>()?
-                    .into_iter()
-                    .flatten()
-                    .collect()
+                inductive_indices(data)?
             } else {
                 vec![integer(&data["name"])?]
             };
@@ -203,11 +192,6 @@ impl Export {
                     }
                 }
             }
-            if let Some(all) = data.get("all").and_then(Value::as_array) {
-                for n in all {
-                    pending.push(self.name(integer(n)?)?);
-                }
-            }
         }
         Ok(seen)
     }
@@ -219,7 +203,13 @@ impl Export {
                 json!({"name": data["name"], "levelParams": data["levelParams"], "type": data["type"]}),
             );
         }
-        (kind.to_owned(), data.clone())
+        let mut data = data.clone();
+        // `all` is exporter dependency metadata, not a kernel declaration field.
+        // Dependencies are derived from the checked expression graph instead.
+        if kind != "inductive" {
+            data.as_object_mut().unwrap().remove("all");
+        }
+        (kind.to_owned(), data)
     }
 
     pub fn axioms(&self, claims: &BTreeSet<String>) -> Result<BTreeSet<String>> {
@@ -232,13 +222,27 @@ impl Export {
 
     pub fn public_model(&self, claims: &BTreeSet<String>) -> Result<PublicModel> {
         let mut model = PublicModel {
-            format: "lean4/kernel/1".into(),
+            format: "lean4/kernel/2".into(),
             declarations: BTreeMap::new(),
             nodes: BTreeMap::new(),
         };
         let mut cache = BTreeMap::new();
         for name in self.closure(claims, true)? {
             let (kind, data) = &self.declarations[&name];
+            if kind == "inductive" {
+                let mut members = inductive_indices(data)?
+                    .into_iter()
+                    .map(|index| self.name(index))
+                    .collect::<Result<Vec<_>>>()?;
+                members.sort();
+                let group = members.first().context("empty inductive group")?;
+                if &name != group {
+                    model
+                        .declarations
+                        .insert(name, json!({"inductiveMember": {"group": group}}));
+                    continue;
+                }
+            }
             let (kind, mut data) = self.project(kind, data, true, &name);
             visit(&kind, &mut data, &mut |t, i| {
                 self.node(t, i, &mut cache, &mut model.nodes)
@@ -281,6 +285,342 @@ impl Export {
         cache.insert((table, index), value.clone());
         Ok(value)
     }
+}
+
+const U16_MAX: u64 = u16::MAX as u64;
+const U32_MAX: u64 = u32::MAX as u64;
+const JS_SAFE_MAX: u64 = 9_007_199_254_740_991;
+
+fn exact_object<'a>(
+    value: &'a Value,
+    fields: &[&str],
+) -> Result<&'a serde_json::Map<String, Value>> {
+    let object = value.as_object().context("expected object")?;
+    let mut actual: Vec<_> = object.keys().map(String::as_str).collect();
+    let mut expected = fields.to_vec();
+    actual.sort_unstable();
+    expected.sort_unstable();
+    ensure!(actual == expected, "unexpected fields");
+    Ok(object)
+}
+
+fn unsigned(value: &Value, max: u64) -> Result<u64> {
+    let value = value.as_u64().context("expected unsigned integer")?;
+    ensure!(value <= max, "integer out of range");
+    Ok(value)
+}
+
+fn unsigned_array(value: &Value, max: u64) -> Result<()> {
+    for value in value.as_array().context("expected array")? {
+        unsigned(value, max)?;
+    }
+    Ok(())
+}
+
+fn text(value: &Value) -> Result<&str> {
+    value.as_str().context("expected string")
+}
+
+fn boolean(value: &Value) -> Result<bool> {
+    value.as_bool().context("expected boolean")
+}
+
+/// Validate the exact lean4export 3.1.0 grammar before either consumer sees it.
+/// This keeps Nanoda's checked declaration and the committed public projection
+/// from assigning different meanings to permissive or future JSON fields.
+fn validate_export_row(row: &Value, metadata: bool) -> Result<()> {
+    if metadata {
+        let row = exact_object(row, &["meta"])?;
+        let meta = exact_object(&row["meta"], &["exporter", "format", "lean"])?;
+        let exporter = exact_object(&meta["exporter"], &["name", "version"])?;
+        text(&exporter["name"])?;
+        text(&exporter["version"])?;
+        let format = exact_object(&meta["format"], &["version"])?;
+        ensure!(
+            text(&format["version"])? == "3.1.0",
+            "unsupported export format"
+        );
+        let lean = exact_object(&meta["lean"], &["githash", "version"])?;
+        text(&lean["githash"])?;
+        text(&lean["version"])?;
+        return Ok(());
+    }
+
+    let object = row.as_object().context("expected object")?;
+    let indices: Vec<_> = ["in", "il", "ie"]
+        .into_iter()
+        .filter(|key| object.contains_key(*key))
+        .collect();
+    ensure!(indices.len() <= 1, "multiple node indices");
+    if let Some(index) = indices.first() {
+        ensure!(
+            object.len() == 2,
+            "node must contain one variant and one index"
+        );
+        unsigned(&object[*index], U32_MAX)?;
+        let (kind, data) = object
+            .iter()
+            .find(|(key, _)| key.as_str() != *index)
+            .context("missing node variant")?;
+        let allowed = match *index {
+            "in" => &["str", "num"][..],
+            "il" => &["succ", "max", "imax", "param"][..],
+            "ie" => &[
+                "bvar", "sort", "const", "app", "lam", "forallE", "letE", "proj", "natVal",
+                "strVal",
+            ][..],
+            _ => unreachable!(),
+        };
+        ensure!(
+            allowed.contains(&kind.as_str()),
+            "node variant has wrong index type"
+        );
+        validate_node(kind, data)?;
+        return Ok(());
+    }
+
+    ensure!(object.len() == 1, "declaration must contain one variant");
+    let (kind, data) = object.iter().next().unwrap();
+    validate_declaration(kind, data)
+}
+
+fn validate_node(kind: &str, data: &Value) -> Result<()> {
+    match kind {
+        "str" => {
+            let data = exact_object(data, &["pre", "str"])?;
+            unsigned(&data["pre"], U32_MAX)?;
+            text(&data["str"])?;
+        }
+        "num" => {
+            let data = exact_object(data, &["pre", "i"])?;
+            unsigned(&data["pre"], U32_MAX)?;
+            unsigned(&data["i"], U32_MAX)?;
+        }
+        "succ" | "param" | "sort" => {
+            unsigned(data, U32_MAX)?;
+        }
+        "max" | "imax" => {
+            let pair = data.as_array().context("expected level pair")?;
+            ensure!(pair.len() == 2, "expected level pair");
+            unsigned_array(data, U32_MAX)?;
+        }
+        "bvar" => {
+            unsigned(data, U16_MAX)?;
+        }
+        "natVal" => {
+            let value = text(data)?;
+            ensure!(
+                !value.is_empty() && value.bytes().all(|b| b.is_ascii_digit()),
+                "invalid natural literal"
+            );
+        }
+        "strVal" => {
+            text(data)?;
+        }
+        "const" => {
+            let data = exact_object(data, &["name", "us"])?;
+            unsigned(&data["name"], U32_MAX)?;
+            unsigned_array(&data["us"], U32_MAX)?;
+        }
+        "app" => {
+            let data = exact_object(data, &["fn", "arg"])?;
+            unsigned(&data["fn"], U32_MAX)?;
+            unsigned(&data["arg"], U32_MAX)?;
+        }
+        "lam" | "forallE" => {
+            let data = exact_object(data, &["name", "type", "body", "binderInfo"])?;
+            for key in ["name", "type", "body"] {
+                unsigned(&data[key], U32_MAX)?;
+            }
+            ensure!(
+                ["default", "implicit", "strictImplicit", "instImplicit"]
+                    .contains(&text(&data["binderInfo"])?),
+                "invalid binderInfo"
+            );
+        }
+        "letE" => {
+            let data = exact_object(data, &["name", "type", "value", "body", "nondep"])?;
+            for key in ["name", "type", "value", "body"] {
+                unsigned(&data[key], U32_MAX)?;
+            }
+            boolean(&data["nondep"])?;
+        }
+        "proj" => {
+            let data = exact_object(data, &["typeName", "idx", "struct"])?;
+            unsigned(&data["typeName"], U32_MAX)?;
+            unsigned(&data["idx"], JS_SAFE_MAX)?;
+            unsigned(&data["struct"], U32_MAX)?;
+        }
+        _ => bail!("unsupported kernel node: {kind}"),
+    }
+    Ok(())
+}
+
+fn declaration_header(data: &Value, fields: &[&str]) -> Result<()> {
+    let data = exact_object(data, fields)?;
+    unsigned(&data["name"], U32_MAX)?;
+    unsigned_array(&data["levelParams"], U32_MAX)?;
+    unsigned(&data["type"], U32_MAX)?;
+    Ok(())
+}
+
+fn validate_declaration(kind: &str, data: &Value) -> Result<()> {
+    match kind {
+        "axiom" => {
+            declaration_header(data, &["name", "levelParams", "type", "isUnsafe"])?;
+            boolean(&data["isUnsafe"])?;
+        }
+        "thm" => {
+            declaration_header(data, &["name", "levelParams", "type", "value", "all"])?;
+            unsigned(&data["value"], U32_MAX)?;
+            unsigned_array(&data["all"], U32_MAX)?;
+        }
+        "opaque" => {
+            declaration_header(
+                data,
+                &["name", "levelParams", "type", "value", "isUnsafe", "all"],
+            )?;
+            unsigned(&data["value"], U32_MAX)?;
+            boolean(&data["isUnsafe"])?;
+            unsigned_array(&data["all"], U32_MAX)?;
+        }
+        "def" => {
+            declaration_header(
+                data,
+                &[
+                    "name",
+                    "levelParams",
+                    "type",
+                    "value",
+                    "hints",
+                    "safety",
+                    "all",
+                ],
+            )?;
+            unsigned(&data["value"], U32_MAX)?;
+            unsigned_array(&data["all"], U32_MAX)?;
+            ensure!(
+                ["safe", "unsafe", "partial"].contains(&text(&data["safety"])?),
+                "invalid definition safety"
+            );
+            match &data["hints"] {
+                Value::String(value) => ensure!(
+                    ["opaque", "abbrev"].contains(&value.as_str()),
+                    "invalid reducibility hint"
+                ),
+                value => {
+                    let value = exact_object(value, &["regular"])?;
+                    unsigned(&value["regular"], JS_SAFE_MAX)?;
+                }
+            }
+        }
+        "quot" => {
+            declaration_header(data, &["name", "levelParams", "type", "kind"])?;
+            ensure!(
+                ["type", "ctor", "lift", "ind"].contains(&text(&data["kind"])?),
+                "invalid quotient kind"
+            );
+        }
+        "inductive" => validate_inductive(data)?,
+        _ => bail!("unknown declaration kind"),
+    }
+    Ok(())
+}
+
+fn validate_inductive(data: &Value) -> Result<()> {
+    let data = exact_object(data, &["types", "ctors", "recs"])?;
+    for value in data["types"].as_array().context("inductive types")? {
+        declaration_header(
+            value,
+            &[
+                "name",
+                "levelParams",
+                "type",
+                "numParams",
+                "numIndices",
+                "all",
+                "ctors",
+                "numNested",
+                "isRec",
+                "isUnsafe",
+                "isReflexive",
+            ],
+        )?;
+        for key in ["numParams", "numIndices", "numNested"] {
+            unsigned(&value[key], U16_MAX)?;
+        }
+        unsigned_array(&value["all"], U32_MAX)?;
+        unsigned_array(&value["ctors"], U32_MAX)?;
+        for key in ["isRec", "isUnsafe", "isReflexive"] {
+            boolean(&value[key])?;
+        }
+    }
+    for value in data["ctors"].as_array().context("constructors")? {
+        declaration_header(
+            value,
+            &[
+                "name",
+                "levelParams",
+                "type",
+                "induct",
+                "cidx",
+                "numParams",
+                "numFields",
+                "isUnsafe",
+            ],
+        )?;
+        unsigned(&value["induct"], U32_MAX)?;
+        for key in ["cidx", "numParams", "numFields"] {
+            unsigned(&value[key], U16_MAX)?;
+        }
+        boolean(&value["isUnsafe"])?;
+    }
+    for value in data["recs"].as_array().context("recursors")? {
+        declaration_header(
+            value,
+            &[
+                "name",
+                "levelParams",
+                "type",
+                "all",
+                "numParams",
+                "numIndices",
+                "numMotives",
+                "numMinors",
+                "rules",
+                "k",
+                "isUnsafe",
+            ],
+        )?;
+        unsigned_array(&value["all"], U32_MAX)?;
+        for key in ["numParams", "numIndices", "numMotives", "numMinors"] {
+            unsigned(&value[key], U16_MAX)?;
+        }
+        for rule in value["rules"].as_array().context("recursor rules")? {
+            let rule = exact_object(rule, &["ctor", "nfields", "rhs"])?;
+            unsigned(&rule["ctor"], U32_MAX)?;
+            unsigned(&rule["nfields"], U16_MAX)?;
+            unsigned(&rule["rhs"], U32_MAX)?;
+        }
+        boolean(&value["k"])?;
+        boolean(&value["isUnsafe"])?;
+    }
+    Ok(())
+}
+
+fn inductive_indices(data: &Value) -> Result<Vec<u64>> {
+    ["types", "ctors", "recs"]
+        .iter()
+        .map(|key| {
+            data[*key]
+                .as_array()
+                .context("inductive entries")?
+                .iter()
+                .map(|declaration| integer(&declaration["name"]))
+                .collect::<Result<Vec<_>>>()
+        })
+        .collect::<Result<Vec<_>>>()
+        .map(|groups| groups.into_iter().flatten().collect())
 }
 
 fn integer(v: &Value) -> Result<u64> {

@@ -49,6 +49,7 @@ export function testAuthority() {
   const { privateKey, publicKey } = generateKeyPairSync("ed25519");
   let calls = 0;
   const backend: ProofBackend = {
+    identity: `test:${publicKey.export({ type: "spki", format: "der" }).toString("hex")}`,
     async verify(certificate) {
       calls++;
       return verify(

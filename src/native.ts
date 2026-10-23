@@ -62,6 +62,8 @@ export function nativeBackend(
       "pin both the guest ELF path and SHA-256 when providing an ELF",
     );
   }
+  const binary = options.binary;
+  const timeout = options.timeout;
   const config = {
     elfPath: options.elfPath,
     elfSha256: options.elfSha256,
@@ -69,24 +71,25 @@ export function nativeBackend(
     verificationKey: options.verificationKey,
   };
   return {
+    identity: `sp1:${options.verifierKey}`,
     async prove(input) {
-      if (!options.elfPath || !options.elfSha256)
+      if (!config.elfPath || !config.elfSha256)
         throw new Error("proving requires a pinned guest ELF");
       return parseCertificate(
         await runNative(
-          options.binary,
+          binary,
           "prove",
           { ...config, input },
-          options.timeout ?? 3_600_000,
+          timeout ?? 3_600_000,
         ),
       );
     },
     async verify(certificate) {
       const result = await runNative(
-        options.binary,
+        binary,
         "verify",
         { ...config, certificate },
-        options.timeout,
+        timeout,
       );
       return (
         typeof result === "object" &&

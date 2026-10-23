@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import { createHTTPV, DiscoveryError } from "../src/client.ts";
 import { canonical, encodeBase64, readModel, sha256 } from "../src/encoding.ts";
-import { MEDIA_TYPE } from "../src/server.ts";
+import { MEDIA_TYPE, methodName } from "../src/server.ts";
 import { requirements, testAuthority } from "./helpers.ts";
 import type { Certificate, Monitor, VerificationResult } from "../src/types.ts";
 
@@ -80,6 +80,9 @@ test("live OPTIONS discovery authenticates resource/method and preserves normal 
     httpv.query(url.replace("transfer", "other"), local),
   ).rejects.toBeInstanceOf(DiscoveryError);
   await expect(httpv.query(url, { method: "POST" })).rejects.toThrow("HTTPS");
+  expect(methodName("patch")).toBe("patch");
+  expect(methodName("PATCH")).toBe("PATCH");
+  expect(methodName("connect")).toBe("connect");
 });
 
 test("compatible upgrade adds claims; changed definitions with identical names fail exact policy", async () => {
@@ -139,6 +142,15 @@ test("a separately checked Lean bridge establishes the client requirement", asyn
       allowedAxioms: [],
     }),
   ).toMatchObject({ status: "verified", reason: "derivation" });
+  expect(
+    await httpv.checkCompatibility({
+      certificate: v1,
+      requirements: required,
+      derivation: bridge,
+      allowedAxioms: [],
+      mode: "exact",
+    }),
+  ).toMatchObject({ status: "incompatible", reason: "requirements-not-met" });
   expect(
     await httpv.checkCompatibility({
       certificate: v2,
@@ -239,6 +251,35 @@ test("watch refreshes advertisements, emits transitions, contains callback failu
     const count = discoveryCount;
     await monitor.refresh();
     expect(discoveryCount).toBe(count);
+  } finally {
+    monitor.stop();
+  }
+});
+
+test("a change callback can request and await a follow-up refresh", async () => {
+  const httpv = createHTTPV({ backend: authority.backend });
+  current = v1;
+  let changes = 0;
+  let monitor!: Monitor;
+  monitor = httpv.watch({
+    url,
+    ...local,
+    requirements: { format: "httpv/requirements/1", specs: v1.specs },
+    mode: "exact",
+    interval: 60_000,
+    async onChange() {
+      changes++;
+      await monitor.refresh();
+    },
+  });
+  try {
+    await Promise.race([
+      monitor.refresh(),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("refresh deadlocked")), 1000),
+      ),
+    ]);
+    expect(changes).toBe(1);
   } finally {
     monitor.stop();
   }
@@ -360,6 +401,7 @@ test("file advertisements refresh in place and stale Lean requirement sidecars f
   const directory = await mkdtemp(join(tmpdir(), "httpv-e2e-"));
   const path = join(directory, "certificate.json");
   const leanPath = join(directory, "remote.lean");
+  const importedPath = join(directory, "Imported.lean");
   await Bun.write(path, JSON.stringify(v1));
   const httpv = createHTTPV({ backend: authority.backend });
   const fileServer = Bun.serve({
@@ -381,14 +423,22 @@ test("file advertisements refresh in place and stale Lean requirement sidecars f
     ).rejects.toMatchObject({ reason: "missing-certificate" });
     await Bun.write(path, JSON.stringify(v3));
     expect(await httpv.query(target, local)).toEqual(v3);
-    const source = "-- local requirements snapshot\n";
+    const source = "import Imported\n-- local requirements snapshot\n";
+    const imported = "-- imported requirement definitions\n";
     await Bun.write(leanPath, source);
+    await Bun.write(importedPath, imported);
     await Bun.write(
       `${leanPath}.httpv.json`,
       JSON.stringify({
         format: "httpv/requirements/1",
         specs: v1.specs,
-        sourceSha256: sha256(source),
+        sourceManifest: {
+          format: "httpv/source-manifest/1",
+          files: {
+            "remote.lean": sha256(source),
+            "Imported.lean": sha256(imported),
+          },
+        },
       }),
     );
     expect(
@@ -400,7 +450,7 @@ test("file advertisements refresh in place and stale Lean requirement sidecars f
         })
       ).status,
     ).toBe("verified");
-    await Bun.write(leanPath, `${source}-- changed\n`);
+    await Bun.write(importedPath, `${imported}-- changed\n`);
     expect(
       (
         await httpv.checkCompatibility({

@@ -12,17 +12,24 @@ export interface Certificate {
 export interface Requirements {
   format: "httpv/requirements/1";
   specs: Specs;
-  /** Required for a .lean sidecar; detects stale exported requirements. */
-  sourceSha256?: string;
+  /** Required for a .lean sidecar; binds every source/build dependency. */
+  sourceManifest?: SourceManifest;
+}
+export interface SourceManifest {
+  format: "httpv/source-manifest/1";
+  /** Paths are relative to the primary Lean source. */
+  files: Record<string, string>;
 }
 export interface PublicModel {
-  format: "lean4/kernel/1";
+  format: "lean4/kernel/2";
   declarations: Record<string, Record<string, Record<string, unknown>>>;
   nodes: Record<string, Record<string, unknown>>;
 }
 
 /** This is trusted application configuration, never certificate-provided code. */
 export interface ProofBackend {
+  /** Stable identity of the trusted verifier profile used for cache isolation. */
+  readonly identity: string;
   verify(certificate: Certificate): Promise<boolean>;
 }
 export type Status = "verified" | "incompatible" | "unknown";
@@ -73,7 +80,7 @@ export interface WatchOptions extends QueryOptions {
   derivation?: unknown;
   mode?: "exact" | "implication";
   onChange(result: VerificationResult): void | Promise<void>;
-  onError?(error: unknown): void;
+  onError?(error: unknown): void | Promise<void>;
 }
 export interface Monitor {
   stop(): void;
