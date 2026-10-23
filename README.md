@@ -13,7 +13,11 @@ A certificate bundles this proof with the specification and its assumptions.
 
 ## Trust model
 
-A verified certificate establishes properties of the mathematical model under the axioms (assumptions) the recipient accepts. When a server advertises that model, clients still trust its deployed code and individual responses to implement it. A server can violate the model without detection while continuing to advertise the same certificate.
+You can verify certificates from an untrusted producer using a locally trusted
+verifier key and an explicit list of permitted axioms. Verification relies on
+the checker identified by that key and SP1's cryptographic guarantees. Acceptance
+establishes that the certified statements follow from those axioms; you decide
+whether the statements and axioms capture what you need.
 
 ## Install ZKLean
 
