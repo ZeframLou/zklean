@@ -83,7 +83,7 @@ theorem Client.stock_conserved (available requested remaining : Nat) :
 );
 
 test.skipIf(!process.env.ZKLEAN_LAKE)(
-  "import rejects a pre-existing declaration with a different proposition",
+  "import rejects conflicting propositions and reuses an existing proof definition",
   async () => {
     const statement = await checked("identity", ["Demo.identity"]);
     const directory = await mkdtemp(join(tmpdir(), "zklean-import-collision-"));
@@ -107,6 +107,18 @@ test.skipIf(!process.env.ZKLEAN_LAKE)(
           "Remote.lean",
         ]),
       ).rejects.toThrow("ZKLean import collision: Demo.identity");
+      await Bun.write(
+        join(directory, "Remote.lean"),
+        leanModule({ ...statement, proof: "base64:AA==" }).replace(
+          "import Lean",
+          "import Lean\ndef Demo.identity (P : Prop) : P → P := fun h => h",
+        ),
+      );
+      await runLake(directory, process.env.ZKLEAN_LAKE!, [
+        "env",
+        "lean",
+        "Remote.lean",
+      ]);
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
