@@ -82,5 +82,6 @@ jobs:
           go-version: '1.23.12'
       - run: cargo build --release --locked -p zklean-native --features prover,execute
       - run: ZKLEAN_GUEST_ELF="$PWD/crates/guest/target/elf-compilation/riscv32im-succinct-zkvm-elf/release/zklean-guest" bun test tests/guest.e2e.test.ts
+      - run: cargo build --release --locked -p zklean-native --features prover,execute
       - run: bun scripts/check-proof-fixture.ts "$PWD/crates/guest/target/elf-compilation/riscv32im-succinct-zkvm-elf/release/zklean-guest"
       - run: cargo check --locked -p zklean-native --features execute

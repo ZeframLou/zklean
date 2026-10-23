@@ -10,6 +10,9 @@ trap 'rm -rf "$stage"' EXIT
 root="$stage/zklean"
 mkdir -p "$root/bin" "$root/libexec" "$root/share/zklean" "$output"
 
+# Tests also build this target with fewer features. Always produce the binary
+# we distribute here, regardless of which checks ran immediately beforehand.
+cargo build --release --locked -p zklean-native --features prover,execute
 bun build --compile src/cli.ts --outfile "$root/bin/zklean"
 cp target/release/zklean-native "$root/libexec/zklean-native"
 cp crates/guest/target/elf-compilation/riscv32im-succinct-zkvm-elf/release/zklean-guest "$root/libexec/zklean-guest"
