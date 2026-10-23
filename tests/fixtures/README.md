@@ -16,9 +16,10 @@ STARK proofs. `guest.e2e.test.ts` executes the real compiled SP1 guest when
 
 `identity.certificate.json` is a **real locally generated SP1 compressed STARK
 proof**, not a test signature. `identity.verifier.json` records its trusted guest
-key, fingerprint, ELF digest, SP1 version, and guest source commit. The crypto
-E2E test verifies it with the unchanged upstream SDK and rejects a tampered axiom
-list and wrong key pin. It deliberately uses no original Lean proof or ELF during
+key, fingerprint, ELF digest, and SP1 version. CI rebuilds the current guest and
+requires all three key identities to match this fixture. The crypto E2E test
+verifies it with the unchanged upstream SDK and rejects a tampered axiom list and
+wrong key pin. It deliberately uses no original Lean proof or ELF during
 verification. This key is test data, not a default production trust policy.
 
 Regenerate using `zklean pin` and `zklean prove` on `identity.ndjson`, then verify
