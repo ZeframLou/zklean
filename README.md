@@ -13,11 +13,9 @@ compressed proofs are verified through its upstream SDK.
 
 ## Install
 
-ZKLean is a work in progress at **0.1.0**. No release is published yet. The
-packaging workflow builds a Linux x86-64 archive as a CI artifact, containing
-the CLI, lean4export, the checked guest, the CPU prover, and the offline verifier.
-Download and extract the CI artifact into `dist`, or build it from source below,
-then install with one command:
+Download and extract the Linux x86-64 archive from the
+[packaging workflow](https://github.com/ZeframLou/zklean/actions/workflows/release.yml)
+into `dist`, or [build it from source](#build-from-source), then run:
 
 ```sh
 ZKLEAN_RELEASE_BASE="file://$PWD/dist" sh install.sh
