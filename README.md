@@ -1,38 +1,19 @@
-# ZKLean and HTTPV
+# ZKLean
 
-**ZKLean** is a command-line tool for checking Lean mathematical specifications
-and making the results inexpensive for others to verify.
+An inventory service must never reserve more stock than it has. Lean can establish
+this for a model of the reservation logic using a mathematical argument called a
+**formal proof**.
 
-**HTTPV** is a separate HTTP protocol and TypeScript library for discovering
-API specifications and checking whether they meet a client's requirements.
-ZKLean works without an HTTP server; HTTPV uses certificates generated separately.
+**ZKLean is a CLI for generating succinct cryptographic proofs of Lean
+specifications.** It uses SP1 to produce a small proof that the original
+mathematical argument passed the checker. Recipients verify this cryptographic
+evidence without downloading and rechecking the original Lean argument.
 
-## Why this matters
+Certificate generation and verification run locally. HTTPV is optional.
 
-A checkout service needs inventory reservations to be backed by available stock.
-If its supplier starts accepting backorders, that assumption no longer holds.
-Clients need to check whether an API's advertised guarantees still meet their
-requirements after an update.
+## Trust model
 
-## How ZKLean works
-
-Lean expresses the inventory rules mathematically. A formal verification proof
-establishes that the modeled reservation operation obeys those rules.
-
-ZKLean checks that mathematical argument and uses SP1 to produce a small
-cryptographic proof that the check succeeded. Recipients verify this evidence
-without downloading and rechecking the original Lean argument.
-
-## How HTTPV works
-
-HTTPV can discover these certificates over HTTPS and periodically check whether
-the advertised guarantees still satisfy a client's requirements. Compatibility
-needs an exact match under the same definitions or a separately verified Lean
-argument establishing the implication.
-
-## What clients still trust
-
-Clients verify the mathematical claims themselves, but must trust the server to deploy matching code and honor the specification in every response. HTTPV cannot detect a server violating that specification or changing behavior without updating its advertisement. Each client chooses which axioms (assumptions) to trust and what to do when compatibility cannot be verified.
+A verified certificate establishes properties of the mathematical model under the axioms (assumptions) the recipient accepts. When a server advertises that model, clients still trust its deployed code and individual responses to implement it. A server can violate the model without detection while continuing to advertise the same certificate.
 
 ## Install ZKLean
 
@@ -68,5 +49,15 @@ reuse the resulting certificate.
 For your own project, change the directory, module, and theorem names. Only the
 axioms explicitly allowed with `--axioms` are accepted.
 
-See [HTTPV integration](docs/HTTPV.md), the [protocol specification](SPEC.md),
+## HTTPV: check remote API guarantees
+
+[HTTPV](docs/HTTPV.md) is a separate HTTP protocol and TypeScript library for
+discovering API specifications, checking compatibility with client requirements,
+and monitoring changes. It consumes certificates generated separately.
+
+For example, a checkout client requires inventory reservations to be backed by
+stock. HTTPV lets it detect when a supplier advertises a new contract allowing
+backorders and decide whether to block requests or switch suppliers.
+
+See the [protocol specification](SPEC.md),
 [proof formats](docs/ENCODING.md), and [source build instructions](docs/DEVELOPMENT.md).
