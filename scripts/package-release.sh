@@ -13,7 +13,7 @@ mkdir -p "$root/bin" "$root/libexec" "$root/share/zklean" "$output"
 # Tests also build this target with fewer features. Always produce the binary
 # we distribute here, regardless of which checks ran immediately beforehand.
 cargo build --release --locked -p zklean-native --features prover,execute
-bun build --compile src/cli.ts --outfile "$root/bin/zklean"
+bun build --compile --target=bun-linux-x64-baseline src/cli.ts --outfile "$root/bin/zklean"
 cp "${CARGO_TARGET_DIR:-target}/release/zklean-native" "$root/libexec/zklean-native"
 cp crates/guest/target/elf-compilation/riscv32im-succinct-zkvm-elf/release/zklean-guest "$root/libexec/zklean-guest"
 cp .tooling/lean4export/.lake/build/bin/lean4export "$root/libexec/lean4export"

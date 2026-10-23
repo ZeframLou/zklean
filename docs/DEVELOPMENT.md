@@ -63,6 +63,24 @@ Tests may rebuild `zklean-native` with only verification or guest-execution
 features. Rebuild it with `--features prover,execute` before `pin`, `prove`, or
 fixture identity checks; `package-release.sh` does this itself.
 
+For local proving, enable the current CPU's vector instructions in a separate
+build directory. This changes the host prover, not the pinned guest:
+
+```sh
+CARGO_TARGET_DIR=/tmp/zklean-local/target RUSTFLAGS="-C target-cpu=native" \
+  cargo build --release --locked -p zklean-native --features prover,execute
+ZKLEAN_NATIVE=/tmp/zklean-local/target/release/zklean-native \
+  bun src/cli.ts prove --export tests/fixtures/identity.ndjson \
+  --claims Demo.identity --out examples/generated/identity.groth16.json
+```
+
+Use the default portable Rust build for distribution; it must run on another
+machine. The archive uses Bun's baseline x86-64 runtime. For constrained proving
+environments, `RAYON_NUM_THREADS`, `GOMAXPROCS`, `GOMEMLIMIT`, and `GOGC` control
+host worker counts and Go memory behavior without changing SP1's source or
+production circuit checks. These settings do not guarantee that a workload fits
+the machine. `RUST_LOG` selects native diagnostics, streamed by `zklean prove`.
+
 To regenerate the real cryptographic fixture, build the current guest and
 native prover, run `zklean pin`, prove `tests/fixtures/identity.ndjson`, and
 positively verify the result through native and embedded verification before
