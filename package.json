@@ -1,8 +1,11 @@
 {
   "name": "zklean",
   "version": "0.1.0",
-  "private": true,
   "description": "Succinct proofs of Lean specifications",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ZeframLou/zklean.git"
+  },
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
