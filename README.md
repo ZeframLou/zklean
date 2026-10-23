@@ -4,10 +4,11 @@ ZKLean is a command-line tool that makes Lean specifications inexpensive to
 verify without downloading and rechecking their original mathematical arguments.
 
 Lean describes software behavior mathematically. A **formal proof** establishes
-properties of that model under stated assumptions. ZKLean checks this argument
-and uses SP1 to produce a small **cryptographic proof** that the check succeeded.
+properties of that model under stated assumptions.
 
-Certificate generation and verification run locally. HTTPV is optional.
+ZKLean runs its checker inside [SP1](https://github.com/succinctlabs/sp1), a system
+for generating cryptographic proofs of program execution. The resulting small
+**cryptographic proof** certifies that the checker accepted the Lean argument.
 
 ## Trust model
 
