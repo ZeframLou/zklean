@@ -25,8 +25,8 @@ those seven calls, in milliseconds. Result caching is disabled.
 
 | Workload | Direct Nanoda | Native Groth16 | Embedded WebAssembly Groth16 |
 | --- | ---: | ---: | ---: |
-| Identity | 3.34 / 2.85 / 1.94 | 275.24 / 273.52 / 271.56 | 344.91 / 341.52 / 336.99 |
-| Pipeline | 3.66 / 4.22 / 3.80 | 280.12 / 280.24 / 277.92 | 340.59 / 339.17 / 335.87 |
+| Identity | 12.91 / 2.48 / 2.06 | 280.06 / 281.75 / 271.10 | 358.20 / 348.69 / 340.28 |
+| Pipeline | 3.59 / 3.65 / 3.28 | 288.40 / 281.16 / 275.39 | 357.29 / 341.21 / 340.78 |
 
 The benchmark independently checks each original export and requires the resulting
 statement to equal the certificate's authenticated statement. Both examples use
@@ -35,8 +35,10 @@ must succeed. Native measurements include process startup and JSON exchange;
 direct checking includes model projection. SDK verification includes certificate
 schema parsing, model validation, axiom policy, and hashing. File reads and the
 initial JSON decoding happen before timing. The first embedded measurement
-includes WebAssembly compilation; later measurements, including the pipeline's
-first call, reuse that module.
+includes worker startup and WebAssembly compilation/instantiation. Later
+measurements, including the pipeline’s first call, reuse an idle worker and its
+instance. Pairing work runs outside the application event loop; the bounded pool
+shares at most two workers across SDK verifier instances.
 
 Measurements used a Linux x86-64 AMD EPYC 9V74 virtual machine with a four-CPU
 quota and 16 GiB memory limit, Bun 1.4.4, Rust 1.99.1, and unchanged upstream SP1
@@ -54,8 +56,8 @@ with `RUSTFLAGS='-C target-cpu=native'`; distribution keeps a portable binary.
 
 | Workload | Guest cycles | Wall time | Peak native process RSS |
 | --- | ---: | ---: | ---: |
-| Identity | 827,835 | 1,496 s (25 min) | 12,717,008 KiB (12.1 GiB) |
-| Pipeline | 11,482,006 | 3,384 s (56 min) | 12,969,308 KiB (12.4 GiB) |
+| Identity | 12.91 / 2.48 / 2.06 | 280.06 / 281.75 / 271.10 | 358.20 / 348.69 / 340.28 |
+| Pipeline | 3.59 / 3.65 / 3.28 | 288.40 / 281.16 / 275.39 | 357.29 / 341.21 / 340.78 |
 
 Both runs used `RAYON_NUM_THREADS=2`, `GOMAXPROCS=2`, `GOMEMLIMIT=6GiB`,
 `GOGC=20`, `TRACE_GEN_WORKERS=1`, `CHECKPOINTS_CHANNEL_CAPACITY=1`, and

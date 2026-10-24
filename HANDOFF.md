@@ -1,286 +1,143 @@
 # Handoff
 
-## Active follow-up: fix the holistic review findings
+## Completed review fixes
 
-The user now requests **all review issues fixed cleanly**. Work is active; the
-older completed-work account below is historical until this section is removed.
-Do not stop after the code fixes: finish real HTTPV crypto workflow, source drift
-CI, packed consumers, portable archive, benchmarks, docs, pushes and PR metadata.
-No subagents are authorized. Preserve all existing publication/privacy constraints.
+The holistic review fixes are implemented and validated. All four additional
+HTTPV Groth16 certificates have been generated, authenticated, and promoted to
+committed example paths. No proving process remains active.
 
-ZKLean runtime fixes are pushed at **12134df08dcfac2af4c1b1b8dc363a64bd4eb11e**
-on `work`: explicit tool/profile paths fail closed; strict verifier-profile
-schema validates version/key/digest/timeout; source requirements retain their
-pre-export source closure through native checking; the default Groth16 backend
-uses a shared two-worker/sixteen-job pool outside the event loop with safe
-retirement; Lean imports encode controls correctly and scale via top-level data
-definitions; literal models require implicit Nat/String declarations and policy
-errors remain inside the invalid-data boundary. No Rust/guest changes.
-Local host check: **27 pass, 2 real guest tests intentionally skipped during
-CPU proving**, 136 assertions. Hosted Check/Package green through f650c1f;
-12134df runs are pending. Final compiled CLI/actual packed SDK consumer checks
-passed (native tools unavailable). Final portable archive rebuilt successfully;
-bare Ubuntu22 verification log `/tmp/zklean-final-bare.log`.
+Keep both repositories private and at version **0.1.0**. No publication, tags,
+merges, releases, public host creation, or visibility changes are authorized.
+Use unchanged upstream **SP1 5.2.4**; do not vendor or patch it. The existing
+Nanoda patch is documented in `vendor/nanoda/UPSTREAM.md`.
 
-HTTPV now explicitly binds the **server-advertised entrypoint** to the client’s
-expected `operation` name and complete certified context. The final API uses
-`Advertisement {operation,certificate}`, `query()` returns an Advertisement,
-`checkCompatibility({advertisement,operation,...})`, and watch requires operation.
-Discovery is `{format:"httpv/1",contracts:{POST:{operation,certificate}}}`.
-Server routes take `{operation,certificate:objectOrPath}` or a provider returning
-the complete pair. Static objects are snapshots. The earlier operations-list
-approach below is obsolete. Binding runs before cache/bridge; changing only the
-advertised entrypoint invalidates acceptance. HTTPV pins the SDK commit above.
-Docs/SPEC/examples have been migrated. Latest filtered tests: **22 pass, 107
-assertions**, `/tmp/httpv-entrypoint-check.log`; mandatory real unit test awaits
-four certificates. Typecheck/format and full Lean fixture regeneration pass.
+- SDK: `/workspace/zklean`, branch `work`. Runtime fixes are at
+  `12134df08dcfac2af4c1b1b8dc363a64bd4eb11e`; subsequent changes update handoff,
+  documentation, and measurements. HTTPV's package.json records its exact SDK pin.
+- HTTPV: `/workspace/httpv`, branch `fix/groth16-verification`.
+  Draft PR: https://github.com/ZeframLou/httpv/pull/1 . Keep it unmerged.
+  Do not push HTTPV main; use the existing fix branch.
+- Read each repository's AGENTS.md. SDK proving remains independent of HTTPV.
+  HTTPV uses public SDK exports and invokes the independent CLI only offline.
+  Consumer installation uses npm or prepared tarballs, without private Git.
 
-Real proof work is active, **do not kill it or run large guest execution beside
-it**. Four new single-unit inventory models exercise actual POST /units,
-compatible V2, backorder V3, and weaker client bridge. Sources are in HTTPV
-`examples/unit-inventory/`; they reserve one unit from an inductively represented
-stock count. The arbitrary-quantity arithmetic example remains separate and
-expensive. V1 guest execution is **33,839,014 cycles**, with no axioms.
+## Corrections
 
-- Current first prover: `/workspace/optimized/target/release/zklean-native prove`.
-- First report (not yet finished): `/tmp/httpv-unit-v1.generation.json`.
-- Log: `/tmp/httpv-unit-v1.prove.log`.
-- Certificate output: `/workspace/httpv/tests/fixtures/unit/v1.certificate.json`
-  (empty until success; do not commit it until authenticated).
-- A sequential runner `/tmp/httpv-unit-proof-queue.py` waits for V1's successful
-  report, then generates V2, V3, bridge with the same pinned guest and resource
-  settings. Live runner log `/tmp/httpv-unit-proof-queue.log`.
-- Requests are `/tmp/httpv-unit-{v1,v2,v3,bridge}.request.json`; all exports were
-  produced by Lean and checked. Reports/logs follow that name prefix.
-- Proof output files go to `httpv/tests/fixtures/unit/*.certificate.json`.
-  Verify all through native/default WASM; compare statements to regenerated
-  fixtures and save resource reports only after success.
-
-HTTPV source fixtures were regenerated with the current source CLI through
-`ZKLEAN_CLI=/tmp/zklean-current-cli bun run fixtures`. The renamed catalog is now
-`scripts/models.ts` (old export-examples.ts deleted); it contains existing and
-new unit models. `scripts/refresh-fixtures.ts` handles each model's project and
-policy; `scripts/prove-examples.ts unit` reproduces unit certificates offline.
-Main inventory source/fixtures remain supported. New unit axiom pin is in
-`examples/unit-inventory/axioms.json` and was computed from checked V1.
-
-Additional follow-up implemented since this section was first written:
-- Runtime worker retirement/import-roundtrip checkpoint is pushed at
-  cc1e480cb92c6ec2524443962ffeea9f39a32df9, and HTTPV now pins that commit.
-- A further concrete decoder bug was found and fixed: literal nodes must include
-  their implicit Nat/String declarations; policy traversal stays inside the SDK's
-  invalid-data error boundary. The new malformed-propext literal regression plus
-  model/policy/crypto tests pass (12 tests, 62 assertions); no guest changes.
-- Canonical unit filenames are **v1.json, v2.json, v3.json, bridge.json** under
-  examples/unit-inventory/certificates. The running raw prover outputs retain
-  tests/fixtures/unit/*.certificate.json: authenticate, then copy/rename after all
-  reports succeed. The fixture directory's old duplicate requirements.json can
-  be deleted; source refresh now writes the canonical example requirement directly.
-- npm files explicitly include the example Lean files/data and unit-flow/upgrades
-  entry points, excluding .lake. The installed demo entry resolves canonical data
-  relative to its own module, with no private checkout. Packed-consumer script
-  runs the actual installed example entrypoint and its packaged canonical data.
-- Root SDK runtime pushed at c9a6176; hosted Check is green. A follow-up hardens
-  worker retirement: trapped WASM instances are discarded, retiring threads count
-  against the budget until termination, and an out-of-field key cannot poison a
-  later valid check. Crypto regressions pass; import now round-trips actual String
-  values through export/import/export (including literal escapes), and passes.
-- Latest rebuilt baseline archive passed bare Ubuntu22 checksum + both real proofs
-  with libexec removed: `/tmp/zklean-worker-bare.log`. Latest actual SDK tarball and
-  compiled CLI checks pass: `/tmp/zklean-worker-package.log`.
-- HTTPV currently pins c9a61760abe078b7874233bd74efce7dced3210e; update it to the
-  follow-up runtime commit after pushing. Typecheck and 19 existing/binding tests
-  pass against that SDK (`/tmp/httpv-core-fixes.log`). A full HTTPV check must wait
-  for the four real fixtures, because the mandatory unit crypto test is now added.
-- Real workflow implemented in `examples/unit-flow.ts` using public package APIs.
-  `examples/unit-upgrades.ts`, `tests/unit-crypto.e2e.test.ts`, and the actual npm
-  tarball check all run it. It covers discovery, V1/V2 acceptance, V3 request gating,
-  a weaker verified bridge, and tamper rejection with default Groth16.
-- Canonical real demo artifacts will live in
-  `httpv/examples/unit-inventory/certificates/{v1,v2,v3,bridge}.json` plus
-  `requirements.json`. **The running Python prover queue STILL writes old paths
-  `tests/fixtures/unit/*.certificate.json`. After ALL FOUR SUCCEED, authenticate
-  and move those outputs to the canonical example paths. Do not remove or rename
-  a file while a prover still has it open.** The old duplicate unit requirements
-  snapshot in tests/fixtures/unit can be removed; the canonical one is regenerated
-  from source by `bun run fixtures` already.
-- `scripts/models.ts` now has modelPath/certificatePath metadata; refresh writes
-  native-checked models under tests/fixtures/unit and the canonical public requirement
-  under examples/unit-inventory/certificates. `scripts/check-certificates.ts` must
-  authenticate all four canonical certs and require their statements to equal the
-  freshly checked model fixtures. No skips/fake proofs.
-- HTTPV formal-artifact CI job now checks out the exact SDK development commit,
-  builds its independent CLI/exporter with pinned Lean, regenerates all source
-  fixtures and rejects drift, then checks real certificates. It uses the existing
-  read-only ZKLEAN_READ_TOKEN prerequisite, still absent. .tooling is gitignored.
-- Both README/usage guides explicitly state npm is unpublished and provide local
-  tarball review. HTTPV docs/spec require explicit operation bindings, conservative
-  stable contexts, correct reasons, and document the real single-unit workflow.
-  HTTPV npm files include example models, real demo data, and runnable unit example;
-  no .lake data. No publication/visibility/version changes.
-
-Remaining follow-up:
-1. Wait for all real proof reports and authenticate/promote the outputs as above.
-   Record resource reports and actual cycles; don't run heavy guest execution during
-   proving. Run complete HTTPV check, check:certificates, example:unit, and packed
-   consumer against an actual SDK npm tarball with the final runtime.
-2. Re-run the benchmark after proving (uncontended) with the worker backend, update
-   raw JSON and guide. Re-run only affected root checks; full hosted guest checks
-   already validate c9a6176, and the guest/Rust sources haven't changed.
-3. Stage final SDK/npm and HTTPV/npm tarballs, ensure example links/data are actually
-   present, and update docs with measured unit proving resources. The latest root
-   runtime archive already passed the bare-container worker check; documentation
-   data changes can be repackaged from the cached Ubuntu22 builder.
-4. Finish final handoff, push both branches, update draft PR #1 title/body and CI
-   status. Do not merge, publish, create tags, change visibility, or retry main push.
-5. HTTPV hosted CI still needs the user's read-only Actions secret. Never persist
-   the broader/transient session token. The previous user question is pending;
-   no readiness/approval has been supplied. Report the external prerequisite if it
-   remains unavailable. The PR attach tool hangs but has been called.
-
-
-## Repositories and constraints
-
-- `/workspace/zklean`: private `ZeframLou/zklean`, branch `work`. The default
-  `main` is an obsolete specification checkpoint; continue on `work`.
-- `/workspace/httpv`: private `ZeframLou/httpv`, branch
-  `fix/groth16-verification`, pushed at `597036a`. Draft PR:
-  https://github.com/ZeframLou/httpv/pull/1 . Its development-only SDK pin is
-  `84400b836862ef9ea74355dc0a058f8f8d3f50ba`, which includes the verified runtime,
-  real identity fixture, and consumer WASM asset types. Later SDK changes concern
-  benchmark fixtures/docs, packaging data, and the CLI's long-run status message.
-- Automatic approval review rejected a direct HTTPV `main` push because explicit
-  shared-default-branch authorization was missing. The changes are safely pushed
-  on the draft PR; do not retry that direct push or merge. The app attachment
-  tool was called but hung; the normal PR link works.
-- Both projects remain at `0.1.0`. Keep source private. No package/release
-  publication, tags, merges, host creation, or visibility changes are authorized.
-- Use unchanged upstream SP1 5.2.4, with no vendoring or patches. The existing
-  Nanoda patch is documented in `vendor/nanoda/UPSTREAM.md`.
-- ZKLean remains independent of HTTPV. HTTPV uses public SDK exports; certificate
-  generation happens offline. Consumer installation uses npm, not private Git.
-- Read each repository's `AGENTS.md` before editing docs. Commit and push to the
-  existing work branches; preserve separate, concise trust explanations.
+- Explicit tool/profile overrides fail closed. Verifier profiles validate their
+  format, SP1 version, key, ELF digest/path, timeout, and supported fields.
+- Source-bound requirements capture their source closure before export and
+  compare it after native checking and final artifact capture. Concurrent edits,
+  unrelated --source bindings, and raw-export/source combinations are rejected
+  while preserving the prior output.
+- Embedded verification runs outside the event loop in a shared pool of at most
+  two workers and sixteen admitted jobs. Trapped/stuck workers are retired;
+  retiring threads count against the budget until termination completes.
+- Lean imports encode control characters correctly, scale through private
+  top-level data definitions, normalize irrelevant metadata/let annotations, and
+  round-trip actual String values through export/import/export.
+- Model validation includes implicit Nat/String literal dependencies. Policy
+  traversal errors stay inside the invalid-certificate boundary.
+- HTTPV discovery explicitly binds an endpoint entrypoint to its certificate:
+  `{format:"httpv/1",contracts:{POST:{operation,certificate}}}`.
+  `query()` returns an Advertisement. Compatibility checks take
+  `{advertisement,operation,requirements,allowedAxioms,...}`; watch also requires
+  the expected operation. The advertised name and complete certified context
+  must match the reviewed requirement before cache or bridge acceptance.
+  A bridge cannot supply an absent operation or authorize another entrypoint.
+- Static server advertisements are snapshots; providers return a complete
+  operation/certificate pair. Client inputs are captured before asynchronous
+  verification. Malformed discovery/options/context processing fail closed.
+- HTTPV CI builds the pinned independent checker, regenerates Lean model
+  fixtures, rejects source drift, and compares all four real certificates to
+  their checked statements. The installed npm check runs the packaged example
+  and packaged data through public APIs, without native tools or Lean.
 
 ## Validation
 
 | Check | Result |
 | --- | --- |
-| Full ZKLean suite, including real guest and Lean | 23 pass, 0 fail, 0 skip; 106 assertions |
-| Native SDK, lightweight native, explicit WASM, default SDK acceptance | Both real certificates passed |
-| Altered proof, different valid model, wrong key, concurrent verification | Passed |
-| Authenticated CLI import, inspection, Lean compilation, failed-output preservation | Passed |
-| Rust formatting/clippy; guest/fixture identity | Passed |
-| TypeScript and formatting | Passed |
-| Actual SDK npm tarball: installed consumer typecheck and native-free verification | Passed |
-| Compiled CLI: real proof, no native tools | Passed |
-| HTTPV full suite, including default real crypto | 18 pass, 0 fail; 92 assertions |
-| HTTPV actual npm tarballs: installed consumer typecheck, discovery and verification | Passed |
-| Fresh Ubuntu 22.04 install: automatic circuits/Lean, doctor, pin, init, inventory check | Passed |
-| Final portable archive on bare Ubuntu 22.04: both real certificates and checksum | Passed |
-| ZKLean hosted Check and Package at SDK pin `84400b8` | Both green |
-| HTTPV hosted Check | Stops before tests: missing `ZKLEAN_READ_TOKEN` |
+| Full SDK suite, real guest and Lean included | 29 pass, 0 fail, 0 skip; 141 assertions |
+| Full HTTPV suite, real inventory/bridge included | 23 pass, 0 fail; 115 assertions |
+| Four inventory certificates: source equality, native and default embedded verification | Passed |
+| Real HTTP discovery, added guarantee, changed behavior, weaker bridge, entrypoint rebinding, tampering, request gating | Passed |
+| Actual npm SDK and HTTPV consumer typechecking and native-free execution | Passed |
+| Compiled SDK CLI and bare Ubuntu 22.04 archive, libexec removed | Both SDK proof fixtures passed |
+| Fresh Ubuntu 22.04 installer, doctor, pin, init, real Lean inventory check | Passed locally and in hosted Package workflow |
+| SDK hosted Check and Package at 007d947 | Both green; full guest suite and clean install included |
+| TypeScript, formatting, source fixture regeneration | Passed |
+| HTTPV hosted CI | Blocked by missing ZKLEAN_READ_TOKEN |
 
-Logs: `/tmp/zklean-full-check.log`, `/tmp/zklean-clean-final.log`,
-`/tmp/zklean-package-types-check.log`, `/tmp/zklean-release-final.log`,
-`/tmp/httpv-full-final.log`, `/tmp/httpv-package-check.log`, and
-`/tmp/zklean-final-artifact-verify.log`.
+Final logs:
+- `/tmp/httpv-finish-validation.log`
+- `/tmp/httpv-full-final.log`, `/tmp/httpv-certificates-final.log`
+- `/tmp/httpv-example-final.log`, `/tmp/httpv-package-final.log`
+- `/tmp/zklean-full-final.log`, `/tmp/zklean-package-final.log`
+- `/tmp/zklean-final-bare.log`, `/tmp/httpv-fixture-refresh.log`
 
-ZKLean hosted green runs:
-https://github.com/ZeframLou/zklean/actions/runs/40045537311 and
-https://github.com/ZeframLou/zklean/actions/runs/40045537300 .
-The workflow prepares artifacts; its historical displayed name may be Release.
-It does not publish anything.
+HTTPV needs an Actions secret named **ZKLEAN_READ_TOKEN**, with read-only
+Contents access to private ZeframLou/zklean. Never persist the broader transient
+session GitHub token as that secret. Local checks passed; do not describe hosted
+HTTPV CI as green until the secret is configured and the workflow succeeds.
+New documentation pushes can trigger additional SDK workflow runs; inspect the
+latest branch runs if a current hosted status is needed.
 
-HTTPV CI requires an Actions secret with read-only Contents access to private
-`ZeframLou/zklean`. An asynchronous user question requested manual setup of
-`ZKLEAN_READ_TOKEN`; no answer has arrived. Never persist the session's broader,
-transient GitHub token as a CI secret. If the user confirms setup, rerun HTTPV
-Check and inspect it. Otherwise record hosted CI as pending that prerequisite.
+## Real certificates and costs
 
-## Completed corrections
-
-- Axiom permissions bind declarations and their full dependency context. Standard
-  pins derive from Lean; custom axioms require reviewed fingerprints. Context
-  matching ignores binder display names/annotations and preserves semantic names,
-  types, and definition bodies. Lake resolves `srcDir`; manifests track transitive
-  source changes. Verification bounds/coalesces concurrent work.
-- Model handling preserves `__proto__` declarations, rejects noncanonical base64
-  padding bits and unpaired Unicode surrogates, and uses UTF-8 canonical ordering.
-  Native cross-language tests cover closure, names, inductive aliases, binder
-  renaming, and polymorphic multi-claim checking.
-- Lean imports reconstruct kernel objects through public APIs and check reused
-  declarations against the authenticated context. They erase irrelevant metadata,
-  support matching proof-valued definitions, and preserve existing output when
-  authentication fails. Shared helper functions avoid huge generated elaborations.
-- The native wrapper reserves stdout for JSON and redirects upstream gnark output
-  to stderr. Bounded native diagnostic tails, CLI progress, and validated
-  `--timeout MS` support long CPU runs. Large models may take hours.
-- HTTPV checks every shared bridge/remote declaration, including operations outside
-  the assumed theorem closures. A real Lean/Nanoda fixture reproduced false
-  acceptance before the fix. The regression rejects conflicting and accepts
-  matching contexts, while allowing unrelated extra remote declarations.
-- The stock bridge derives the weaker conservation property. Monitor expiry,
-  timeouts, stopped state, synchronous callbacks, and `requireVerified()` gating
-  are implemented/documented. Default verification uses embedded Groth16 with
-  no native path/profile discovery. Runtime never generates certificates.
-
-## Real proofs and benchmark
-
-`tests/fixtures/identity.certificate.json` and
-`tests/fixtures/composition.certificate.json` are real upstream SP1 proofs using
-production VK/shape checks and official ceremony artifacts. No manufactured
-certificate or signature substitute is used. Both have 260 evidence bytes.
-The actual guest identity matches `src/guest.json`:
-
+The pinned guest is unchanged:
 - ELF SHA-256: `10819f2bb944e48fcbfbd5f49f47ba508bb0069a33923f8368a179e9e1bc5d37`
 - Checker key: `0x00a2d646d4c4c693eec3f7f24133b648ab3332c4b6d1e079aaa401c28c0f2d89`
-- Identity certificate ID: `4b8a989a35eb046e928e33b940f7b0c064d03254c7264bf1abf5361e7c773f4d`
 
-See `docs/BENCHMARKS.md`, `docs/benchmark-results.json`, and the two
-`docs/*-generation.json` reports. The measured complete certificates are 3,190
-and 37,534 bytes, compared with exports of 722 and 7,745 bytes. Median direct
-checking is 2.85/4.22 ms; native verification 273.52/280.24 ms; embedded
-verification 341.52/339.17 ms. These workloads show no size or speed advantage.
-The script independently checks the export/model match and a locally empty
-axiom policy before timing seven uncached samples.
+SDK identity/composition certificates remain in tests/fixtures. The refreshed
+quiet benchmark in docs/benchmark-results.json measures the actual worker-based
+backend with caching disabled. Median direct checking is 2.48/3.65 ms; native
+verification 281.75/281.16 ms; embedded verification 348.69/341.21 ms. Complete
+certificates are larger than the original exports. There is no measured size or
+speed advantage; privacy of proof terms and recipient portability are the tradeoff.
+See docs/BENCHMARKS.md and the two SDK generation resource reports.
 
-Generation used 4-CPU/16-GiB limits, a host-optimized native prover, two Rayon/Go
-workers, `GOMEMLIMIT=6GiB`, and `GOGC=20`. Identity took 1,496 seconds and peaked
-at 12.1 GiB RSS; composition took 3,384 seconds and peaked at 12.4 GiB. Both runs
-finished successfully. Guest cycles: identity 827,835, composition 11,482,006,
-inventory 353,114,958. No inventory Groth16 proof was generated or benchmarked.
+HTTPV's new single-unit inventory model represents unbounded stock inductively
+and models POST /units. Its four real certificates and the weaker requirement
+snapshot are in examples/unit-inventory/certificates/{v1,v2,v3,bridge,requirements}.json.
+V1 conserves stock; V2 adds success on available stock; V3 truthfully certifies a
+weaker guarantee while accepting backorders; the bridge derives nonempty input
+on success from conservation. This is separate from the older arbitrary-quantity
+arithmetic example, whose Groth16 certificates have not been generated.
 
-The initial portable attempt exceeded the memory limit while large archives
-occupied RAM-backed `/tmp`. Those archives now live on disk under
-`/workspace/.cache/`; do not move them back to tmpfs. Official circuit archive:
-`/workspace/.cache/zklean-groth16.tar.gz`, SHA-256
+| Unit workload | Wall seconds | Peak RSS KiB | Rust workers |
+| --- | ---: | ---: | ---: |
+| Baseline | 7437.82 | 13452196 | 2 |
+| Additional guarantee | 8391.86 | 13064868 | 2 |
+| Changed behavior | 3710.86 | 13008232 | 4 |
+| Weaker-requirement bridge | 5523.37 | 13436376 | 4 |
+
+Raw reports: HTTPV docs/unit-generation.json. V1 executes 33,839,014 guest
+cycles. All runs used Go workers 2, GOMEMLIMIT=6GiB, GOGC=20, trace workers 1,
+and both checkpoint/record channel capacities 1. The last two used all four
+available Rust workers after the user asked about speedups. Workloads differ;
+do not claim a controlled twofold improvement from their wall times.
+The four certificates contain genuine upstream SP1 evidence, not signatures or
+manufactured proof substitutes. Transport-only tests retain a clearly isolated
+signature backend.
+
+## Environment and distribution
+
+Source `/workspace/zklean-env.sh` for tool/cache paths. Do not change HOME.
+Optimized prover: `/workspace/optimized/target/release/zklean-native`.
+Portable Ubuntu 22.04 target: `/workspace/baseline/target`.
+Docker builder: zklean-build:ubuntu22, explicit local Unix socket. Preserve the
+proxy CA and unset the host BINDGEN_EXTRA_CLANG_ARGS inside that builder.
+An alternative SP1 output directory needs an ancestor named `target`.
+
+Official circuit archive: `/workspace/.cache/zklean-groth16.tar.gz`, SHA-256
 `6cbc2c155c41001e81efd81119bd3d4f32313fcd3184df383d50225315b73104`.
-No proving process remains active. Generated proofs/logs are in
-`examples/generated/` and `/tmp/zklean-*-prove*`.
+Keep large archives on disk, outside RAM-backed /tmp.
 
-## Tools and distribution
+The actual portable archive, checksum, installer, docs, example sources, benchmark
+fixtures and prepared SDK tarball are staged in SDK dist/. The HTTPV tarball
+includes its runnable unit example, formal sources, and real certificate data;
+.lake and test signing helpers are excluded. Repacking never publishes anything.
 
-Source `/workspace/zklean-env.sh` for this environment's tool/cache paths. Fresh
-environments must provision documented dependencies. Do not change HOME.
-The optimized prover is `/workspace/optimized/target/release/zklean-native`;
-the portable Ubuntu 22.04 build target is `/workspace/baseline/target`.
-Docker builder image `zklean-build:ubuntu22` remains available. Use the explicit
-local socket, preserve proxy/CA trust, and unset the host's
-`BINDGEN_EXTRA_CLANG_ARGS` inside that builder. The SP1 build script needs an
-ancestor named `target`; do not rename that target directory.
-
-`scripts/package-release.sh` always rebuilds `prover,execute`, because test
-helpers can overwrite the target with fewer features. It compiles Bun's baseline
-x86-64 runtime. `dist/zklean-linux-x64.tar.gz` and checksum are staged, with
-installer, README, specification, docs/raw benchmark reports, example Lean
-sources, and benchmark certificates/exports/profile. Docs/data copy changes
-were repackaged after the final runtime archive passed the clean checks above.
-
-The installer automatically fetches checksum-pinned proving circuits and pinned
-Lean. End users need no Go, Rust, Docker, Bun, private Git credentials, or native
-verifier configuration. The proposed public binary/docs host is
-`ZeframLou/zklean-dist`; it has not been created or published. The one-command
-public install remains conditional on that maintainer step. Concrete local
-installation uses `ZKLEAN_RELEASE_BASE=file://...` and is already validated.
-No source visibility or package publication has changed.
+The proposed public binary/docs host ZeframLou/zklean-dist has not been created
+or published. Both npm packages are unpublished. README installation commands
+are explicitly conditional on publication; private reviewers use tested local
+archives/tarballs. Publication remains a separate maintainer action.

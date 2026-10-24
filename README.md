@@ -14,15 +14,18 @@ A certificate bundles this proof with the specification and its assumptions.
 ## Trust model
 
 You can verify certificates from an untrusted producer using a locally trusted
-verifier key and an explicit list of permitted axioms. Verification relies on
+verifier key and explicitly permitted axioms (assumptions accepted without proof).
+Verification relies on
 the checker identified by that key and SP1's cryptographic guarantees. Acceptance
 establishes that the certified statements follow from those axioms; you decide
 whether the statements and axioms capture what you need.
 
 ## Install ZKLean
 
-For a published binary release, install ZKLean and its dependencies on Linux
-x86-64 with one command:
+The public binary host is not published yet. Private reviewers can
+[test the prepared archive locally](docs/DISTRIBUTION.md#check-the-actual-archive).
+After publication, install ZKLean and its dependencies on Linux x86-64 with
+one command:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/ZeframLou/zklean-dist/main/install.sh | sh
@@ -31,7 +34,8 @@ curl -fsSL https://raw.githubusercontent.com/ZeframLou/zklean-dist/main/install.
 The binary-only distribution is prepared separately from this private source
 repository; publishing it requires the steps in [Distribution](docs/DISTRIBUTION.md).
 The installer downloads about 2.9 GB of upstream proving data and the pinned
-Lean toolchain. The npm SDK is also unpublished. After publication, recipients can use
+Lean toolchain. The npm SDK is also unpublished. After publication, recipients
+can use
 `npm install zklean` with Bun 1.4.4 or newer; private reviewers can
 [test prepared tarballs](docs/DISTRIBUTION.md#npm-consumers).
 
