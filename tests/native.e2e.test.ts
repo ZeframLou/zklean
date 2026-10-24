@@ -202,6 +202,7 @@ test("offline Groth16 verifier rejects non-SP1 proofs and a changed guest pin", 
   const certificate = {
     ...value,
     proof: `base64:${Buffer.alloc(260).toString("base64")}`,
+    source: "https://example.com/v1.ndjson",
   };
   expect(await nativeBackend(config).verify(certificate)).toBe(false);
   await expect(

@@ -67,7 +67,8 @@ statementId = H("zklean/statement/1\0", {format, claims, definitions, axioms})
 ```
 
 Each of `claims`, `definitions` and `axioms` maps Lean names to identities. A name
-occurs at most once across the three maps.
+occurs at most once across the three maps. The certificate's `source` is not
+committed; it only locates an export that must reproduce these identities.
 
 The certificate's `proof` is `base64:` followed by padded, canonical RFC 4648
 base64 of exactly 260 bytes: SP1's four-byte circuit-key selector and the 256-byte

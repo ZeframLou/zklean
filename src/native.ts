@@ -1,4 +1,4 @@
-import { parseCertificate } from "./encoding.ts";
+import { parseCertificate, statement } from "./encoding.ts";
 import type { Certificate, ProofBackend } from "./types.ts";
 
 export interface ProveInput {
@@ -70,9 +70,9 @@ export async function runNative(
     clearTimeout(timer);
   }
 }
-export function nativeBackend(
-  options: NativeOptions,
-): ProofBackend & { prove(input: ProveInput): Promise<Certificate> } {
+export function nativeBackend(options: NativeOptions): ProofBackend & {
+  prove(input: ProveInput, source: string): Promise<Certificate>;
+} {
   if (
     options.timeout !== undefined &&
     (!Number.isSafeInteger(options.timeout) ||
@@ -101,24 +101,26 @@ export function nativeBackend(
   };
   return {
     identity: `sp1:5.2.4:groth16:${options.verifierKey}`,
-    async prove(input) {
+    async prove(input, source) {
       if (!config.elfPath || !config.elfSha256)
         throw new Error("proving requires a pinned guest ELF");
-      return parseCertificate(
-        await runNative(
-          binary,
-          "prove",
-          { ...config, input },
-          timeout ?? 3_600_000,
-          options.onProgress,
-        ),
-      );
+      const proved = (await runNative(
+        binary,
+        "prove",
+        { ...config, input },
+        timeout ?? 3_600_000,
+        options.onProgress,
+      )) as object;
+      return parseCertificate({ ...proved, source });
     },
-    async verify(certificate) {
+    async verify(value) {
       const result = await runNative(
         binary,
         "verify",
-        { ...config, certificate },
+        {
+          ...config,
+          certificate: { ...statement(value), proof: value.proof },
+        },
         timeout,
       );
       return (

@@ -5316,6 +5316,7 @@ dependencies = [
  "bincode",
  "hex",
  "libc",
+ "nanoda_lib",
  "serde",
  "serde_json",
  "sha2",

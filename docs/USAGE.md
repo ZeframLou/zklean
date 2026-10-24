@@ -21,14 +21,19 @@ zklean check --project inventory --module V1 \
 zklean prove --project inventory --module V1 \
   --claims Inventory.reservation_safe \
   --definitions Inventory.POST_reservations --axioms propext \
-  --out reservation.json
+  --source https://acme.example/reservation.ndjson --out reservation.json
 zklean verify --certificate reservation.json --axioms propext
 ```
 
 `check` runs Nanoda directly and prints the statement: the identities of the
 claims, of the listed definitions, and of every axiom the proofs use.
 `--definitions` names declarations the claims are about, such as an API
-operation, so recipients can match them too. `prove` additionally runs the checker inside SP1
+operation, so recipients can match them too. `prove` also writes `reservation.ndjson`, the Lean export it
+proved from. Publish it at the `--source` URL: it holds every definition and
+statement recipients need. It also contains your proofs; to keep them private,
+publish instead the export of a specification module that states the claims as
+`axiom`s (`zklean export … --out reservation.ndjson`). Its identities are the same.
+`prove` additionally runs the checker inside SP1
 and generates cryptographic evidence; this can take hours and needs a measured
 memory budget. See [Benchmarks](BENCHMARKS.md) before choosing a proving workload;
 `prove --timeout MS` overrides the default one-hour deadline. `verify` uses the embedded WebAssembly verifier and the
@@ -57,16 +62,24 @@ loop; an idle worker lets the process exit.
 For TypeScript checking in a Bun application, add `@types/bun` as a development
 dependency if the project does not already include it.
 
-## Match a certificate against your own requirements
+## Read a received certificate
 
-An identity hashes a declaration together with everything it depends on: every
-constant name, type and definition body. Binder names are ignored. Two
-declarations have the same identity only if they say the same thing about the
-same definitions.
+A certificate names each declaration by an identity, a hash of the declaration
+together with everything it depends on: every constant name, type and
+definition body. Binder names are ignored. Its `source` is the URL of one Lean
+export file containing all of them. Fetch and check it:
 
-To depend on a certified guarantee, compile the provider's Lean specification,
-the module that defines the operations and states the claims. It may state
-claims as `axiom`s, since a proposition's identity ignores its proof. Then record
+```sh
+zklean fetch --certificate reservation.json --out reservation.ndjson
+```
+
+`fetch` downloads the export, checks it with Nanoda, and recomputes every
+identity in the certificate. It saves the file only if all of them match.
+Nothing fetched is executed.
+
+An export holds kernel terms rather than readable Lean. To review the
+definitions and write your own proofs, use the provider's Lean source from any
+copy: if its identities match the certificate, it is the certified model. Record
 what your own code assumes:
 
 ```sh
@@ -77,8 +90,7 @@ zklean requirements --project client --module Remote \
 
 A certificate satisfies the snapshot when every required claim and definition
 appears in it with the same identity. Requirements generation does not prove the
-claims. Regenerate and review the snapshot whenever its Lean sources change, for
-example as a CI step.
+claims. Regenerate and review the snapshot whenever its Lean sources change.
 
 ## Derive a different requirement
 
@@ -95,18 +107,21 @@ theorem Client.stock_conserved (available requested remaining : Nat) :
   exact (Inventory.reservation_safe available requested remaining accepted).2.2
 ```
 
-Save the remote certificate's `claims` object as `remote-claims.json`, and
-certify the derivation with the remote guarantee as a permitted axiom:
+Here `Remote` is the provider's specification module. Save the remote
+certificate's `claims` object as `remote-claims.json`, and certify the derivation
+with the remote guarantee as a permitted axiom:
 
 ```sh
 zklean prove --project client --module Bridge \
   --claims Client.stock_conserved \
   --axioms propext,Inventory.reservation_safe \
-  --axiom-policy remote-claims.json --out bridge.json
+  --axiom-policy remote-claims.json \
+  --source https://client.example/bridge.ndjson --out bridge.json
 ```
 
 The bridge certificate lists `Inventory.reservation_safe` among its axioms with
-the remote claim's identity. A recipient verifies both certificates and accepts
+the remote claim's identity, and its source export contains that axiom's
+statement. A recipient verifies both certificates and accepts
 the bridge only with that remote claim permitted by identity.
 
 ## Choose axioms

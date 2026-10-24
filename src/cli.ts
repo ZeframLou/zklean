@@ -3,23 +3,30 @@ import { parseArgs } from "node:util";
 import { resolve } from "node:path";
 import { version } from "../package.json";
 import { nativeBackend, runNative } from "./native.ts";
-import { parseCertificate } from "./encoding.ts";
 import { groth16Backend } from "./groth16.ts";
 import { createVerifier } from "./verifier.ts";
 import { exportModule, findTools, nativeOptions } from "./tooling.ts";
 import type { ProveInput } from "./native.ts";
 import { checkAxioms, standardAxioms } from "./policy.ts";
 import type { Statement, VerifyOptions } from "./types.ts";
-import { identified } from "./encoding.ts";
+import {
+  canonical,
+  identified,
+  parseCertificate,
+  statement as statementOf,
+} from "./encoding.ts";
+import { download, matchSource } from "./fetch.ts";
 
 const help = `ZKLean — check and certify Lean contracts
 
-  zklean prove --project DIR --module NAME --claims A,B [--definitions D] --out CERT.json [--timeout MS]
+  zklean prove --project DIR --module NAME --claims A,B [--definitions D]
+      --source URL --out CERT.json [--timeout MS]
   zklean verify --certificate CERT.json [--axioms A,B]
+  zklean fetch --certificate CERT.json --out SOURCE.ndjson
   zklean requirements --project DIR --module NAME --claims A,B [--definitions D] --out FILE.json
   zklean check --project DIR --module NAME --claims A,B [--definitions D] [--axioms A,B]
 
-  zklean export --project DIR --module NAME --out FILE.ndjson [--claims A,B]
+  zklean export --project DIR --module NAME --out FILE.ndjson [--claims A,B] [--definitions D]
   zklean pin --out PROFILE.json [--elf FILE]
 
 The installer supplies the prover/verifier, guest, exporter, and pinned Lean.
@@ -27,6 +34,8 @@ Every source command also accepts --export FILE instead of --project/--module.
 Advanced overrides: --config, --binary, --elf, --lake, and --exporter.
 --axioms names Lean's standard axioms; custom axioms need --axiom-policy FILE
 mapping each reviewed axiom name to its identity.
+prove writes CERT.json and the export it proved from, CERT.ndjson. Publish that
+export at the --source URL: it holds every definition recipients need.
 `;
 
 const list = (value: string | undefined) =>
@@ -62,6 +71,7 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
         "binary",
         "elf",
         "timeout",
+        "source",
       ].map((key) => [key, { type: "string" as const }]),
     ),
   });
@@ -135,7 +145,7 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
     return exportModule({
       project: resolve(required("project")),
       module: required("module"),
-      claims,
+      claims: [...claims, ...list(optional("definitions"))],
       tools,
     });
   };
@@ -155,23 +165,47 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
       allowedAxioms: names,
     };
     if (command === "prove") {
-      enforcePolicy(
-        (await runNative(tools.binary, "check", input)) as Statement,
-      );
+      const statement = (await runNative(
+        tools.binary,
+        "check",
+        input,
+      )) as Statement;
+      enforcePolicy(statement);
+      const source = required("source");
+      const out = required("out");
+      // Validate the certificate shape before hours of proving.
+      parseCertificate({ ...statement, proof: "base64:AA==", source });
       console.error(
         "Generating a local Groth16 proof; large models may take hours…",
       );
-      result = await nativeBackend({
+      const proved = await nativeBackend({
         ...(await nativeOptions(tools, true)),
         ...(timeout === undefined ? {} : { timeout }),
         onProgress: (text) => {
           process.stderr.write(text);
         },
-      }).prove(input);
+      }).prove(input, source);
+      if (canonical(statement) !== canonical(statementOf(proved)))
+        throw new Error("proved statement differs from the checked statement");
+      result = proved;
+      await Bun.write(out.replace(/\.json$/, "") + ".ndjson", input.export);
     } else {
       result = await runNative(tools.binary, command, input);
       if (command === "check") enforcePolicy(result as Statement);
     }
+  } else if (command === "fetch") {
+    const certificate = parseCertificate(
+      await Bun.file(required("certificate")).json(),
+    );
+    const exported = await download(certificate.source);
+    const mismatches = await matchSource(certificate, exported, tools.binary);
+    if (mismatches.length) {
+      process.stdout.write(`${JSON.stringify({ mismatches }, null, 2)}\n`);
+      process.exitCode = 1;
+      return;
+    }
+    await Bun.write(required("out"), exported);
+    return;
   } else if (command === "verify") {
     const certificate = parseCertificate(
       await Bun.file(required("certificate")).json(),

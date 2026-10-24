@@ -12,7 +12,11 @@ export interface Statement {
   axioms: Identified;
 }
 export interface Certificate extends Statement {
+  /** Groth16 proof that the pinned checker accepted the statement. */
   proof: string;
+  /** URL (https or file) of a lean4export file containing every claim,
+   * definition and axiom. Untrusted: it must reproduce the certified identities. */
+  source: string;
 }
 export interface Requirements {
   format: "zklean/requirements/1";

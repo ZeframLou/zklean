@@ -77,12 +77,12 @@ export function parseStatement(value: unknown): Statement {
   return structuredClone(statement);
 }
 export function parseCertificate(value: unknown): Certificate {
-  const c = object(value);
-  keys(c, ["format", "claims", "definitions", "axioms", "proof"]);
-  const { proof, ...rest } = c;
+  const { proof, source, ...rest } = object(value);
   if (decodeBase64(proof).length === 0) throw new Error("empty proof");
+  if (typeof source !== "string" || !/^(https|file):\/\/\S+$/.test(source))
+    throw new Error("invalid certificate source");
   // Own the validated data so caller mutation cannot alter an in-flight check.
-  return { ...parseStatement(rest), proof: proof as string };
+  return { ...parseStatement(rest), proof: proof as string, source };
 }
 export function statement(c: Statement): Statement {
   return {

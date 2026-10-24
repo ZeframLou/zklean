@@ -50,7 +50,6 @@ test("native and embedded upstream verifiers accept the locally generated Groth1
   const certificate = (await Bun.file(
     resolve(import.meta.dir, "fixtures/identity.certificate.json"),
   ).json()) as Certificate;
-  // Migration is incomplete until a real Groth16 fixture is generated.
   expect(Buffer.from(certificate.proof.slice(7), "base64").length).toBe(260);
   const trusted = (await Bun.file(
     resolve(import.meta.dir, "fixtures/identity.verifier.json"),
@@ -65,9 +64,12 @@ test("native and embedded upstream verifiers accept the locally generated Groth1
     '"str":"identity"',
     '"str":"renamed"',
   );
-  // A different, independently checked public model is structurally valid and
+  // A different, independently checked statement is well formed and
   // mathematically true, but this proof must not authenticate it.
-  const changed = (await runNative(binary, "check", request)) as Certificate;
+  const changed = {
+    ...((await runNative(binary, "check", request)) as Certificate),
+    source: certificate.source,
+  };
   const altered = Buffer.from(certificate.proof.slice(7), "base64");
   altered[40] = altered[40]! ^ 1;
   for (const backend of [groth16Backend(), nativeBackend(config)]) {

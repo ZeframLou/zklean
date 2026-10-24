@@ -1,4 +1,4 @@
-import { delimiter, join, resolve } from "node:path";
+import { join } from "node:path";
 
 export const LEAN_TOOLCHAIN = "leanprover/lean4:v4.36.0-rc1";
 
@@ -31,28 +31,4 @@ export async function runLake(
       `Lake ${args[0]} failed:\n${`${stdout}\n${stderr}`.trim().slice(-4000)}`,
     );
   return stdout;
-}
-
-/** Ask Lake for the configured source search path, including each library's srcDir. */
-export async function resolveLeanSource(
-  project: string,
-  module: string,
-  lake: string,
-): Promise<string> {
-  if (!/^[A-Za-z_][A-Za-z0-9_']*(?:\.[A-Za-z_][A-Za-z0-9_']*)*$/.test(module))
-    throw new Error("invalid Lean module name");
-  const paths = await runLake(project, lake, [
-    "env",
-    "printenv",
-    "LEAN_SRC_PATH",
-  ]);
-  for (const path of paths.trim().split(delimiter)) {
-    const candidate = resolve(
-      project,
-      path,
-      `${module.replaceAll(".", "/")}.lean`,
-    );
-    if (await Bun.file(candidate).exists()) return candidate;
-  }
-  throw new Error(`Lake could not resolve the source for ${module}`);
 }

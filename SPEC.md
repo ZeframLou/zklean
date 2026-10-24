@@ -66,7 +66,8 @@ The SP1 guest MUST:
   "claims": { "Inventory.reservation_safe": "b682…698a" },
   "definitions": { "Inventory.POST_reservations": "93a7…315d" },
   "axioms": { "propext": "dba3…d434" },
-  "proof": "base64:…"
+  "proof": "base64:…",
+  "source": "https://acme.example/reservation.ndjson"
 }
 ```
 
@@ -75,6 +76,19 @@ The SP1 guest MUST:
   an API operation. It MAY be empty.
 - `axioms`: every axiom the proofs use.
 - `proof`: the Groth16 proof of the statement.
+- `source`: the `https` or `file` URL of one file, in Lean's standard kernel
+  export format (lean4export NDJSON), that contains every claim, definition and
+  axiom together with everything they depend on.
+
+The source is not part of the proved statement. It is an untrusted pointer: a
+recipient checks the file with Nanoda and accepts it only if it reproduces every
+certified identity. A wrong source can make matching fail, but cannot make a
+different statement match, and a source can move without re-proving.
+
+`zklean prove` writes the export it proved from next to the certificate, ready
+to publish. That export contains the proofs. A provider who keeps its proofs
+private publishes instead the export of a specification module that states its
+claims as `axiom`s; the identities are the same.
 
 [ENCODING.md](docs/ENCODING.md) defines identities, the committed statement and
 the proof encoding.
@@ -112,20 +126,29 @@ equal the certified theorems' identities.
 A certificate satisfies a requirement when every required claim and definition
 appears in it with the same identity.
 
+To read a certificate's definitions, `zklean fetch` downloads its source, checks
+it with Nanoda, and recomputes every identity. A mismatch means the source is not
+what was certified. Nothing fetched is executed: an export is data, kernel terms
+that only the checker interprets.
+
 ## 5. Command-line interface
 
 ```sh
 zklean check --project inventory --module V1 \
   --claims Inventory.reservation_safe --definitions Inventory.POST_reservations \
   --axioms propext
-zklean prove … --out reservation.json
+zklean prove … --source https://acme.example/reservation.ndjson --out reservation.json
 zklean verify --certificate reservation.json --axioms propext
+zklean fetch --certificate reservation.json --out reservation.ndjson
 zklean requirements --project client --module Bridge \
   --claims Client.stock_conserved --out requirements.json
 ```
 
 - `check` checks the derivation and prints the statement, without proving.
-- `prove` also generates the Groth16 proof.
+- `prove` also generates the Groth16 proof, and writes the certificate and its
+  source export (`reservation.json`, `reservation.ndjson`). `--source` is the URL
+  where the export will be published.
+- `fetch` downloads the source, checks it and matches every identity.
 - `--axioms` names permitted axioms. Lean's standard axioms resolve to pinned
   identities; others need `--axiom-policy FILE`, a JSON map from name to identity.
 

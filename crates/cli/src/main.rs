@@ -4,6 +4,7 @@ use zklean_core::ProveInput;
 
 #[cfg(feature = "execute")]
 mod execute;
+mod identify;
 #[cfg(feature = "prover")]
 mod sp1;
 mod verify;
@@ -63,6 +64,7 @@ fn main() -> Result<()> {
         }
         #[cfg(feature = "prover")]
         "prove" | "identity" => sp1::run(&command, &input)?,
+        "identify" => identify::run(&input)?,
         "verify" => verify::run(&input)?,
         #[cfg(feature = "execute")]
         "execute" => execute::run(&input)?,

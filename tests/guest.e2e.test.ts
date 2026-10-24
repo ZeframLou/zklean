@@ -24,14 +24,17 @@ beforeAll(async () => {
 }, 300_000);
 
 test.skipIf(!elfPath)(
-  "SP1 executes Nanoda and commits the same model as native checking",
+  "SP1 executes Nanoda and commits the same statement as native checking",
   async () => {
+    const request = await input("v1", undefined, undefined, [
+      "Inventory.POST_reservations",
+    ]);
     const result = (await runNative(binary, "execute", {
       elfPath,
-      input: await input("v1"),
-    })) as { cycles: number; statement: { axioms: string[] } };
+      input: request,
+    })) as { cycles: number; statement: unknown };
     expect(result.cycles).toBeGreaterThan(0);
-    expect(result.statement.axioms).toEqual(["propext"]);
+    expect(result.statement).toEqual(await runNative(binary, "check", request));
   },
   300_000,
 );

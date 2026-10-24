@@ -3,6 +3,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "bun:test";
 import { loadRequirements } from "../src/requirements.ts";
+import { parseCertificate } from "../src/encoding.ts";
+import { download, matchSource } from "../src/fetch.ts";
+import { binary, checked } from "./helpers.ts";
+import { pathToFileURL } from "node:url";
 import { findTools, nativeOptions } from "../src/tooling.ts";
 
 const lake = process.env.ZKLEAN_LAKE;
@@ -65,4 +69,37 @@ test("requirements load only exact JSON snapshots", async () => {
     { ...snapshot, definitions: { "Demo.identity": "b".repeat(64) } },
   ])
     await expect(loadRequirements(invalid as never)).rejects.toThrow();
+});
+
+const certificate = {
+  format: "zklean/1",
+  claims: { "Demo.identity": "b".repeat(64) },
+  definitions: {},
+  axioms: {},
+  proof: "base64:AA==",
+  source: "https://example.com/spec.ndjson",
+};
+
+test("a certificate names one https or file source", () => {
+  expect(parseCertificate(certificate).source).toBe(certificate.source);
+  for (const source of [
+    undefined,
+    "ext::sh -c id",
+    "http://example.com/spec.ndjson",
+    { url: certificate.source },
+  ])
+    expect(() => parseCertificate({ ...certificate, source })).toThrow();
+});
+
+test("a source export must reproduce every certified identity", async () => {
+  const statement = await checked("identity", ["Demo.identity"], []);
+  const exported = await download(
+    pathToFileURL(join(import.meta.dir, "fixtures/identity.ndjson")).href,
+  );
+  const sourced = parseCertificate({ ...certificate, ...statement });
+  expect(await matchSource(sourced, exported, binary)).toEqual([]);
+  const forged = { ...sourced, claims: { "Demo.identity": "d".repeat(64) } };
+  expect(
+    (await matchSource(forged, exported, binary)).map((m) => m.name),
+  ).toEqual(["Demo.identity"]);
 });
