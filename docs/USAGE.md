@@ -6,13 +6,14 @@ inside [SP1](https://github.com/succinctlabs/sp1/tree/v5.2.4) and produces a
 Groth16 certificate that recipients can verify without the original proof terms.
 The certificate still includes the statement's definitions and any used axioms.
 
-## Create a project
+## Check and certify a module
 
 The installed CLI supplies the checker, prover, exporter, and pinned
-[Lean](https://lean-lang.org/) toolchain. Start with its inventory example:
+[Lean](https://lean-lang.org/) toolchain. Point it at a Lake project that uses
+that toolchain. These steps copy the inventory example project shipped with the release:
 
 ```sh
-zklean init --project inventory
+cp -R examples/inventory inventory
 zklean check --project inventory --module V1 \
   --claims Inventory.reservation_safe --axioms propext
 zklean prove --project inventory --module V1 \
@@ -44,24 +45,20 @@ if (result.status !== "verified") throw new Error(result.reason);
 The SDK runs on [Bun](https://bun.sh/) 1.4.4 or newer. It includes its verifier;
 it needs no native installation, compiler, Lean process, or circuit download.
 Its trusted key is application configuration, never certificate data. Pairing
-checks run outside the application event loop in a shared pool of two workers;
-at most sixteen checks are admitted across verifier instances. Excess work
-returns `unknown` with reason `verifier-busy`. Worker failures and a two-minute
-worker deadline release their slots, and idle workers allow the process to exit.
+checks run one at a time in a background worker, outside the application event
+loop; an idle worker lets the process exit.
 For TypeScript checking in a Bun application, add `@types/bun` as a development
 dependency if the project does not already include it.
 
 ## Read a received certificate
 
 ```sh
-zklean inspect --certificate reservation.json --axioms propext
 zklean import --certificate reservation.json --axioms propext \
   --out inventory/Remote.lean
 ```
 
-Both commands authenticate the certificate and enforce the axiom policy first.
-`inspect` prints its statements and relevant definitions using Lean's printer.
-`import` reconstructs kernel objects through Lean's public API and writes an
+`import` authenticates the certificate and enforces the axiom policy first. It
+then reconstructs kernel objects through Lean's public API and writes an
 assumption fingerprint file, `inventory/Remote.lean.axioms.json`.
 
 Review the operations, types, definitions, and assumptions before depending on
@@ -115,12 +112,8 @@ zklean requirements --project inventory --module Bridge \
 ```
 
 Requirements generation records the propositions you require, without claiming
-to prove them. Source manifests bind the resolved Lake sources, including
-transitive imports. The CLI compares that source closure before export and after
-checking and artifact capture; changes abort without overwriting the snapshot.
-Source changes require a fresh snapshot and review. To bind a sidecar to source,
-use `--project/--module`; `--export` creates a self-contained snapshot and cannot
-be combined with `--source` for requirements generation.
+to prove them. The snapshot is a self-contained JSON file; regenerate and review
+it whenever its Lean sources change, for example as a CI step.
 
 Exact matching compares resolved kernel contexts, ignoring bound-variable
 display names and binder annotations. It does not infer arbitrary mathematical
@@ -141,7 +134,7 @@ Policy is checked again on every call, including cached cryptographic results.
 
 ## Troubleshoot installation
 
-Run `zklean doctor` to locate bundled tools. Development overrides are
+Tools are found next to the installed CLI. Development overrides are
 `ZKLEAN_NATIVE`, `ZKLEAN_GUEST_ELF`, `ZKLEAN_EXPORTER`, `ZKLEAN_LAKE`, and
 `ZKLEAN_PROFILE`, or the corresponding CLI flags shown by `zklean --help`.
 Explicit flag and environment paths must exist; a missing override fails rather

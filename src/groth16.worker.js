@@ -1,4 +1,4 @@
-// One request at a time per worker; compiled WASM and memory stay off the host.
+// Compiled WASM and its memory stay off the host thread.
 import { parentPort } from "node:worker_threads";
 let instance;
 parentPort.on("message", async (data) => {
@@ -8,12 +8,12 @@ parentPort.on("message", async (data) => {
     new Uint8Array(exports.memory.buffer, exports.input_buffer(), 324).set(
       data.input,
     );
-    let valid = false;
+    let valid;
     try {
       valid = exports.verify() === 1;
     } catch {
-      // A trap can interrupt Rust allocation cleanup. Discard this instance
-      // before another request rather than reusing potentially damaged state.
+      // A trapping proof is invalid. The trap can leave Rust state
+      // inconsistent, so the host replaces this worker.
       parentPort.postMessage({ valid: false, reset: true });
       return;
     }

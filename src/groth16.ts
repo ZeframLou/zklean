@@ -1,7 +1,7 @@
 /// <reference path="./assets.d.ts" />
 import profile from "./guest.json";
 import { decodeBase64, statementCommitment } from "./encoding.ts";
-import { groth16Pool } from "./groth16-pool.ts";
+import { verifyGroth16 } from "./groth16-worker-host.ts";
 import type { ProofBackend } from "./types.ts";
 
 /** The checker key is trusted application configuration, never certificate data. */
@@ -19,7 +19,7 @@ export function groth16Backend(
       input.set(proof);
       input.set(Buffer.from(statementCommitment(certificate), "hex"), 260);
       input.set(Buffer.from(verifierKey.slice(2), "hex"), 292);
-      return groth16Pool.verify(input);
+      return verifyGroth16(input);
     },
   };
 }

@@ -1,9 +1,7 @@
-import { Cache, certificateId, modelId, parseCertificate } from "./encoding.ts";
+import { certificateId, modelId, parseCertificate } from "./encoding.ts";
 import { checkAxioms } from "./policy.ts";
 import { groth16Backend } from "./groth16.ts";
-import { VerifierBusyError } from "./backend-errors.ts";
 import type {
-  Certificate,
   VerificationResult,
   VerifierOptions,
   VerifyOptions,
@@ -12,43 +10,31 @@ import type {
 /** Local certificate verification has no HTTP or discovery dependency. */
 export function createVerifier(options: VerifierOptions = {}) {
   const backend = options.backend ?? groth16Backend();
-  const verified = new Cache<boolean>(options.cacheSize ?? 128);
-  const pending = new Map<string, Promise<boolean>>();
-  const limit = options.maxConcurrency ?? 2;
-  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 128)
-    throw new Error("invalid verification concurrency");
-  let active = 0;
-  const waiters: (() => void)[] = [];
-  const execute = async (certificate: Certificate): Promise<boolean> => {
-    if (active >= limit)
-      await new Promise<void>((resolve) => waiters.push(resolve));
-    else active++;
-    try {
-      return await backend!.verify(certificate);
-    } finally {
-      const next = waiters.shift();
-      if (next) next();
-      else active--;
-    }
-  };
+  // Keyed by the whole certificate, so every accepted certificate carries a
+  // valid proof. Concurrent checks of one certificate share a single run.
+  // Bounded: Groth16 proofs can be rerandomized into unlimited valid variants.
+  const checks = new Map<string, Promise<boolean>>();
 
   async function verify(
     value: unknown,
     policy: VerifyOptions,
   ): Promise<VerificationResult> {
-    let certificate: Certificate;
     let identity: { certificateId: string; modelId: string };
+    let key: string;
+    let check: () => Promise<boolean>;
     try {
-      certificate = parseCertificate(value);
+      const certificate = parseCertificate(value);
       identity = {
         certificateId: certificateId(certificate),
         modelId: modelId(certificate.specs),
       };
-      // Policy projection also traverses untrusted model data. Keep it inside
-      // the data-validation boundary, independently of backend availability.
+      // Policy checks traverse untrusted model data, so they stay inside the
+      // data-validation boundary.
       const policyError = checkAxioms(certificate, policy);
       if (policyError)
         return { ...identity, status: "unknown", reason: policyError };
+      key = `${backend.identity}\0${identity.certificateId}`;
+      check = () => backend.verify(certificate);
     } catch (error) {
       return {
         status: "unknown",
@@ -56,34 +42,23 @@ export function createVerifier(options: VerifierOptions = {}) {
         detail: String(error),
       };
     }
+    let task = checks.get(key);
+    if (!task) {
+      task = check();
+      checks.set(key, task);
+      if (checks.size > 1024) checks.delete(checks.keys().next().value!);
+    }
     try {
-      const cacheKey = `${backend.identity}\0${identity.certificateId}`;
-      if (!verified.get(cacheKey)) {
-        let task = pending.get(cacheKey);
-        if (!task) {
-          if (pending.size >= limit * 8)
-            return { ...identity, status: "unknown", reason: "verifier-busy" };
-          task = Promise.resolve().then(() => execute(certificate));
-          pending.set(cacheKey, task);
-          void task.finally(() => pending.delete(cacheKey)).catch(() => {});
-        }
-        if (!(await task))
-          return {
-            ...identity,
-            status: "unknown",
-            reason: "invalid-certificate",
-          };
-        verified.set(cacheKey, true);
-      }
-      return { ...identity, status: "verified", reason: "valid" };
+      if (await task)
+        return { ...identity, status: "verified", reason: "valid" };
+      checks.delete(key);
+      return { ...identity, status: "unknown", reason: "invalid-certificate" };
     } catch (error) {
+      checks.delete(key);
       return {
         ...identity,
         status: "unknown",
-        reason:
-          error instanceof VerifierBusyError
-            ? "verifier-busy"
-            : "verifier-unavailable",
+        reason: "verifier-unavailable",
         detail: String(error),
       };
     }

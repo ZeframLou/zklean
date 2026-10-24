@@ -73,5 +73,5 @@ fi
 echo "Installed ZKLean in $prefix"
 case ":$PATH:" in
   *":$prefix/bin:"*) ;;
-  *) echo "Add $prefix/bin to PATH, then run: zklean doctor" ;;
+  *) echo "Add $prefix/bin to PATH, then run: zklean --help" ;;
 esac

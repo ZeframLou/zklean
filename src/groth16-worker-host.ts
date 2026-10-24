@@ -1,0 +1,55 @@
+/// <reference path="./assets.d.ts" />
+import workerPath from "./groth16.worker.js" with { type: "file" };
+import wasmPath from "./verifier.wasm" with { type: "file" };
+import { Worker } from "node:worker_threads";
+
+/** One background worker runs pairing checks off the event loop, one at a time.
+ * A worker that traps or fails is replaced before the next check. */
+let worker: Worker | undefined;
+let wasm: Promise<Uint8Array> | undefined;
+let queue: Promise<unknown> = Promise.resolve();
+
+function run(input: Uint8Array): Promise<boolean> {
+  wasm ??= Bun.file(wasmPath).bytes();
+  return wasm.then(
+    (bytes) =>
+      new Promise<boolean>((resolve, reject) => {
+        const fresh = !worker;
+        const current = (worker ??= new Worker(workerPath, {
+          name: "zklean-groth16",
+        }));
+        const done = (error?: unknown, valid = false, reset = false) => {
+          current.off("message", onMessage);
+          current.off("error", done);
+          current.off("exit", onExit);
+          current.unref();
+          if (error !== undefined || reset) {
+            if (worker === current) worker = undefined;
+            void current.terminate();
+          }
+          if (error !== undefined) reject(error);
+          else resolve(valid);
+        };
+        const onMessage = (data: {
+          valid?: boolean;
+          reset?: boolean;
+          error?: string;
+        }) =>
+          typeof data?.valid === "boolean"
+            ? done(undefined, data.valid, data.reset)
+            : done(new Error(data?.error ?? "invalid Groth16 worker reply"));
+        const onExit = () => done(new Error("Groth16 worker exited"));
+        current.on("message", onMessage);
+        current.once("error", done);
+        current.once("exit", onExit);
+        current.ref();
+        current.postMessage({ input, ...(fresh ? { wasm: bytes } : {}) });
+      }),
+  );
+}
+
+export function verifyGroth16(input: Uint8Array): Promise<boolean> {
+  const result = queue.then(() => run(input));
+  queue = result.catch(() => {});
+  return result;
+}

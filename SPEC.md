@@ -122,7 +122,7 @@ generates an SP1 certificate, verifies it, and writes the result. `zklean verify
 checks a certificate against a locally trusted verifier and explicit axiom policy.
 
 ```sh
-zklean init --project inventory
+cp -R examples/inventory inventory
 zklean prove --project inventory --module V1 \
   --claims Inventory.reservation_safe --axioms propext --out reservation.json
 zklean verify --certificate reservation.json --axioms propext
@@ -130,12 +130,10 @@ zklean verify --certificate reservation.json --axioms propext
 
 `zklean check` checks the original argument without generating an SP1 proof.
 `zklean export` exposes the Lean export for build pipelines. `zklean pin` derives
-a verifier profile from a locally built guest; `zklean doctor` reports the resolved
-local tools. Verification does not require HTTP, a remote service, or the
+a verifier profile from a locally built guest. Verification does not require HTTP, a remote service, or the
 original Lean proof terms.
 
-`zklean inspect` MUST authenticate a certificate and enforce its axiom policy
-before displaying its public statements. `zklean import` MUST do the same
+`zklean import` MUST authenticate a certificate and enforce its axiom policy
 before reconstructing declarations through Lean's public API. Certified
 propositions become explicit assumptions for a separate bridge proof; import
 does not certify that bridge. Existing Lean declarations MUST agree with the
@@ -151,17 +149,8 @@ requirements. It checks the model's declarations but does not certify that the
 requirements themselves have been proved. Applications trust these snapshots
 as their own requirements, not as evidence of a remote guarantee.
 
-Snapshots have the form `{format:"zklean/requirements/1",specs}`. Source-based
-generation also includes a `zklean/source-manifest/1` with source, imported
-modules, project files, and toolchain artifact digests. A `.lean` path resolves
-to `<path>.zklean.json`; every recorded digest MUST match before that sidecar
-is used. Source-bound generation MUST retain its pre-export source closure and
-reject edits through the final model check and manifest capture. A supplied raw
-export MUST NOT be labeled as bound to an independently supplied source path.
-JSON snapshots can be loaded directly.
-
-The public TypeScript API exports `createSourceManifest` and `loadRequirements`
-for applications that maintain and consume those snapshots.
+Snapshots have the form `{format:"zklean/requirements/1",specs}`. They are
+self-contained; regenerate them when their Lean sources change.
 
 ## 6. References
 

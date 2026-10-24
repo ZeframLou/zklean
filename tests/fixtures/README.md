@@ -26,7 +26,7 @@ CI rebuilds the guest and requires its identity to match the fixture.
 The crypto E2E tests accept the identity certificate through native, explicit
 WebAssembly, and default SDK verification. They reject altered evidence, a different valid
 model, and wrong keys, without receiving the original Lean proof or guest ELF.
-The authenticated CLI import test also checks compilation, inspection, and
+The authenticated CLI import test also checks compilation and
 preservation of existing output files after authentication fails.
 
 Regenerate using `zklean pin` and `zklean prove` on `identity.ndjson`, then verify

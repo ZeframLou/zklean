@@ -12,13 +12,6 @@ export interface Certificate {
 export interface Requirements {
   format: "zklean/requirements/1";
   specs: Specs;
-  /** Required for a .lean sidecar; binds every source/build dependency. */
-  sourceManifest?: SourceManifest;
-}
-export interface SourceManifest {
-  format: "zklean/source-manifest/1";
-  /** Paths are relative to the primary Lean source. */
-  files: Record<string, string>;
 }
 export interface PublicModel {
   format: "lean4/kernel/2";
@@ -28,7 +21,7 @@ export interface PublicModel {
 
 /** This is trusted application configuration, never certificate-provided code. */
 export interface ProofBackend {
-  /** Stable identity of the trusted verifier profile used for cache isolation. */
+  /** Stable identity of the trusted verifier profile; isolates cached results. */
   readonly identity: string;
   verify(certificate: Certificate): Promise<boolean>;
 }
@@ -39,7 +32,6 @@ export type Reason =
   | "forbidden-axiom"
   | "unpinned-axiom"
   | "axiom-mismatch"
-  | "verifier-busy"
   | "verifier-unavailable";
 export interface VerificationResult {
   status: Status;
@@ -57,7 +49,4 @@ export interface VerifyOptions {
 }
 export interface VerifierOptions {
   backend?: ProofBackend;
-  cacheSize?: number;
-  /** Bound expensive independent backend checks; identical checks share a slot. */
-  maxConcurrency?: number;
 }

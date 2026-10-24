@@ -48,7 +48,7 @@ available stock, and leave `remaining + reserved = original stock`.
 Check the guarantee directly before budgeting cryptographic proof generation:
 
 ```sh
-zklean init --project inventory
+cp -R examples/inventory inventory
 zklean check --project inventory --module V1 \
   --claims Inventory.reservation_safe --axioms propext
 ```

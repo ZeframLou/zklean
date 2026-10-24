@@ -84,8 +84,7 @@ jobs:
         run: |
           ZKLEAN_RELEASE_BASE="file://$PWD/release" sh release/install.sh
           export PATH="/tmp/zklean-install/bin:/tmp/zklean-elan/bin:$PATH"
-          zklean doctor
           zklean verify --certificate release/identity.certificate.json
           zklean pin --out /tmp/installed-verifier.json
-          zklean init --project /tmp/installed-contract
+          cp -R release/examples/inventory /tmp/installed-contract
           zklean check --project /tmp/installed-contract --module V1 --claims Inventory.reservation_safe --axioms propext

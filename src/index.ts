@@ -12,14 +12,13 @@ export type {
   Certificate,
   Specs,
   Requirements,
-  SourceManifest,
   PublicModel,
   ProofBackend,
   VerifierOptions,
   VerifyOptions,
   VerificationResult,
 } from "./types.ts";
-export { createSourceManifest, loadRequirements } from "./requirements.ts";
+export { loadRequirements } from "./requirements.ts";
 export {
   declarationIdentity,
   contextMatches,

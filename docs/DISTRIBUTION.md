@@ -47,8 +47,7 @@ curl, CA certificates, tar, gzip, zstd, and libgcc installed:
 ```sh
 ZKLEAN_PREFIX="$HOME/.local" ZKLEAN_RELEASE_BASE="file://$PWD/dist" sh dist/install.sh
 export PATH="$HOME/.local/bin:$PATH"
-zklean doctor
-zklean init --project /tmp/installed-contract
+cp -R dist/examples/inventory /tmp/installed-contract
 zklean check --project /tmp/installed-contract --module V1 \
   --claims Inventory.reservation_safe --axioms propext
 zklean verify --certificate tests/fixtures/identity.certificate.json

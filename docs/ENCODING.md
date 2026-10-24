@@ -95,11 +95,8 @@ Neither identity depends on arbitrary input JSON property order.
 
 ## Requirement snapshots
 
-Local requirements use `{format:"zklean/requirements/1",specs}`. A `.lean` path
-resolves to `<path>.zklean.json` and requires a `zklean/source-manifest/1`
-containing the primary source, imported sources, Lake project files, and toolchain
-artifacts. Every recorded digest is checked before the sidecar is used.
-The self-contained snapshot is what the application trusts.
+Local requirements use `{format:"zklean/requirements/1",specs}`. The
+self-contained snapshot is what the application trusts.
 
 [HTTPV](https://github.com/ZeframLou/httpv) defines discovery and compatibility
 checking separately from this certificate profile.

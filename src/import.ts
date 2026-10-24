@@ -17,7 +17,7 @@ function leanString(value: unknown): string {
 
 /** Reconstruct kernel objects through Lean's public API. No new expression
  * parser or elaborator is involved. Callers must authenticate the certificate. */
-export function leanModule(certificate: Certificate, inspect = false): string {
+export function leanModule(certificate: Certificate): string {
   const model = publicContext(
     readModel(certificate.specs),
     certificate.specs.claims,
@@ -64,7 +64,7 @@ export function leanModule(certificate: Certificate, inspect = false): string {
   // of model size. One enormous nested let-expression overflows on String and
   // other substantial kernel contexts even when their expression DAG is shallow.
   const nodeLines: string[] = [];
-  const lines = inspect ? ["  let originalEnv ← getEnv"] : [];
+  const lines: string[] = [];
   const refs = new Map<string, string>();
   const dependencies = new Map<string, Set<string>>();
   const list = (items: unknown) =>
@@ -310,27 +310,6 @@ export function leanModule(certificate: Certificate, inspect = false): string {
       lines.push(
         `  zkleanRequire (.${tags[kind]} { ${header(data)}${fields.length ? `, ${fields.join(", ")}` : ""} })`,
       );
-    }
-  }
-  if (inspect) {
-    for (const name of Object.keys(model.declarations).sort()) {
-      const decl = model.declarations[name]!;
-      if (decl.inductiveMember) continue;
-      const entries = decl.inductive
-        ? (decl.inductive.types as Record<string, unknown>[])
-        : Object.values(decl);
-      for (const d of entries) {
-        const kind = decl.thm ? "theorem" : Object.keys(decl)[0];
-        const display = kernelName(model, d.name as string);
-        const pad = certificate.specs.claims.includes(display) ? "  " : "    ";
-        if (pad.length === 4)
-          lines.push(`  unless originalEnv.contains ${ref(d.name)} do`);
-        lines.push(
-          `${pad}logInfo m!"{${leanString(`${kind} ${display} : `)}}{← Meta.ppExpr ${ref(d.type)}}"`,
-        );
-        if (d.value)
-          lines.push(`${pad}logInfo m!"  := {← Meta.ppExpr ${ref(d.value)}}"`);
-      }
     }
   }
   return `${prelude.join("\n")}\n${nodeLines.join("\n")}\n\nopen Lean Elab in\nrun_elab do\n${lines.join("\n")}\n`;

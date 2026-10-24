@@ -53,9 +53,12 @@ for (let i = 0; i < paths.length; i++) {
   const verify = (
     backend: typeof native | ReturnType<typeof groth16Backend>,
   ) => {
-    const verifier = createVerifier({ backend, cacheSize: 0 });
+    // A fresh verifier per call keeps its result cache out of the timings.
     return async () => {
-      const result = await verifier.verify(certificate, policy);
+      const result = await createVerifier({ backend }).verify(
+        certificate,
+        policy,
+      );
       if (result.status !== "verified") throw new Error(JSON.stringify(result));
     };
   };

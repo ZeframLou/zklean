@@ -92,7 +92,7 @@ test.skipIf(!process.env.ZKLEAN_LAKE)(
 );
 
 test.skipIf(!process.env.ZKLEAN_LAKE)(
-  "a received kernel model supports readable inspection and a new Lean derivation",
+  "a received kernel model supports a new Lean derivation",
   async () => {
     const statement = await checked("v1");
     // This test starts after authentication and exercises model reconstruction.
@@ -143,18 +143,6 @@ theorem Client.stock_conserved (available requested remaining : Nat) :
           "Inventory.reservation_safe",
         ),
       );
-      await Bun.write(
-        join(directory, "Inspect.lean"),
-        leanModule(certificate, true),
-      );
-      const text = await runLake(directory, tools.lake!, [
-        "env",
-        "lean",
-        "Inspect.lean",
-      ]);
-      expect(text).toContain("theorem Inventory.reservation_safe");
-      expect(text).toContain("def Inventory.POST_reservations");
-      expect(text).not.toContain("def Nat.");
     } finally {
       await rm(directory, { recursive: true, force: true });
     }

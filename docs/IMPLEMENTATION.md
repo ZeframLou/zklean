@@ -3,11 +3,9 @@
 The TypeScript package provides certificate decoding, model snapshots, verifier
 policy, and the CLI. The Rust workspace supplies the shared Nanoda checker,
 upstream Groth16 verifier, and local SP1 CPU prover and executor.
-`crates/guest` is built with the SP1 toolchain. Embedded pairing checks run in a
-shared pool of two Bun workers with a sixteen-request admission bound. Each
-worker reuses its WASM instance, owns its input memory, and is replaced after an
-error or a two-minute execution deadline; idle workers do not hold the process
-open. The compiled CLI embeds both the worker entry point and verifier WASM.
+`crates/guest` is built with the SP1 toolchain. Embedded pairing checks run one at a time in a background
+Bun worker that reuses its WASM instance and is replaced after a trap or error.
+The compiled CLI embeds both the worker entry point and verifier WASM.
 
 Nanoda is pinned and vendored; see `vendor/nanoda/UPSTREAM.md`. SP1 is pinned to
 5.2.4 and used without source modifications. Native and WebAssembly verification call its lightweight

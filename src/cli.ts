@@ -3,38 +3,27 @@ import { parseArgs } from "node:util";
 import { resolve } from "node:path";
 import { version } from "../package.json";
 import { nativeBackend, runNative } from "./native.ts";
-import { canonical, parseCertificate } from "./encoding.ts";
+import { parseCertificate } from "./encoding.ts";
 import { groth16Backend } from "./groth16.ts";
 import { createVerifier } from "./verifier.ts";
-import { createSourceManifest } from "./requirements.ts";
 import { exportModule, findTools, nativeOptions } from "./tooling.ts";
 import type { ProveInput } from "./native.ts";
-import { resolveLeanSource } from "./lean.ts";
 import { checkAxioms } from "./policy.ts";
-import type { Certificate, VerifyOptions, SourceManifest } from "./types.ts";
+import type { Certificate, VerifyOptions } from "./types.ts";
 import { leanModule } from "./import.ts";
 import { declarationIdentity } from "./context.ts";
 import { readModel } from "./encoding.ts";
-import { runLake } from "./lean.ts";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import inventorySource from "../examples/lean/Inventory.lean" with { type: "text" };
-import exampleSource from "../examples/lean/V1.lean" with { type: "text" };
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 
 const help = `ZKLean — check and certify Lean contracts
 
-  zklean init --project DIR
   zklean prove --project DIR --module NAME --claims A,B --out CERT.json [--timeout MS]
   zklean verify --certificate CERT.json [--axioms A,B]
-  zklean inspect --certificate CERT.json [--axioms A,B]
   zklean import --certificate CERT.json --out Remote.lean [--axioms A,B]
   zklean requirements --project DIR --module NAME --claims A,B --out FILE.json
   zklean check --project DIR --module NAME --claims A,B [--axioms A,B]
 
   zklean export --project DIR --module NAME --out FILE.ndjson [--claims A,B]
   zklean pin --out PROFILE.json [--elf FILE]
-  zklean doctor
 
 The installer supplies the prover/verifier, guest, exporter, and pinned Lean.
 Every source command also accepts --export FILE instead of --project/--module.
@@ -69,7 +58,6 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
         "claims",
         "axioms",
         "axiom-policy",
-        "source",
         "config",
         "certificate",
         "binary",
@@ -95,27 +83,6 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
     throw new Error(
       "--timeout must be an integer from 1 to 2147483647 milliseconds",
     );
-  if (command === "init") {
-    const project = resolve(required("project"));
-    const files = {
-      "lean-toolchain": "leanprover/lean4:v4.36.0-rc1\n",
-      "lakefile.toml":
-        'name = "Contract"\n[[lean_lib]]\nname = "Contract"\nroots = ["Inventory", "V1"]\n',
-      "Inventory.lean": inventorySource,
-      "V1.lean": exampleSource,
-    };
-    for (const name of Object.keys(files))
-      if (await Bun.file(join(project, name)).exists())
-        throw new Error(`refusing to overwrite ${join(project, name)}`);
-    await mkdir(project, { recursive: true });
-    for (const [name, text] of Object.entries(files))
-      await writeFile(join(project, name), text, { flag: "wx" });
-    const quotedProject = `'${project.replaceAll("'", "'\\''")}'`;
-    console.log(
-      `Created ${project}. Run zklean prove --project ${quotedProject} --module V1 --claims Inventory.reservation_safe --axioms propext --out reservation.json`,
-    );
-    return;
-  }
   const tools = await findTools({
     binary: optional("binary"),
     elf: optional("elf"),
@@ -123,24 +90,6 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
     lake: optional("lake"),
     config: optional("config"),
   });
-
-  if (command === "doctor") {
-    const entries = await Promise.all(
-      Object.entries(tools).map(async ([name, path]) => ({
-        name,
-        path: path ?? null,
-        available: path ? await Bun.file(path).exists() : false,
-      })),
-    );
-    console.log(
-      JSON.stringify(
-        Object.fromEntries(entries.map((v) => [v.name, v])),
-        null,
-        2,
-      ),
-    );
-    return;
-  }
 
   if (command === "pin") {
     const elfPath = tools.elf ?? resolve(required("elf"));
@@ -173,52 +122,27 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
     const reason = checkAxioms(statement, policy);
     if (reason) throw new Error(`axiom policy rejected the model: ${reason}`);
   };
-  const exported = async (): Promise<{
-    text: string;
-    source: string | undefined;
-    sourceFiles?: SourceManifest;
-  }> => {
+  const exported = async (): Promise<string> => {
     const path = optional("export");
-    if (path) {
-      if (command === "requirements" && optional("source"))
-        throw new Error(
-          "source-bound requirements must be exported from --project/--module",
-        );
-      return { text: await Bun.file(path).text(), source: optional("source") };
-    }
-    const project = resolve(required("project"));
-    const module = required("module");
-    const resolvedSource = await resolveLeanSource(
-      project,
-      module,
-      tools.lake ?? "lake",
-    );
-    const source = optional("source") ?? resolvedSource;
-    if (
-      command === "requirements" &&
-      resolve(source) !== resolve(resolvedSource)
-    )
-      throw new Error("--source must match the Lake-resolved module source");
-    const before =
-      command === "requirements"
-        ? await createSourceManifest(source, tools.lake, false)
-        : undefined;
-    const text = await exportModule({ project, module, claims, tools });
-    return { text, source, ...(before ? { sourceFiles: before } : {}) };
+    if (path) return Bun.file(path).text();
+    return exportModule({
+      project: resolve(required("project")),
+      module: required("module"),
+      claims,
+      tools,
+    });
   };
 
   if (command === "export") {
-    const result = await exported();
-    await Bun.write(required("out"), result.text);
+    await Bun.write(required("out"), await exported());
     return;
   }
 
   let result: unknown;
   if (["check", "requirements", "prove"].includes(command)) {
     if (claims.length === 0) throw new Error("--claims is required");
-    const source = await exported();
     const input: ProveInput = {
-      export: source.text,
+      export: await exported(),
       claims,
       allowedAxioms: list(optional("axioms")),
     };
@@ -239,30 +163,8 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
     } else {
       result = await runNative(tools.binary, command, input);
       if (command === "check") enforcePolicy(result as Certificate);
-      if (command === "requirements" && source.source) {
-        const manifest = await createSourceManifest(
-          source.source,
-          tools.lake ?? "lake",
-        );
-        const after = await createSourceManifest(
-          source.source,
-          tools.lake ?? "lake",
-          false,
-        );
-        if (
-          !source.sourceFiles ||
-          canonical(source.sourceFiles) !== canonical(after) ||
-          Object.entries(source.sourceFiles.files).some(
-            ([path, hash]) => manifest.files[path] !== hash,
-          )
-        )
-          throw new Error(
-            "Lean sources changed during requirements generation; retry",
-          );
-        Object.assign(result as object, { sourceManifest: manifest });
-      }
     }
-  } else if (["verify", "inspect", "import"].includes(command)) {
+  } else if (["verify", "import"].includes(command)) {
     const certificate = parseCertificate(
       await Bun.file(required("certificate")).json(),
     );
@@ -298,29 +200,6 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
           2,
         )}\n`,
       );
-      return;
-    } else if (command === "inspect") {
-      if (!tools.lake) throw new Error("Lean not found; reinstall ZKLean");
-      const directory = await mkdtemp(join(tmpdir(), "zklean-inspect-"));
-      try {
-        await Bun.write(
-          join(directory, "lean-toolchain"),
-          "leanprover/lean4:v4.36.0-rc1\n",
-        );
-        await Bun.write(
-          join(directory, "lakefile.toml"),
-          'name = "ZKLeanInspection"\n',
-        );
-        await Bun.write(
-          join(directory, "Inspect.lean"),
-          leanModule(certificate, true),
-        );
-        process.stdout.write(
-          await runLake(directory, tools.lake, ["env", "lean", "Inspect.lean"]),
-        );
-      } finally {
-        await rm(directory, { recursive: true, force: true });
-      }
       return;
     }
   } else {

@@ -56,8 +56,8 @@ with `RUSTFLAGS='-C target-cpu=native'`; distribution keeps a portable binary.
 
 | Workload | Guest cycles | Wall time | Peak native process RSS |
 | --- | ---: | ---: | ---: |
-| Identity | 12.91 / 2.48 / 2.06 | 280.06 / 281.75 / 271.10 | 358.20 / 348.69 / 340.28 |
-| Pipeline | 3.59 / 3.65 / 3.28 | 288.40 / 281.16 / 275.39 | 357.29 / 341.21 / 340.78 |
+| Identity | 827,835 | 1,496 s (25 min) | 12,717,008 KiB (12.1 GiB) |
+| Pipeline | 11,482,006 | 3,384 s (56 min) | 12,969,308 KiB (12.4 GiB) |
 
 Both runs used `RAYON_NUM_THREADS=2`, `GOMAXPROCS=2`, `GOMEMLIMIT=6GiB`,
 `GOGC=20`, `TRACE_GEN_WORKERS=1`, `CHECKPOINTS_CHANNEL_CAPACITY=1`, and
