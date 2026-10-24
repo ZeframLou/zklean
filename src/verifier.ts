@@ -37,8 +37,18 @@ export function createVerifier(options: VerifierOptions = {}) {
     policy: VerifyOptions,
   ): Promise<VerificationResult> {
     let certificate: Certificate;
+    let identity: { certificateId: string; modelId: string };
     try {
       certificate = parseCertificate(value);
+      identity = {
+        certificateId: certificateId(certificate),
+        modelId: modelId(certificate.specs),
+      };
+      // Policy projection also traverses untrusted model data. Keep it inside
+      // the data-validation boundary, independently of backend availability.
+      const policyError = checkAxioms(certificate, policy);
+      if (policyError)
+        return { ...identity, status: "unknown", reason: policyError };
     } catch (error) {
       return {
         status: "unknown",
@@ -46,14 +56,6 @@ export function createVerifier(options: VerifierOptions = {}) {
         detail: String(error),
       };
     }
-    const identity = {
-      certificateId: certificateId(certificate),
-      modelId: modelId(certificate.specs),
-    };
-    // Always apply the caller's current policy, including on a cache hit.
-    const policyError = checkAxioms(certificate, policy);
-    if (policyError)
-      return { ...identity, status: "unknown", reason: policyError };
     try {
       const cacheKey = `${backend.identity}\0${identity.certificateId}`;
       if (!verified.get(cacheKey)) {

@@ -61,6 +61,7 @@ export function validateModel(model: PublicModel): void {
   const active = new Set<string>();
   const seen = new Set<string>();
   const constants = new Set<string>();
+  const literalTypes = new Set<string>();
 
   const ref = (value: unknown, category: Category): void => {
     const hash = string(value);
@@ -106,10 +107,12 @@ export function validateModel(model: PublicModel): void {
     if (kind === "natVal") {
       if (!/^[0-9]+$/.test(string(value)))
         throw new Error("invalid natural literal");
+      literalTypes.add("Nat");
       return;
     }
     if (kind === "strVal") {
       string(value);
+      literalTypes.add("String");
       return;
     }
     if (kind === "sort" || kind === "succ") {
@@ -372,6 +375,10 @@ export function validateModel(model: PublicModel): void {
         throw new Error("missing inductive member");
   if ([...constants].some((name) => !declaredNameHashes.has(name)))
     throw new Error("unresolved kernel constant");
+  if (
+    [...literalTypes].some((name) => !Object.hasOwn(model.declarations, name))
+  )
+    throw new Error("unresolved literal type");
   if (seen.size !== Object.keys(model.nodes).length)
     throw new Error("unrelated public kernel nodes");
 }

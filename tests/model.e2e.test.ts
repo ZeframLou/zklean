@@ -15,8 +15,47 @@ import {
 import { runNative } from "../src/native.ts";
 import { binary, buildNative, checked, input } from "./helpers.ts";
 import type { Certificate, PublicModel } from "../src/types.ts";
+import { createVerifier } from "../src/verifier.ts";
 
 beforeAll(buildNative, 300_000);
+
+test("literal dependencies are required before axiom policy traversal", async () => {
+  for (const literal of [{ natVal: "0" }, { strVal: "untrusted" }]) {
+    const nodes: PublicModel["nodes"] = Object.create(null);
+    const add = (node: Record<string, unknown>) => {
+      const hash = sha256(canonical(node));
+      nodes[hash] = node;
+      return hash;
+    };
+    const anonymous = add({ anonymous: true });
+    const name = add({ str: { pre: anonymous, str: "propext" } });
+    const type = add(literal);
+    const model = {
+      format: "lean4/kernel/2",
+      nodes,
+      declarations: {
+        propext: { axiom: { name, type, levelParams: [], isUnsafe: false } },
+      },
+    };
+    const certificate = {
+      format: "zklean/1",
+      specs: {
+        claims: ["propext"],
+        declarations: encodeBase64(canonical(model)),
+      },
+      axioms: ["propext"],
+      proof: "base64:AA==",
+    };
+    expect(() => readModel(certificate.specs)).toThrow(
+      "unresolved literal type",
+    );
+    expect(
+      await createVerifier().verify(certificate, {
+        allowedAxioms: ["propext"],
+      }),
+    ).toMatchObject({ status: "unknown", reason: "invalid-certificate" });
+  }
+});
 
 test("projection preserves Lean names that coincide with JavaScript object properties", async () => {
   const request = await input("identity", ["__proto__"]);

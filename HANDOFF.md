@@ -59,6 +59,21 @@ Main inventory source/fixtures remain supported. New unit axiom pin is in
 `examples/unit-inventory/axioms.json` and was computed from checked V1.
 
 Additional follow-up implemented since this section was first written:
+- Runtime worker retirement/import-roundtrip checkpoint is pushed at
+  cc1e480cb92c6ec2524443962ffeea9f39a32df9, and HTTPV now pins that commit.
+- A further concrete decoder bug was found and fixed: literal nodes must include
+  their implicit Nat/String declarations; policy traversal stays inside the SDK's
+  invalid-data error boundary. The new malformed-propext literal regression plus
+  model/policy/crypto tests pass (12 tests, 62 assertions); no guest changes.
+- Canonical unit filenames are **v1.json, v2.json, v3.json, bridge.json** under
+  examples/unit-inventory/certificates. The running raw prover outputs retain
+  tests/fixtures/unit/*.certificate.json: authenticate, then copy/rename after all
+  reports succeed. The fixture directory's old duplicate requirements.json can
+  be deleted; source refresh now writes the canonical example requirement directly.
+- npm files explicitly include the example Lean files/data and unit-flow/upgrades
+  entry points, excluding .lake. The installed demo entry resolves canonical data
+  relative to its own module, with no private checkout. Packed-consumer script
+  copies this exact public-API workflow and canonical data into a fresh npm app.
 - Root SDK runtime pushed at c9a6176; hosted Check is green. A follow-up hardens
   worker retirement: trapped WASM instances are discarded, retiring threads count
   against the budget until termination, and an out-of-field key cannot poison a
