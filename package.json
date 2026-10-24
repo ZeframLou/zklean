@@ -32,8 +32,7 @@
     "src",
     "README.md",
     "SPEC.md",
-    "docs/ENCODING.md",
-    "docs/USAGE.md",
+    "docs",
     "examples/lean/Inventory.lean",
     "examples/lean/V1.lean"
   ]

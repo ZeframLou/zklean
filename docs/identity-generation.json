@@ -1,0 +1,11 @@
+{
+  "exitCode": 0,
+  "wallSeconds": 1496.2195237,
+  "userSeconds": 2888.152096,
+  "systemSeconds": 53.090363,
+  "peakRssKiB": 12717008,
+  "rayonThreads": 2,
+  "goMemoryLimit": "6GiB",
+  "goGc": 20,
+  "goMaxProcs": 2
+}

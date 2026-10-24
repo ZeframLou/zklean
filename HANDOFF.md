@@ -1,320 +1,164 @@
 # Handoff
 
-## Current continuation checkpoint — 2026-10-23 (Los Angeles)
+Continue the original request: switch ZKLean to Groth16 and resolve the
+correctness, security, quality, usability, and documentation issues in both
+repositories. Successful fixture generation is a dependency, not the end of the
+task. The identity Groth16 proof is now real and validated; finish the remaining
+benchmark, integration, packaging, and documentation work below.
 
-This section supersedes the older network blocker and validation status below.
-The original scope and constraints still apply. Work remains active; do not
-report the Groth16 migration complete without positive real-proof verification.
+## Repositories and constraints
 
-- ZKLean branch `work` now includes commits through `275e52a`.
-- HTTPV `main` includes `d0b7d53`, a genuinely weaker stock-conservation bridge.
-- HTTPV's remaining work is on `fix/groth16-verification`, starting at `89d28d6`.
-  Draft PR: https://github.com/ZeframLou/httpv/pull/1 . Automatic approval review
-  rejected pushing the security fix directly to `main`; use the review branch.
-  Do not retry a direct main push without explicit user authorization. No merge
-  has been performed. The app attachment tool was called but did not return.
-- Both projects remain private and at `0.1.0`. Nothing has been published.
+- `/workspace/zklean`, private repository `ZeframLou/zklean`, branch `work`.
+  Its default `main` is an old specification-only checkpoint. Use `work`.
+- `/workspace/httpv`, private repository `ZeframLou/httpv`.
+  `main` includes `d0b7d53`, the weaker stock-conservation bridge. Continue on
+  `fix/groth16-verification`; its context security fix is `89d28d6`.
+  Draft PR: https://github.com/ZeframLou/httpv/pull/1 .
+- Automatic approval review rejected a direct push of the security fix to HTTPV
+  `main` because explicit shared-branch authorization was missing. The safer review
+  branch is pushed. Do not retry a direct main push without explicit authorization.
+  Do not merge the PR. The app attachment tool was called but did not return.
+- Keep both projects at `0.1.0`, private, with no package/release publication, tags,
+  merges, or visibility changes. Prepare distribution for review without publishing.
+- Use upstream SP1 5.2.4 without modifications or vendoring. Nanoda's existing
+  vendor patch is documented in `vendor/nanoda/UPSTREAM.md`.
+- Keep ZKLean independent of HTTPV. HTTPV imports public SDK exports only and
+  never generates certificates during request handling. Consumers install from npm;
+  its private Git pin is development-only.
+- Read each repository's `AGENTS.md` before editing documentation. READMEs should
+  motivate the project, explain unfamiliar terms, link dependencies, and keep each
+  trust model to one paragraph of at most three sentences. Commit and push regularly.
 
-### Completed in this continuation
+## Current verified state
 
-- Fixed special declaration names such as `__proto__` being lost by projection;
-  rejected base64 padding aliases and unpaired Unicode surrogates. Added native
-  cross-language, graph-closure, binder-renaming, and inductive-alias regressions.
-- Imported Lean models now check all reused declarations, erase the exporter's
-  irrelevant metadata, and accept matching existing proof-valued definitions.
-  The real Lean reconstruction, weaker derivation, and collision tests pass.
-- Failed authenticated imports no longer overwrite a Lean destination with an
-  error JSON result. A real-fixture CLI import/inspection regression is added;
-  it still awaits the Groth16 fixture.
-- Native stdout is reserved for JSON; upstream gnark diagnostics go to stderr.
-  Proving progress can stream through the CLI. CLI timeout is configurable.
-- Packaging explicitly rebuilds proving features. Built the actual native prover
-  on Ubuntu 22.04 and tested its archive in a fresh Ubuntu 22.04 container: automatic
-  circuit and Lean installation, doctor, matching checker pin, init, and real
-  inventory source checking all passed. Subsequent CLI changes require final
-  repackaging. The final package script selects Bun's baseline x86-64 runtime.
-- Added checksum-pinned automatic circuit installation, a separate binary-only
-  distribution plan, a clean-install CI job, and packed npm consumer checks.
-  The proposed public binary host is not published or created.
-- HTTPV now checks every shared declaration in a bridge and remote model, including
-  definitions outside assumed-claim closures. A real Lean/Nanoda fixture reproduced
-  the previous false acceptance; the regression and all 13 transport/compatibility
-  tests pass against its existing SDK pin. The fix is in draft PR #1.
-- Usage guides and specifications are substantially updated. HTTPV's default-WASM
-  migration edits remain uncommitted until the real SDK fixture passes. Preserve
-  that working tree. Its development SDK pin is still the old working pin.
+The real identity proof is generated by the unchanged upstream CPU/Groth16
+pipeline using official ceremony artifacts. It passed the SDK's native check,
+upstream lightweight native check, explicit WASM, and default SDK verification.
+It has 260 evidence bytes and the actual pinned checker identity:
 
-### Active real proof generation
+- ELF SHA-256: `10819f2bb944e48fcbfbd5f49f47ba508bb0069a33923f8368a179e9e1bc5d37`
+- Checker key: `0x00a2d646d4c4c693eec3f7f24133b648ab3332c4b6d1e079aaa401c28c0f2d89`
+- Certificate identity: `4b8a989a35eb046e928e33b940f7b0c064d03254c7264bf1abf5361e7c773f4d`
 
-Network access now works, including the official SP1 circuit archive and Go
-modules. This fresh environment was provisioned from official toolchains.
-Source `/workspace/zklean-env.sh` for paths and cache locations; do not change HOME.
+The committed identity fixture/profile have been replaced only after those
+positive checks. `src/guest.json` matches the actual identity and needs no key
+change. No manufactured proof or signature substitutes for cryptographic tests.
 
-The first portable identity proof attempt was killed after 22m20s at the 16 GiB
-cgroup memory limit. A second portable run was intentionally stopped to use a
-CPU-optimized host prover. Upstream SP1 and its production VK/shape checks are
-unchanged. Fresh optimized identity exactly matches `src/guest.json` and the
-original ELF digest.
-
-Current proof process (when this section was written): PID `44654`, launched by
-`/tmp/zklean-run-proof.py` using `/workspace/optimized/target/release/zklean-native`.
-The host binary was built with `RUSTFLAGS='-C target-cpu=native'` in the separate
-`/workspace/optimized/target` directory. It uses two Rayon threads, two Go workers,
-`GOMEMLIMIT=6GiB`, and `GOGC=20`. Core proving completed in about 115 seconds;
-BN254 wrapping is still progressing. No real Groth16 certificate has completed.
-
-- Input request: `/tmp/zklean-identity-request.json`
-- Live diagnostics: `/tmp/zklean-prove-optimized.log`
-- Pending output: `examples/generated/identity.groth16.json` (empty until success)
-- Exit/time/peak-memory report: `/tmp/zklean-prove-optimized.result.json`
-- Earlier failed attempt: `/tmp/zklean-prove.log`
-- Cgroup memory events: `/sys/fs/cgroup/memory.events` (two prior OOM kills)
-
-Keep proving sequential. Do not run the large guest execution beside a prover.
-Real guest cycle counts are 827,835 for identity, 11,482,006 for the new polymorphic
-pipeline composition example, and 353,114,958 for inventory. The benchmark now
-uses identity and composition; inventory CPU proving can require hours.
-
-### Next dependencies
-
-1. Wait for the current proof. Inspect its actual exit report and positive native
-   acceptance (the prover verifies with both upstream SDK and lightweight verifier).
-   Verify it through explicit and default WASM before replacing either committed
-   identity fixture. Never manufacture a positive fixture or skip the crypto tests.
-2. Replace the certificate/profile only after success; run full root checks with
-   `ZKLEAN_LAKE` and `ZKLEAN_GUEST_ELF`, crypto tampering/import checks, fixture
-   identity, Rust formatting/clippy, formatting, compile, and packed SDK checks.
-   Rebuild proving features before pin/prove; test helpers overwrite the binary.
-3. Generate a real composition certificate sequentially and run
-   `scripts/benchmark.ts` for complete sizes and verification costs. Update the
-   benchmark guide with observed results and real generation resource limits.
-4. Commit/push the passing SDK, then update HTTPV's development pin and lockfile,
-   copy the real fixture/profile, and finish the pending embedded-verifier migration.
-   Run all HTTPV checks and its npm-packed-consumer path. Update draft PR #1 around
-   its final scope and validation; do not merge it.
-5. Rebuild/repackage the final archive on the existing `zklean-build:ubuntu22`
-   Docker image using `CARGO_TARGET_DIR=/workspace/baseline/target`. The previous
-   clean test containers were removed after success to recover disk space.
-6. Replace this active checkpoint with final verified state and remaining concrete
-   publication prerequisites. Keep all versions, visibility, and release constraints.
-
-Continue the request: switch ZKLean to Groth16 and resolve the correctness,
-security, quality, usability, and documentation issues found in both repositories.
-The Groth16 migration is a work checkpoint, not a validated implementation.
-
-## Repositories
-
-| Repository | Branch | Implementation checkpoint |
-| --- | --- | --- |
-| `ZeframLou/zklean` | `work` | `e1e15af` |
-| `ZeframLou/httpv` | `main` | `e094778` |
-
-Local checkouts are `/workspace/zklean` and `/workspace/httpv`. Both repositories
-are private. ZKLean's implementation is on `work`; do not resume from its old
-default branch. HTTPV still pins SDK commit
-`608dd4bc089eeb71a62eba1def407e4f84697cf9` for development, so its working
-compressed-proof integration has not yet switched to the new SDK.
-
-## Constraints
-
-- Keep both projects at `0.1.0`. Do not publish packages or releases, create tags,
-  merge branches, or change repository visibility as part of this handoff.
-- Use upstream SP1 5.2.4 without source modifications or vendoring. The existing
-  Nanoda vendor patch is documented separately in `vendor/nanoda/UPSTREAM.md`.
-- Keep ZKLean independent of HTTPV. HTTPV imports only ZKLean's public exports;
-  it does not generate certificates during request handling.
-- HTTPV consumers install from npm. Its private Git pin is development-only.
-- Deliver one compact ZKLean installation command with automatic dependencies.
-  Do not make consumers download CI artifacts or configure a native verifier.
-- Prefer meaningful E2E and formal checks. Keep changes simple; commit and push
-  regularly. Read each repository's `AGENTS.md` before editing its documentation.
-- README writing: motivation first, define unfamiliar terms, link dependencies,
-  and keep the trust model to one paragraph of at most three sentences. Avoid
-  apologies, development history, and unnecessary implementation details.
-
-## Completed changes
-
-- `7c8619f`: axiom permissions bind declarations and their complete dependency
-  contexts, rather than trusting names. Standard Lean axiom pins are generated
-  from the pinned toolchain; custom assumptions require reviewed fingerprints.
-  Lake resolves source paths, including `srcDir`, and manifests detect transitive
-  source edits before a rebuild.
-- `608dd4b`: shared context comparison ignores bound-variable display names and
-  binder annotations while retaining constant names, types, and definition bodies.
-- `f37a02b`: reconstruct received public kernel models through Lean's public API.
-  A real Lean/Nanoda regression derives a weaker stock-conservation property from
-  the received reservation guarantee without its original source or proof.
-- HTTPV `e094778`: bounded monitor checks, expiring verification, stopped-state
-  invalidation, synchronous state callbacks, and `requireVerified()` request
-  gating. Its usage guide includes a gated request example. Bridge checks use
-  complete remote assumption identities and resolved contexts.
-- ZKLean's verifier coalesces concurrent identical checks and bounds independent
-  backend work and queue size; cached results still enforce the current policy.
-
-## Groth16 checkpoint
-
-`e1e15af` changes the CPU prover to `.groth16()`. The `prover` Cargo feature links
-SP1's native gnark backend so installed users need neither Go nor Docker.
-`crates/verifier` wraps the unchanged upstream `sp1-verifier` crate for native
-and WebAssembly verification. The npm SDK defaults to the embedded WASM verifier
-and a locally trusted checker key; certificates cannot choose either key.
-
-The wire proof is SP1's four-byte circuit selector plus its 256-byte Groth16
-proof. The public specification is additional data. The checker key is BN254
-`vk.bytes32()`, which differs from the old serialized BabyBear fingerprint.
-
-CLI wiring adds `init`, authenticated `inspect`, and authenticated `import`.
-An import writes a Lean module and `<output>.axioms.json` for subsequent bridge
-authoring. Kernel reconstruction and inspection passed their E2E test; the full
-authenticated import path still needs the real Groth16 fixture.
-
-**No real Groth16 certificate has been generated or positively verified yet.**
-The committed identity certificate and verifier profile are still the old
-compressed-STARK fixtures. `src/guest.json` contains the BN254 conversion of the
-existing checker fingerprint; validate it against a fresh native `identity`
-result before trusting the migration. Do not replace a real proof with a mock,
-test signature, or manufactured bytes.
-
-## Network blocker
-
-The user saved a configuration allowing full network access. The bound running
-environment continued reporting `restricted`, `enforced`, and no custom domains;
-actual downloads returned HTTP 403. Verify the policy of the resumed environment
-and actual access, rather than assuming the saved configuration has applied.
-
-Required destinations include:
-
-- `sp1-circuits.s3-us-east-2.amazonaws.com`
-- `sp1-circuits.s3.us-east-2.amazonaws.com`
-- `storage.googleapis.com`, used by a Go module proxy redirect
-
-Use the cloud runtime skill and the supported environment configuration workflow.
-Keep the inherited proxy and CA trust; do not bypass the destination policy.
-
-## Resume proving and validation
-
-See `docs/DEVELOPMENT.md` for the source toolchain. The previous workspace has
-Bun 1.4.4, Rust stable and 1.91.1, SP1 5.2.4, Lean 4.36.0-rc1, and the exporter.
-These paths are conveniences for that workspace, not installation requirements:
-
-```sh
-export PATH="/workspace/.tools/go/bin:/workspace/.cargo/bin:/workspace/.sp1/bin:/tmp/zklean-tools/node_modules/.bin:$PATH"
-export CARGO_HOME=/workspace/.cargo
-export RUSTUP_HOME=/workspace/.rustup
-export GOPATH=/workspace/.go
-export GOCACHE=/workspace/.cache/go-build
-export ZKLEAN_LAKE=/workspace/lean-4.36.0-rc1-linux/bin/lake
-export SP1_GROTH16_CIRCUIT_PATH=/workspace/.sp1/circuits/groth16
-```
-
-`/usr/bin/go` in that workspace is not the required Go toolchain; use the Go
-1.23.12 installation at `/workspace/.tools/go/bin`. Fresh environments must
-provision the documented tools. Do not repurpose `HOME` to fix cache permissions.
-
-From the ZKLean root, after network access works:
-
-```sh
-bun install --frozen-lockfile
-bash scripts/prepare-sp1.sh
-bash scripts/build-guest.sh
-cargo build --release --locked -p zklean-native --features prover,execute
-rustup target add wasm32-unknown-unknown
-bun run build:verifier
-
-export ZKLEAN_GUEST_ELF="$PWD/crates/guest/target/elf-compilation/riscv32im-succinct-zkvm-elf/release/zklean-guest"
-bun src/cli.ts pin --elf "$ZKLEAN_GUEST_ELF" \
-  --out examples/generated/verifier.json
-
-bun src/cli.ts prove --export tests/fixtures/identity.ndjson \
-  --claims Demo.identity --config examples/generated/verifier.json \
-  --out examples/generated/identity.groth16.json
-
-bun src/cli.ts verify --certificate examples/generated/identity.groth16.json \
-  --config examples/generated/verifier.json
-```
-
-The SDK appends its circuit version to `SP1_GROTH16_CIRCUIT_PATH`; supply the root
-directory, not an already versioned path. Keep the production VK checks and
-fixed recursion/core shapes in `crates/cli/src/sp1.rs` enabled.
-
-Compare the freshly generated key and ELF digest with `src/guest.json`. Update
-that file from the actual built checker identity if needed. Only after successful
-real verification, replace `tests/fixtures/identity.certificate.json` and
-`identity.verifier.json` with the generated certificate and profile. Then run:
-
-```sh
-bun scripts/check-proof-fixture.ts "$ZKLEAN_GUEST_ELF"
-cargo fmt --check -p zklean-core -p zklean-native -p zklean-verifier
-cargo clippy --locked -p zklean-native -p zklean-verifier -- -D warnings
-bun run check
-bun run format:check
-bun run compile
-```
-
-The crypto test must accept the real certificate through native, explicit WASM,
-and default SDK verification, and reject altered evidence and wrong keys. Add
-valid-model tampering coverage, beyond malformed-input rejection. Verify the
-compiled CLI and a packed npm consumer with no native verifier installed.
-
-**Build ordering:** test helpers rebuild `zklean-native` without `prover`; guest
-tests rebuild it with `execute`. Rebuild with `--features prover` before `pin`,
-`prove`, or packaging. Fix the release workflow's ordering or build outputs so
-`bun run check` cannot silently replace the binary intended for distribution.
-
-Once root crypto checks pass, commit and push the SDK. Update HTTPV's development
-pin and lockfile, copy the real fixture/profile, and migrate its client examples
-to the default embedded verifier. Remove native-path/profile discovery and make
-its crypto integration test mandatory in CI. Retest the packed consumer path
-using npm installation, not a sibling checkout or Git dependency.
-
-## Validation at checkpoint
+Validation after replacement:
 
 | Check | Result |
 | --- | --- |
-| ZKLean full check, including real SP1 guest execution and Lean | 14 pass, 2 fail |
-| Failing tests | Crypto fixture acceptance; concurrent real crypto verification |
-| Failure cause | Both still consume the legacy compressed-STARK fixture |
-| TypeScript, CLI compilation, Rust formatting/clippy | Passed for the checked configurations |
-| Embedded verifier rejects invalid evidence from compiled CLI | Passed |
-| Native prover build with gnark | Blocked by Go dependency download policy |
-| Real Groth16 generation and positive verification | Not performed |
-| HTTPV check against its existing SDK pin and native crypto adapter | 17 pass |
+| Full ZKLean typecheck and suite, including real guest and Lean | 23 pass, 0 fail, 0 skip |
+| Native, explicit WASM, default verification; altered valid model/evidence/wrong keys | Passed |
+| Authenticated CLI import, inspection, Lean compilation, failed-import preservation | Passed |
+| Native concurrency coalescing and custom axiom policies | Passed |
+| Rust formatting/clippy and guest/fixture identity | Passed |
+| TypeScript formatting and standalone compilation | Passed |
+| Actual npm SDK tarball, no native tools available | Passed |
+| Compiled CLI positive verification, no native tools available | Passed |
+| HTTPV shared-context fix against its existing SDK | 13 transport/compatibility tests pass |
+| HTTPV default embedded integration and packed consumer | Pending SDK pin update |
+| Larger composition certificate and quantitative benchmark | Active below |
+| Final archive after latest CLI changes | Repackage/retest below |
 
-Do not skip the two failing root tests or report the Groth16 migration complete
-until a real certificate passes them. The native prover configuration has not
-finished compiling, and a positive WASM pairing check has not been exercised.
+The full root check log is `/tmp/zklean-full-check.log`; npm/compiled consumer
+results are `/tmp/zklean-package-check.log`. Hosted root CI previously failed
+because it still consumed the legacy fixture; the new commit should resolve it.
+HTTPV hosted CI currently fails before tests because `ZKLEAN_READ_TOKEN` is not
+configured. Its existing workflow requires a read-only token for the private SDK;
+do not persist the session's broader/transient GitHub token as that secret.
 
-## Remaining review work
+## Completed corrections
 
-1. Finish Groth16 generation, pin validation, tampering checks, and HTTPV migration
-   as above. Retest custom axiom policies and independently verified bridges.
-2. Finish the certificate-to-Lean authoring guide and a nontrivial bridge example.
-   HTTPV's committed example still renames an identical proposition. Explain the
-   conservative matching rules: binder renaming works; changed definitions with
-   the same name require distinct/versioned contexts. Review importer collisions:
-   it currently skips declarations already present in Lean; downstream context
-   and axiom checks remain essential.
-3. Complete the one-command installer and release distribution. Both source repos
-   remain private, while current public install/docs links assume accessibility.
-   Prepare a concrete distribution mechanism without exposing source repositories
-   or publishing an unrequested release. `release.yml` currently only uploads CI
-   artifacts and now targets Ubuntu 22.04; that alone does not solve distribution.
-4. Test the actual archive on a clean supported Linux baseline, including Lean
-   installation and a real source command. Earlier native binaries required
-   GLIBC 2.39. Validate the baseline build and runtime libraries, remove the
-   provisioned-runner/skip-Lean blind spot, and fix the build-order issue above.
-5. Measure complete certificate sizes and verification cost against direct
-   Nanoda checking on small and larger examples. A 260-byte proof does not make
-   every full certificate smaller or cheaper. Replace unsupported README claims
-   with concrete motivation and link reproducible measurements.
-6. Finish both READMEs, usage guides, and specifications. Root encoding/spec docs
-   were partly migrated; other material and fixture descriptions still describe
-   compressed proofs or native setup. HTTPV's specification must document exact
-   matching, monitor expiry/timeouts, synchronous callbacks, request gating, and
-   sidecar generation consistently. Keep trust models separate and concise.
-7. Expand adversarial/cross-language coverage of model projection, graph closure,
-   canonical encoding, and context comparison. These transformations are part of
-   the trusted boundary; avoid tests that merely repeat their implementation.
+- Axiom permissions bind the declaration and full dependency context; standard
+  pins come from the Lean toolchain, custom axioms require reviewed fingerprints.
+  Context matching ignores binder display names/annotations but preserves names,
+  types, and definition bodies. Lake resolves `srcDir`; manifests detect transitive
+  source edits before rebuilding. Verifiers bound concurrent work and coalesce checks.
+- Fixed `__proto__` declaration loss, noncanonical base64 padding bits, and unpaired
+  Unicode surrogates. Added native cross-language, closure, binder-renaming,
+  inductive-alias, and polymorphic multi-claim coverage.
+- Imports reconstruct kernel objects through Lean's public API and check reused
+  declarations against the authenticated public context. They erase irrelevant
+  exporter metadata and support matching existing proof-valued definitions.
+  Failed authentication preserves existing Lean and axiom-pin output files.
+- Upstream gnark prints to stdout. The native wrapper now reserves original stdout
+  for JSON and redirects library diagnostics to stderr. CLI proving can stream
+  diagnostics; `--timeout MS` supports long runs.
+- HTTPV's example now derives the weaker stock-conservation property. A new real
+  Lean/Nanoda fixture reproduced false acceptance when a bridge redefined a shared
+  operation outside assumed remote claim closures. HTTPV now checks every shared
+  declaration; unrelated extra remote declarations remain allowed. See draft PR #1.
+- Monitor timeouts, expiry, stopped-state invalidation, synchronous callbacks,
+  and `requireVerified()` request gating are implemented and documented.
 
-The original request covers all these issues. Successful fixture regeneration
-is the first dependency, not the end of the task.
+## Active composition proof and measurement
+
+Source `/workspace/zklean-env.sh` for this environment's tools/cache paths.
+Fresh environments must provision the documented tools. Do not change HOME.
+Network downloads now work, including official S3 circuits and Go modules.
+
+The successful identity run used a host-optimized prover:
+`/workspace/optimized/target/release/zklean-native`, built with
+`RUSTFLAGS='-C target-cpu=native'` in a separate target directory. The guest and
+production VK/shape checks are unchanged. It ran with two Rayon and Go workers,
+`GOMEMLIMIT=6GiB`, and `GOGC=20`. It took 1496 seconds and peaked at 12.1 GiB RSS.
+Its resource report is `docs/identity-generation.json`.
+
+The first portable attempt hit the 16 GiB cgroup limit after 22 minutes. Large
+archives had occupied 3.4 GiB in RAM-backed `/tmp`; they were moved to disk at
+`/workspace/.cache/`. The verified circuit archive is now
+`/workspace/.cache/zklean-groth16.tar.gz`, SHA-256
+`6cbc2c155c41001e81efd81119bd3d4f32313fcd3184df383d50225315b73104`.
+Do not move these large caches back into RAM-backed temporary storage.
+
+A real **composition** proof has now started sequentially via
+`/tmp/zklean-run-proof.py`. It uses the same guest, host binary, and resource
+settings. It certifies `Pipeline.compose` and `Pipeline.weaken`, with no axioms.
+
+- Request: `/tmp/zklean-composition-request.json`
+- Live log: `/tmp/zklean-composition-prove.log`
+- Pending certificate: `examples/generated/composition.groth16.json`
+- Exit/time/peak report: `/tmp/zklean-composition-prove.result.json`
+
+Do not run a large guest execution beside a prover. Real guest cycle counts are
+827,835 for identity, 11,482,006 for composition, and 353,114,958 for inventory.
+The benchmark uses identity and composition; inventory proving can require hours.
+
+After composition succeeds, run `scripts/benchmark.ts` on the two real generated
+certificates. It checks positive native and embedded verification without cache
+hits and reports complete file/canonical/model/evidence sizes, first-call and
+seven-sample median/minimum costs. Save reproducible results in the benchmark
+guide, with actual hardware/resource settings; do not claim a universal size or
+speed advantage. The default portable binary is retained for distribution.
+
+## Remaining integration and packaging
+
+1. Commit/push the passing SDK fixture and current docs changes to `work`. Update
+   HTTPV's dev Git pin to that exact full commit and regenerate its Bun lockfile.
+   Copy the real identity certificate/profile. Its migration edits already exist
+   uncommitted: default embedded verifier examples/tests, removed native discovery,
+   mandatory crypto/packed CI checks, and updated guides/specs. Preserve them.
+2. Run full HTTPV typecheck/tests/formatting, including mandatory real crypto.
+   Pack the SDK with npm and run HTTPV's actual npm tarball consumer check; do not
+   use a sibling checkout or private Git dependency as consumer validation.
+   Update draft PR #1's title/body around the final scope and verified results.
+3. Complete the composition benchmark above and finish all stale fixture/profile
+   descriptions. Include needed docs in the npm tarballs. Keep consumer links
+   pointed at the proposed public binary/docs host rather than private source URLs.
+4. Rebuild the final archive on the existing `zklean-build:ubuntu22` Docker image,
+   with `CARGO_TARGET_DIR=/workspace/baseline/target`. Packaging explicitly rebuilds
+   `prover,execute` and chooses Bun's baseline x86-64 runtime. Test helpers overwrite
+   the native binary with reduced features; rebuild before pin/prove/identity checks.
+5. The earlier actual Ubuntu 22.04 archive passed a fresh-container install with
+   automatic circuit and Lean installation, doctor, matching checker pin, init,
+   and inventory source checking. Repackage/retest after the latest CLI changes.
+   The old clean test containers were removed to recover disk. For the next clean
+   test, mount the circuit archive from its new disk path. Preserve proxy and CA
+   trust in Docker as documented by the environment runtime skill.
+6. The proposed `ZeframLou/zklean-dist` binary-only host is staged but unpublished;
+   package/release publication and host creation are maintainer actions. Do not
+   expose the source repositories. `install.sh`, README, specification, and docs
+   are copied into `dist` beside the archive/checksum for concrete review.
+7. Record final checks, resource limits, hosted-CI credential prerequisite, review
+   branch/PR, and publication prerequisites here. Do not merge or publish anything.

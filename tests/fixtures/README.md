@@ -16,13 +16,17 @@ and resolved definitions for composed stages and weaker postconditions.
 `guest.e2e.test.ts` executes the real compiled SP1 guest when
 `ZKLEAN_GUEST_ELF` is provided.
 
-`identity.certificate.json` is a **real locally generated SP1 compressed STARK
-proof**, not a test signature. `identity.verifier.json` records its trusted guest
-key, fingerprint, ELF digest, and SP1 version. CI rebuilds the current guest and
-requires all three key identities to match this fixture. The crypto E2E test
-verifies it with the unchanged upstream SDK and rejects a tampered axiom list and
-wrong key pin. It deliberately uses no original Lean proof or ELF during
-verification. This key is test data, not a default production trust policy.
+`identity.certificate.json` is a real locally generated SP1 5.2.4 Groth16 proof.
+Its evidence is 260 bytes: the circuit selector and Groth16 proof. It uses the
+SDK's pinned checker identity; the certificate cannot select a verification key.
+`identity.verifier.json` records the BN254 checker key, ELF digest, and SP1 version.
+CI rebuilds the guest and requires its identity to match the fixture.
+
+The crypto E2E tests accept this certificate through native, explicit WebAssembly,
+and default SDK verification. They reject altered evidence, a different valid
+model, and wrong keys, without receiving the original Lean proof or guest ELF.
+The authenticated CLI import test also checks compilation, inspection, and
+preservation of existing output files after authentication fails.
 
 Regenerate using `zklean pin` and `zklean prove` on `identity.ndjson`, then verify
 the resulting certificate with `zklean verify` before replacing the fixture.
