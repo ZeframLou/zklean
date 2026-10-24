@@ -1,5 +1,103 @@
 # Handoff
 
+## Current continuation checkpoint — 2026-10-23 (Los Angeles)
+
+This section supersedes the older network blocker and validation status below.
+The original scope and constraints still apply. Work remains active; do not
+report the Groth16 migration complete without positive real-proof verification.
+
+- ZKLean branch `work` now includes commits through `275e52a`.
+- HTTPV `main` includes `d0b7d53`, a genuinely weaker stock-conservation bridge.
+- HTTPV's remaining work is on `fix/groth16-verification`, starting at `89d28d6`.
+  Draft PR: https://github.com/ZeframLou/httpv/pull/1 . Automatic approval review
+  rejected pushing the security fix directly to `main`; use the review branch.
+  Do not retry a direct main push without explicit user authorization. No merge
+  has been performed. The app attachment tool was called but did not return.
+- Both projects remain private and at `0.1.0`. Nothing has been published.
+
+### Completed in this continuation
+
+- Fixed special declaration names such as `__proto__` being lost by projection;
+  rejected base64 padding aliases and unpaired Unicode surrogates. Added native
+  cross-language, graph-closure, binder-renaming, and inductive-alias regressions.
+- Imported Lean models now check all reused declarations, erase the exporter's
+  irrelevant metadata, and accept matching existing proof-valued definitions.
+  The real Lean reconstruction, weaker derivation, and collision tests pass.
+- Failed authenticated imports no longer overwrite a Lean destination with an
+  error JSON result. A real-fixture CLI import/inspection regression is added;
+  it still awaits the Groth16 fixture.
+- Native stdout is reserved for JSON; upstream gnark diagnostics go to stderr.
+  Proving progress can stream through the CLI. CLI timeout is configurable.
+- Packaging explicitly rebuilds proving features. Built the actual native prover
+  on Ubuntu 22.04 and tested its archive in a fresh Ubuntu 22.04 container: automatic
+  circuit and Lean installation, doctor, matching checker pin, init, and real
+  inventory source checking all passed. Subsequent CLI changes require final
+  repackaging. The final package script selects Bun's baseline x86-64 runtime.
+- Added checksum-pinned automatic circuit installation, a separate binary-only
+  distribution plan, a clean-install CI job, and packed npm consumer checks.
+  The proposed public binary host is not published or created.
+- HTTPV now checks every shared declaration in a bridge and remote model, including
+  definitions outside assumed-claim closures. A real Lean/Nanoda fixture reproduced
+  the previous false acceptance; the regression and all 13 transport/compatibility
+  tests pass against its existing SDK pin. The fix is in draft PR #1.
+- Usage guides and specifications are substantially updated. HTTPV's default-WASM
+  migration edits remain uncommitted until the real SDK fixture passes. Preserve
+  that working tree. Its development SDK pin is still the old working pin.
+
+### Active real proof generation
+
+Network access now works, including the official SP1 circuit archive and Go
+modules. This fresh environment was provisioned from official toolchains.
+Source `/workspace/zklean-env.sh` for paths and cache locations; do not change HOME.
+
+The first portable identity proof attempt was killed after 22m20s at the 16 GiB
+cgroup memory limit. A second portable run was intentionally stopped to use a
+CPU-optimized host prover. Upstream SP1 and its production VK/shape checks are
+unchanged. Fresh optimized identity exactly matches `src/guest.json` and the
+original ELF digest.
+
+Current proof process (when this section was written): PID `44654`, launched by
+`/tmp/zklean-run-proof.py` using `/workspace/optimized/target/release/zklean-native`.
+The host binary was built with `RUSTFLAGS='-C target-cpu=native'` in the separate
+`/workspace/optimized/target` directory. It uses two Rayon threads, two Go workers,
+`GOMEMLIMIT=6GiB`, and `GOGC=20`. Core proving completed in about 115 seconds;
+BN254 wrapping is still progressing. No real Groth16 certificate has completed.
+
+- Input request: `/tmp/zklean-identity-request.json`
+- Live diagnostics: `/tmp/zklean-prove-optimized.log`
+- Pending output: `examples/generated/identity.groth16.json` (empty until success)
+- Exit/time/peak-memory report: `/tmp/zklean-prove-optimized.result.json`
+- Earlier failed attempt: `/tmp/zklean-prove.log`
+- Cgroup memory events: `/sys/fs/cgroup/memory.events` (two prior OOM kills)
+
+Keep proving sequential. Do not run the large guest execution beside a prover.
+Real guest cycle counts are 827,835 for identity, 11,482,006 for the new polymorphic
+pipeline composition example, and 353,114,958 for inventory. The benchmark now
+uses identity and composition; inventory CPU proving can require hours.
+
+### Next dependencies
+
+1. Wait for the current proof. Inspect its actual exit report and positive native
+   acceptance (the prover verifies with both upstream SDK and lightweight verifier).
+   Verify it through explicit and default WASM before replacing either committed
+   identity fixture. Never manufacture a positive fixture or skip the crypto tests.
+2. Replace the certificate/profile only after success; run full root checks with
+   `ZKLEAN_LAKE` and `ZKLEAN_GUEST_ELF`, crypto tampering/import checks, fixture
+   identity, Rust formatting/clippy, formatting, compile, and packed SDK checks.
+   Rebuild proving features before pin/prove; test helpers overwrite the binary.
+3. Generate a real composition certificate sequentially and run
+   `scripts/benchmark.ts` for complete sizes and verification costs. Update the
+   benchmark guide with observed results and real generation resource limits.
+4. Commit/push the passing SDK, then update HTTPV's development pin and lockfile,
+   copy the real fixture/profile, and finish the pending embedded-verifier migration.
+   Run all HTTPV checks and its npm-packed-consumer path. Update draft PR #1 around
+   its final scope and validation; do not merge it.
+5. Rebuild/repackage the final archive on the existing `zklean-build:ubuntu22`
+   Docker image using `CARGO_TARGET_DIR=/workspace/baseline/target`. The previous
+   clean test containers were removed after success to recover disk space.
+6. Replace this active checkpoint with final verified state and remaining concrete
+   publication prerequisites. Keep all versions, visibility, and release constraints.
+
 Continue the request: switch ZKLean to Groth16 and resolve the correctness,
 security, quality, usability, and documentation issues found in both repositories.
 The Groth16 migration is a work checkpoint, not a validated implementation.
