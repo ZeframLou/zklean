@@ -11,6 +11,50 @@ import { runLake } from "../src/lean.ts";
 
 beforeAll(buildNative, 300_000);
 
+test("embedded verification keeps application timers responsive", async () => {
+  const certificate = await Bun.file(
+    new URL("./fixtures/identity.certificate.json", import.meta.url),
+  ).json();
+  const verifier = createVerifier({ cacheSize: 0 });
+  expect(
+    (await verifier.verify(certificate, { allowedAxioms: [] })).status,
+  ).toBe("verified");
+  let timerFired = false;
+  const timer = new Promise<void>((resolve) =>
+    setTimeout(() => {
+      timerFired = true;
+      resolve();
+    }, 5),
+  );
+  expect(
+    (await verifier.verify(certificate, { allowedAxioms: [] })).status,
+  ).toBe("verified");
+  expect(timerFired).toBe(true);
+  await timer;
+});
+
+test("embedded verifiers share a bounded worker budget across instances", async () => {
+  const certificate = await Bun.file(
+    new URL("./fixtures/identity.certificate.json", import.meta.url),
+  ).json();
+  const results = await Promise.all(
+    Array.from({ length: 18 }, () =>
+      createVerifier({ cacheSize: 0 }).verify(certificate, {
+        allowedAxioms: [],
+      }),
+    ),
+  );
+  expect(results.filter((result) => result.status === "verified")).toHaveLength(
+    16,
+  );
+  expect(
+    results.filter((result) => result.reason === "verifier-busy"),
+  ).toHaveLength(2);
+  expect(
+    (await createVerifier().verify(certificate, { allowedAxioms: [] })).status,
+  ).toBe("verified");
+}, 30_000);
+
 test("native and embedded upstream verifiers accept the locally generated Groth16 certificate", async () => {
   const certificate = (await Bun.file(
     resolve(import.meta.dir, "fixtures/identity.certificate.json"),

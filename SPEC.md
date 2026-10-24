@@ -155,7 +155,10 @@ Snapshots have the form `{format:"zklean/requirements/1",specs}`. Source-based
 generation also includes a `zklean/source-manifest/1` with source, imported
 modules, project files, and toolchain artifact digests. A `.lean` path resolves
 to `<path>.zklean.json`; every recorded digest MUST match before that sidecar
-is used. JSON snapshots can be loaded directly.
+is used. Source-bound generation MUST retain its pre-export source closure and
+reject edits through the final model check and manifest capture. A supplied raw
+export MUST NOT be labeled as bound to an independently supplied source path.
+JSON snapshots can be loaded directly.
 
 The public TypeScript API exports `createSourceManifest` and `loadRequirements`
 for applications that maintain and consume those snapshots.

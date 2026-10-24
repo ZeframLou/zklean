@@ -73,5 +73,12 @@ tarball installed with npm, including real embedded proof verification without
 native tools. HTTPV's corresponding packed-consumer check installs both
 tarballs with npm and exercises its public API.
 
+Both npm packages are currently unpublished. Review prepared tarballs without
+Git dependencies, then use Bun for the application:
+
+```sh
+npm install /path/to/zklean-0.1.0.tgz /path/to/httpv-0.1.0.tgz
+```
+
 Publishing the npm packages and the binary host is a maintainer action. No
 package, release, tag, merge, or visibility change is performed by packaging.

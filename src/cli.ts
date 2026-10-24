@@ -11,7 +11,7 @@ import { exportModule, findTools, nativeOptions } from "./tooling.ts";
 import type { ProveInput } from "./native.ts";
 import { resolveLeanSource } from "./lean.ts";
 import { checkAxioms } from "./policy.ts";
-import type { Certificate, VerifyOptions } from "./types.ts";
+import type { Certificate, VerifyOptions, SourceManifest } from "./types.ts";
 import { leanModule } from "./import.ts";
 import { declarationIdentity } from "./context.ts";
 import { readModel } from "./encoding.ts";
@@ -176,28 +176,35 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
   const exported = async (): Promise<{
     text: string;
     source: string | undefined;
+    sourceFiles?: SourceManifest;
   }> => {
     const path = optional("export");
-    if (path)
+    if (path) {
+      if (command === "requirements" && optional("source"))
+        throw new Error(
+          "source-bound requirements must be exported from --project/--module",
+        );
       return { text: await Bun.file(path).text(), source: optional("source") };
+    }
     const project = resolve(required("project"));
     const module = required("module");
-    const source =
-      optional("source") ??
-      (await resolveLeanSource(project, module, tools.lake ?? "lake"));
+    const resolvedSource = await resolveLeanSource(
+      project,
+      module,
+      tools.lake ?? "lake",
+    );
+    const source = optional("source") ?? resolvedSource;
+    if (
+      command === "requirements" &&
+      resolve(source) !== resolve(resolvedSource)
+    )
+      throw new Error("--source must match the Lake-resolved module source");
     const before =
       command === "requirements"
         ? await createSourceManifest(source, tools.lake, false)
         : undefined;
     const text = await exportModule({ project, module, claims, tools });
-    if (before) {
-      const after = await createSourceManifest(source, tools.lake, false);
-      if (canonical(before) !== canonical(after))
-        throw new Error(
-          "Lean sources changed during export; retry requirements generation",
-        );
-    }
-    return { text, source };
+    return { text, source, ...(before ? { sourceFiles: before } : {}) };
   };
 
   if (command === "export") {
@@ -233,12 +240,26 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
       result = await runNative(tools.binary, command, input);
       if (command === "check") enforcePolicy(result as Certificate);
       if (command === "requirements" && source.source) {
-        Object.assign(result as object, {
-          sourceManifest: await createSourceManifest(
-            source.source,
-            tools.lake ?? "lake",
-          ),
-        });
+        const manifest = await createSourceManifest(
+          source.source,
+          tools.lake ?? "lake",
+        );
+        const after = await createSourceManifest(
+          source.source,
+          tools.lake ?? "lake",
+          false,
+        );
+        if (
+          !source.sourceFiles ||
+          canonical(source.sourceFiles) !== canonical(after) ||
+          Object.entries(source.sourceFiles.files).some(
+            ([path, hash]) => manifest.files[path] !== hash,
+          )
+        )
+          throw new Error(
+            "Lean sources changed during requirements generation; retry",
+          );
+        Object.assign(result as object, { sourceManifest: manifest });
       }
     }
   } else if (["verify", "inspect", "import"].includes(command)) {

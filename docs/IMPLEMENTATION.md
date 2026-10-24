@@ -3,7 +3,11 @@
 The TypeScript package provides certificate decoding, model snapshots, verifier
 policy, and the CLI. The Rust workspace supplies the shared Nanoda checker,
 upstream Groth16 verifier, and local SP1 CPU prover and executor.
-`crates/guest` is built with the SP1 toolchain.
+`crates/guest` is built with the SP1 toolchain. Embedded pairing checks run in a
+shared pool of two Bun workers with a sixteen-request admission bound. Each
+worker reuses its WASM instance, owns its input memory, and is replaced after an
+error or a two-minute execution deadline; idle workers do not hold the process
+open. The compiled CLI embeds both the worker entry point and verifier WASM.
 
 Nanoda is pinned and vendored; see `vendor/nanoda/UPSTREAM.md`. SP1 is pinned to
 5.2.4 and used without source modifications. Native and WebAssembly verification call its lightweight
@@ -33,3 +37,9 @@ verifier profile, and lean4export in one checksum-pinned archive. `install.sh`
 installs that archive and automatically installs the pinned Lean toolchain through
 `elan`. Tool discovery is relative to the CLI or `ELAN_HOME`, so ordinary commands
 require no environment variables or configuration files.
+
+Authenticated imports construct kernel nodes as private top-level data definitions
+to avoid elaboration depth growing with the number of nodes. Lean string literals
+use a dedicated encoder, and reused declarations are compared after the pinned
+exporter's metadata erasure and nondependent-let hint normalization. These hints
+do not change kernel meaning.

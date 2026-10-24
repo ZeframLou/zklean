@@ -1,5 +1,87 @@
 # Handoff
 
+## Active follow-up: fix the holistic review findings
+
+The user now requests **all review issues fixed cleanly**. Work is active; the
+older completed-work account below is historical until this section is removed.
+Do not stop after the code fixes: finish real HTTPV crypto workflow, source drift
+CI, packed consumers, portable archive, benchmarks, docs, pushes and PR metadata.
+No subagents are authorized. Preserve all existing publication/privacy constraints.
+
+ZKLean fixes now implemented: explicit tool/profile paths fail closed; source
+requirements retain the pre-export source closure through native checking and
+final artifact capture, reject unrelated --export/--source binding, and preserve
+existing output on a concurrent edit; the default Groth16 backend uses a shared
+two-worker/sixteen-job bounded pool with worker failure/deadline recovery; Lean
+imports use a proper string encoder, private top-level node definitions instead
+of giant nested lets, and the pinned exporter's nondependent-let normalization.
+New regressions pass. Local check: **26 pass, 2 real guest tests intentionally
+skipped while CPU proving is active**, 124 assertions; hosted full checks must
+cover the guest. Actual packed SDK/compiled CLI worker checks passed; latest log
+`/tmp/zklean-worker-package.log`. No Rust/guest changes, so the guest pin is stable.
+
+HTTPV now requires a nonempty `operations` list on checkCompatibility and watch.
+Every client-selected declaration/context must occur in the remote *claim*
+closure and the requirement closure, before exact/bridge acceptance. Bridges
+cannot supply an absent operation. Cache keys include bindings. Context changes
+in exact mode return incompatible/operation-mismatch; implication mode returns
+unknown/operation-mismatch. Tests/examples are being migrated; latest log is
+`/tmp/httpv-binding-check.log`. A checked renamed Backorders operation plus the
+independent inventory bridge is a regression fixture. Docs are not yet updated.
+
+Real proof work is active, **do not kill it or run large guest execution beside
+it**. Four new single-unit inventory models exercise actual POST /units,
+compatible V2, backorder V3, and weaker client bridge. Sources are in HTTPV
+`examples/unit-inventory/`; they reserve one unit from an inductively represented
+stock count. The arbitrary-quantity arithmetic example remains separate and
+expensive. V1 guest execution is **33,839,014 cycles**, with no axioms.
+
+- Current first prover: `/workspace/optimized/target/release/zklean-native prove`.
+- First report (not yet finished): `/tmp/httpv-unit-v1.generation.json`.
+- Log: `/tmp/httpv-unit-v1.prove.log`.
+- Certificate output: `/workspace/httpv/tests/fixtures/unit/v1.certificate.json`
+  (empty until success; do not commit it until authenticated).
+- A sequential runner `/tmp/httpv-unit-proof-queue.py` waits for V1's successful
+  report, then generates V2, V3, bridge with the same pinned guest and resource
+  settings. Live runner log `/tmp/httpv-unit-proof-queue.log`.
+- Requests are `/tmp/httpv-unit-{v1,v2,v3,bridge}.request.json`; all exports were
+  produced by Lean and checked. Reports/logs follow that name prefix.
+- Proof output files go to `httpv/tests/fixtures/unit/*.certificate.json`.
+  Verify all through native/default WASM; compare statements to regenerated
+  fixtures and save resource reports only after success.
+
+HTTPV source fixtures were regenerated with the current source CLI through
+`ZKLEAN_CLI=/tmp/zklean-current-cli bun run fixtures`. The renamed catalog is now
+`scripts/models.ts` (old export-examples.ts deleted); it contains existing and
+new unit models. `scripts/refresh-fixtures.ts` handles each model's project and
+policy; `scripts/prove-examples.ts unit` reproduces unit certificates offline.
+Main inventory source/fixtures remain supported. New unit axiom pin is in
+`examples/unit-inventory/axioms.json` and was computed from checked V1.
+
+Remaining follow-up:
+1. Finish root docs and push the passing SDK runtime to work, then update HTTPV's
+   full SDK Git pin/lockfile. Keep the projects independent and npm consumer path.
+2. Add HTTPV formal-artifact CI: build/use the independent ZKLean CLI from its
+   pinned private checkout with the existing read-only token; regenerate all
+   source fixtures and git diff them; authenticate the four real unit certs and
+   require exact equality to the freshly checked statements. Do not add secrets
+   using the broader transient session GitHub token.
+3. Add mandatory real unit crypto discovery/upgrade/gating/bridge test and runnable
+   demo using committed real certs. The old signature fixtures stay useful for
+   isolated transport/policy tests. No skips or fake proofs for the real workflow.
+4. Update all HTTPV docs/spec/examples for required operations and conservative
+   stable operation contexts. Explicitly document unpublished npm packages and
+   local tarball review. Economics must remain honest: measured proof generation
+   is expensive and the complete certs/verification lose on the old samples.
+5. Re-run benchmarks with the worker backend after proving completes, refresh
+   JSON/docs, package baseline Ubuntu22 archive and check native-free compiled
+   worker verification in a bare container. Packed consumers must typecheck and
+   run actual npm tarballs. Latest root package proof checks already pass.
+6. Update final handoff, checks, PR #1 body/title. Push HTTPV only to
+   fix/groth16-verification; no main push or merge. The PR attach tool still hangs
+   but was called during the review. Both worktrees contain authorized changes.
+
+
 The original Groth16 migration and correctness/security/quality/usability/docs
 work is implemented and locally validated in both repositories. Two real CPU
 Groth16 certificates, quantitative benchmarks, embedded HTTPV integration, npm

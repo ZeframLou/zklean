@@ -11,13 +11,15 @@ async function run(command: string[], cwd = temporary, isolated = false) {
     stdout: "pipe",
     stderr: "inherit",
     env: {
-      ...process.env,
+      ...Object.fromEntries(
+        Object.entries(process.env).filter(
+          ([key]) => !isolated || !key.startsWith("ZKLEAN_"),
+        ),
+      ),
       npm_config_cache: join(temporary, "npm-cache"),
       ...(isolated
         ? {
             PATH: "/no-native-tools",
-            ZKLEAN_NATIVE: "/no-native-verifier",
-            ZKLEAN_PROFILE: "/no-native-profile",
           }
         : {}),
     },

@@ -1,6 +1,7 @@
 import { Cache, certificateId, modelId, parseCertificate } from "./encoding.ts";
 import { checkAxioms } from "./policy.ts";
 import { groth16Backend } from "./groth16.ts";
+import { VerifierBusyError } from "./backend-errors.ts";
 import type {
   Certificate,
   VerificationResult,
@@ -77,7 +78,10 @@ export function createVerifier(options: VerifierOptions = {}) {
       return {
         ...identity,
         status: "unknown",
-        reason: "verifier-unavailable",
+        reason:
+          error instanceof VerifierBusyError
+            ? "verifier-busy"
+            : "verifier-unavailable",
         detail: String(error),
       };
     }

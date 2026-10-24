@@ -24,8 +24,8 @@ zklean verify --certificate reservation.json --axioms propext
 and generates cryptographic evidence; this can take hours and needs a measured
 memory budget. See [Benchmarks](BENCHMARKS.md) before choosing a proving workload;
 `prove --timeout MS` overrides the default one-hour deadline. `verify` uses the embedded WebAssembly verifier and the
-locally trusted checker key. Recipients install only the npm SDK when they do
-not need source checking or proof generation:
+locally trusted checker key. The npm package is currently unpublished. After publication, recipients can
+install the SDK when they do not need source checking or proof generation:
 
 ```sh
 npm install zklean
@@ -43,7 +43,11 @@ if (result.status !== "verified") throw new Error(result.reason);
 
 The SDK runs on [Bun](https://bun.sh/) 1.4.4 or newer. It includes its verifier;
 it needs no native installation, compiler, Lean process, or circuit download.
-Its trusted key is application configuration, never certificate data.
+Its trusted key is application configuration, never certificate data. Pairing
+checks run outside the application event loop in a shared pool of two workers;
+at most sixteen checks are admitted across verifier instances. Excess work
+returns `unknown` with reason `verifier-busy`. Worker failures and a two-minute
+worker deadline release their slots, and idle workers allow the process to exit.
 For TypeScript checking in a Bun application, add `@types/bun` as a development
 dependency if the project does not already include it.
 
@@ -112,7 +116,11 @@ zklean requirements --project inventory --module Bridge \
 
 Requirements generation records the propositions you require, without claiming
 to prove them. Source manifests bind the resolved Lake sources, including
-transitive imports; source changes require a fresh snapshot and review.
+transitive imports. The CLI compares that source closure before export and after
+checking and artifact capture; changes abort without overwriting the snapshot.
+Source changes require a fresh snapshot and review. To bind a sidecar to source,
+use `--project/--module`; `--export` creates a self-contained snapshot and cannot
+be combined with `--source` for requirements generation.
 
 Exact matching compares resolved kernel contexts, ignoring bound-variable
 display names and binder annotations. It does not infer arbitrary mathematical
@@ -136,6 +144,9 @@ Policy is checked again on every call, including cached cryptographic results.
 Run `zklean doctor` to locate bundled tools. Development overrides are
 `ZKLEAN_NATIVE`, `ZKLEAN_GUEST_ELF`, `ZKLEAN_EXPORTER`, `ZKLEAN_LAKE`, and
 `ZKLEAN_PROFILE`, or the corresponding CLI flags shown by `zklean --help`.
+Explicit flag and environment paths must exist; a missing override fails rather
+than selecting another tool or verifier profile. Discovery applies only when
+no override is supplied.
 Proving uses the checksum-pinned upstream circuit files installed with the CLI;
 `SP1_GROTH16_CIRCUIT_PATH` overrides their root for source builds.
 

@@ -12,6 +12,62 @@ import { runNative } from "../src/native.ts";
 import type { Certificate } from "../src/types.ts";
 
 test.skipIf(!process.env.ZKLEAN_LAKE)(
+  "import preserves control characters and literal escape sequences in kernel strings",
+  async () => {
+    const directory = await mkdtemp(join(tmpdir(), "zklean-import-strings-"));
+    try {
+      await Bun.write(
+        join(directory, "lean-toolchain"),
+        "leanprover/lean4:v4.36.0-rc1\n",
+      );
+      await Bun.write(
+        join(directory, "lakefile.toml"),
+        'name = "ImportStrings"\n[[lean_lib]]\nname = "ImportStrings"\nroots = ["Control"]\n',
+      );
+      // Controls use Lean's Unicode escapes; literal backslashes must also survive.
+      await Bun.write(
+        join(directory, "Control.lean"),
+        'import Init.Core\ndef Demo.message : String := "\\u0008\\u000c\\u0000\\u001f\\u007f\\\\b\\\\f\\\"α😀"\ntheorem Demo.message_same : Demo.message = Demo.message := rfl\n',
+      );
+      const tools = await findTools();
+      const exported = await exportModule({
+        project: directory,
+        module: "Control",
+        claims: ["Demo.message_same"],
+        tools,
+      });
+      const statement = (await runNative(binary, "check", {
+        export: exported,
+        claims: ["Demo.message_same"],
+        allowedAxioms: [],
+      })) as Certificate;
+      await Bun.write(
+        join(directory, "Remote.lean"),
+        leanModule({ ...statement, proof: "base64:AA==" }),
+      );
+      await runLake(directory, tools.lake!, ["env", "lean", "Remote.lean"]);
+      const source = await Bun.file(
+        join(import.meta.dir, "fixtures/identity.ndjson"),
+      ).text();
+      const binder = 'quote" \\b \\f \b\f\t\n\r\u0000\u001fα😀';
+      const renamed = (await runNative(binary, "check", {
+        export: source.replace('"str":"h"', `"str":${JSON.stringify(binder)}`),
+        claims: ["Demo.identity"],
+        allowedAxioms: [],
+      })) as Certificate;
+      await Bun.write(
+        join(directory, "Names.lean"),
+        leanModule({ ...renamed, proof: "base64:AA==" }),
+      );
+      await runLake(directory, tools.lake!, ["env", "lean", "Names.lean"]);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  },
+  60_000,
+);
+
+test.skipIf(!process.env.ZKLEAN_LAKE)(
   "a received kernel model supports readable inspection and a new Lean derivation",
   async () => {
     const statement = await checked("v1");

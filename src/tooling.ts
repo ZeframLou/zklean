@@ -29,47 +29,69 @@ async function first(
   }
 }
 
+async function locate(
+  name: string,
+  override: string | undefined,
+  environment: string | undefined,
+  defaults: (string | undefined)[],
+): Promise<string | undefined> {
+  const selected = override ?? environment;
+  if (selected !== undefined) {
+    if (!selected || !(await Bun.file(selected).exists()))
+      throw new Error(`${name} not found: ${selected}`);
+    return resolve(selected);
+  }
+  return first(defaults);
+}
+
 /** Locate bundled tools first, with source-tree paths as a development fallback. */
 export async function findTools(overrides: ToolOverrides = {}): Promise<Tools> {
   return {
     binary:
-      (await first([
+      (await locate(
+        "native binary",
         overrides.binary,
         process.env.ZKLEAN_NATIVE,
-        join(installedRoot, "libexec", "zklean-native"),
-        join(sourceRoot, "target", "release", "zklean-native"),
-      ])) ??
+        [
+          join(installedRoot, "libexec", "zklean-native"),
+          join(sourceRoot, "target", "release", "zklean-native"),
+        ],
+      )) ??
       resolve(
         overrides.binary ??
           process.env.ZKLEAN_NATIVE ??
           "target/release/zklean-native",
       ),
-    elf: await first([
+    elf: await locate(
+      "guest ELF",
       overrides.elf,
       process.env.ZKLEAN_GUEST_ELF,
-      join(installedRoot, "libexec", "zklean-guest"),
-      join(
-        sourceRoot,
-        "crates/guest/target/elf-compilation/riscv32im-succinct-zkvm-elf/release/zklean-guest",
-      ),
-    ]),
-    exporter: await first([
+      [
+        join(installedRoot, "libexec", "zklean-guest"),
+        join(
+          sourceRoot,
+          "crates/guest/target/elf-compilation/riscv32im-succinct-zkvm-elf/release/zklean-guest",
+        ),
+      ],
+    ),
+    exporter: await locate(
+      "Lean exporter",
       overrides.exporter,
       process.env.ZKLEAN_EXPORTER,
-      join(installedRoot, "libexec", "lean4export"),
-      join(
-        sourceRoot,
-        ".tooling",
-        "lean4export",
-        ".lake",
-        "build",
-        "bin",
-        "lean4export",
-      ),
-    ]),
-    lake: await first([
-      overrides.lake,
-      process.env.ZKLEAN_LAKE,
+      [
+        join(installedRoot, "libexec", "lean4export"),
+        join(
+          sourceRoot,
+          ".tooling",
+          "lean4export",
+          ".lake",
+          "build",
+          "bin",
+          "lean4export",
+        ),
+      ],
+    ),
+    lake: await locate("Lake", overrides.lake, process.env.ZKLEAN_LAKE, [
       join(installedRoot, "libexec", "lean", "bin", "lake"),
       join(
         process.env.ELAN_HOME ?? join(process.env.HOME ?? "", ".elan"),
@@ -78,12 +100,15 @@ export async function findTools(overrides: ToolOverrides = {}): Promise<Tools> {
       ),
       Bun.which("lake") ?? undefined,
     ]),
-    config: await first([
+    config: await locate(
+      "verifier profile",
       overrides.config,
       process.env.ZKLEAN_PROFILE,
-      join(installedRoot, "share", "zklean", "verifier.json"),
-      join(sourceRoot, "examples", "generated", "verifier.json"),
-    ]),
+      [
+        join(installedRoot, "share", "zklean", "verifier.json"),
+        join(sourceRoot, "examples", "generated", "verifier.json"),
+      ],
+    ),
   };
 }
 

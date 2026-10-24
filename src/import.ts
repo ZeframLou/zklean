@@ -2,6 +2,19 @@ import { kernelName, publicContext } from "./context.ts";
 import { readModel, certificateId } from "./encoding.ts";
 import type { Certificate } from "./types.ts";
 
+/** Encode Lean literals directly, preserving literal backslashes and controls. */
+function leanString(value: unknown): string {
+  if (typeof value !== "string") throw new Error("expected kernel string");
+  return `"${Array.from(value, (character) => {
+    if (character === '"') return '\\"';
+    if (character === "\\") return "\\\\";
+    const code = character.codePointAt(0)!;
+    return code < 32 || code === 127
+      ? `\\u${code.toString(16).padStart(4, "0")}`
+      : character;
+  }).join("")}"`;
+}
+
 /** Reconstruct kernel objects through Lean's public API. No new expression
  * parser or elaborator is involved. Callers must authenticate the certificate. */
 export function leanModule(certificate: Certificate, inspect = false): string {
@@ -9,7 +22,7 @@ export function leanModule(certificate: Certificate, inspect = false): string {
     readModel(certificate.specs),
     certificate.specs.claims,
   );
-  const lines = [
+  const prelude = [
     "import Lean",
     "",
     `-- ZKLean certificate ${certificateId(certificate)}`,
@@ -17,9 +30,12 @@ export function leanModule(certificate: Certificate, inspect = false): string {
     "set_option maxRecDepth 10000",
     "set_option maxHeartbeats 10000000",
     "",
-    "-- The pinned exporter erases metadata such as Lean's borrowed annotations.",
+    "-- Match the exporter's metadata erasure and nondependent-let hint normalization.",
     "private partial def zkleanKernelExpr (e : Lean.Expr) : Lean.Expr :=",
-    "  e.replace fun | .mdata _ body => some (zkleanKernelExpr body) | _ => none",
+    "  e.replace fun",
+    "    | .mdata _ body => some (zkleanKernelExpr body)",
+    "    | .letE name type value body true => some (.letE name (zkleanKernelExpr type) (zkleanKernelExpr value) (zkleanKernelExpr body) false)",
+    "    | _ => none",
     "private def zkleanPublicInfo (info : Lean.ConstantInfo) : Lean.ConstantInfo :=",
     "  let type := zkleanKernelExpr info.type",
     "  match info with",
@@ -32,6 +48,7 @@ export function leanModule(certificate: Certificate, inspect = false): string {
     "  | .recInfo v => .recInfo { v with type, rules := v.rules.map fun r => { r with rhs := zkleanKernelExpr r.rhs } }",
     "  | .quotInfo v => .quotInfo { v with type }",
     "private def zkleanRequire (expected : Lean.ConstantInfo) : Lean.Elab.TermElabM Unit := do",
+    "  let expected := zkleanPublicInfo expected",
     '  let some actual := (← Lean.getEnv).find? expected.name | Lean.throwError "missing imported declaration"',
     "  let actual ← match actual with",
     "    | .defnInfo _ | .opaqueInfo _ => do",
@@ -42,10 +59,12 @@ export function leanModule(certificate: Certificate, inspect = false): string {
     "  unless actual == expected do",
     '    Lean.throwError m!"ZKLean import collision: {expected.name}"',
     "",
-    "open Lean Elab in",
-    "run_elab do",
-    ...(inspect ? ["  let originalEnv ← getEnv"] : []),
   ];
+  // A separate private definition per node keeps elaboration depth independent
+  // of model size. One enormous nested let-expression overflows on String and
+  // other substantial kernel contexts even when their expression DAG is shallow.
+  const nodeLines: string[] = [];
+  const lines = inspect ? ["  let originalEnv ← getEnv"] : [];
   const refs = new Map<string, string>();
   const dependencies = new Map<string, Set<string>>();
   const list = (items: unknown) =>
@@ -65,7 +84,7 @@ export function leanModule(certificate: Certificate, inspect = false): string {
         break;
       case "str":
         type = "Name";
-        value = `.str ${ref(d.pre)} ${JSON.stringify(d.str)}`;
+        value = `.str ${ref(d.pre)} ${leanString(d.str)}`;
         break;
       case "num":
         type = "Name";
@@ -125,14 +144,14 @@ export function leanModule(certificate: Certificate, inspect = false): string {
         break;
       case "strVal":
         type = "Expr";
-        value = `.lit (.strVal ${JSON.stringify(data)})`;
+        value = `.lit (.strVal ${leanString(data)})`;
         break;
       default:
         throw new Error(`unsupported kernel node: ${kind}`);
     }
-    const id = `v${refs.size}`;
+    const id = `zkleanNode${refs.size}`;
     refs.set(key, id);
-    lines.push(`  let ${id} : ${type} := ${value}`);
+    nodeLines.push(`private def ${id} : Lean.${type} := ${value}`);
     return id;
   };
   const constants = (
@@ -307,12 +326,12 @@ export function leanModule(certificate: Certificate, inspect = false): string {
         if (pad.length === 4)
           lines.push(`  unless originalEnv.contains ${ref(d.name)} do`);
         lines.push(
-          `${pad}logInfo m!"{${JSON.stringify(`${kind} ${display} : `)}}{← Meta.ppExpr ${ref(d.type)}}"`,
+          `${pad}logInfo m!"{${leanString(`${kind} ${display} : `)}}{← Meta.ppExpr ${ref(d.type)}}"`,
         );
         if (d.value)
           lines.push(`${pad}logInfo m!"  := {← Meta.ppExpr ${ref(d.value)}}"`);
       }
     }
   }
-  return `${lines.join("\n")}\n`;
+  return `${prelude.join("\n")}\n${nodeLines.join("\n")}\n\nopen Lean Elab in\nrun_elab do\n${lines.join("\n")}\n`;
 }

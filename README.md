@@ -31,7 +31,9 @@ curl -fsSL https://raw.githubusercontent.com/ZeframLou/zklean-dist/main/install.
 The binary-only distribution is prepared separately from this private source
 repository; publishing it requires the steps in [Distribution](docs/DISTRIBUTION.md).
 The installer downloads about 2.9 GB of upstream proving data and the pinned
-Lean toolchain. SDK recipients need only `npm install zklean` and Bun 1.4.4 or newer.
+Lean toolchain. The npm SDK is also unpublished. After publication, recipients can use
+`npm install zklean` with Bun 1.4.4 or newer; private reviewers can
+[test prepared tarballs](docs/DISTRIBUTION.md#npm-consumers).
 
 ## Certify an inventory reservation
 
@@ -39,13 +41,20 @@ The [inventory example](examples/lean/Inventory.lean) models a reservation for
 one product. Successful reservations must have a positive quantity, fit within
 available stock, and leave `remaining + reserved = original stock`.
 
-Generate a certificate for that guarantee, then verify it locally:
+Check the guarantee directly before budgeting cryptographic proof generation:
 
 ```sh
 zklean init --project inventory
+zklean check --project inventory --module V1 \
+  --claims Inventory.reservation_safe --axioms propext
+```
 
+After choosing a CPU time and memory budget, generate and verify a certificate:
+
+```sh
 zklean prove --project inventory --module V1 \
-  --claims Inventory.reservation_safe --axioms propext --out reservation.json
+  --claims Inventory.reservation_safe --axioms propext \
+  --timeout 86400000 --out reservation.json
 
 zklean verify --certificate reservation.json --axioms propext
 ```
@@ -64,6 +73,10 @@ axioms explicitly allowed with `--axioms` are accepted.
 [HTTPV](https://github.com/ZeframLou/httpv) is a separate HTTP protocol and
 TypeScript library for discovering API specifications and checking whether they
 satisfy a client's requirements.
+
+Proof privacy and a recipient verifier that needs no Lean installation can
+justify the offline proving cost. The measured examples have larger complete
+certificates and slower verification than direct Nanoda checking.
 
 The Groth16 evidence is 260 bytes; a full certificate also carries its public
 model, which can exceed the original Lean export. Compare complete sizes and

@@ -1,10 +1,121 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, chmod } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "bun:test";
 import { createSourceManifest, loadRequirements } from "../src/requirements.ts";
+import { findTools } from "../src/tooling.ts";
+import { binary, buildNative } from "./helpers.ts";
 
 const lake = process.env.ZKLEAN_LAKE;
+
+test("explicit tool and profile paths fail closed instead of falling back", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "zklean-missing-tools-"));
+  try {
+    const missing = join(directory, "missing");
+    for (const key of ["binary", "elf", "exporter", "lake", "config"])
+      await expect(findTools({ [key]: missing })).rejects.toThrow("not found");
+    for (const env of [{}, { ZKLEAN_PROFILE: missing }]) {
+      const child = Bun.spawn(
+        [
+          process.execPath,
+          "src/cli.ts",
+          "verify",
+          "--certificate",
+          "tests/fixtures/identity.certificate.json",
+          ...(Object.keys(env).length ? [] : ["--config", missing]),
+        ],
+        { env: { ...process.env, ...env }, stdout: "pipe", stderr: "pipe" },
+      );
+      expect(await child.exited).toBe(1);
+      expect(await new Response(child.stderr).text()).toContain(
+        "verifier profile not found",
+      );
+      expect(await new Response(child.stdout).text()).toBe("");
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test.skipIf(!lake)(
+  "source changes after export cannot bless an older requirement snapshot",
+  async () => {
+    await buildNative();
+    const directory = await mkdtemp(
+      join(tmpdir(), "zklean-requirement-transaction-"),
+    );
+    try {
+      await Bun.write(
+        join(directory, "lean-toolchain"),
+        "leanprover/lean4:v4.36.0-rc1\n",
+      );
+      await Bun.write(
+        join(directory, "lakefile.toml"),
+        'name = "Transaction"\n[[lean_lib]]\nname = "Transaction"\nroots = ["Remote"]\n',
+      );
+      const source = join(directory, "Remote.lean");
+      await Bun.write(
+        source,
+        "prelude\naxiom Remote.required : ∀ P : Prop, P → P\n",
+      );
+      const output = `${source}.zklean.json`;
+      await Bun.write(output, "preserve existing sidecar\n");
+      const wrapper = join(directory, "native.ts");
+      await Bun.write(
+        wrapper,
+        `#!${process.execPath}\nimport {writeFileSync} from "node:fs";\nif (process.argv[2] === "requirements") writeFileSync(${JSON.stringify(source)}, "prelude\\naxiom Remote.required : ∀ P : Prop, P\\n");\nconst child=Bun.spawnSync([${JSON.stringify(binary)}, ...process.argv.slice(2)], {stdin:"inherit", stdout:"inherit", stderr:"inherit"});\nprocess.exit(child.exitCode);\n`,
+      );
+      await chmod(wrapper, 0o755);
+      const child = Bun.spawn(
+        [
+          process.execPath,
+          "src/cli.ts",
+          "requirements",
+          "--project",
+          directory,
+          "--module",
+          "Remote",
+          "--claims",
+          "Remote.required",
+          "--binary",
+          wrapper,
+          "--out",
+          output,
+        ],
+        { stdout: "pipe", stderr: "pipe" },
+      );
+      expect(await child.exited).toBe(1);
+      expect(await new Response(child.stderr).text()).toContain(
+        "sources changed during requirements generation",
+      );
+      expect(await Bun.file(output).text()).toBe("preserve existing sidecar\n");
+      const unbound = Bun.spawn(
+        [
+          process.execPath,
+          "src/cli.ts",
+          "requirements",
+          "--export",
+          "tests/fixtures/identity.ndjson",
+          "--source",
+          source,
+          "--claims",
+          "Demo.identity",
+          "--out",
+          output,
+        ],
+        { stdout: "pipe", stderr: "pipe" },
+      );
+      expect(await unbound.exited).toBe(1);
+      expect(await new Response(unbound.stderr).text()).toContain(
+        "source-bound requirements",
+      );
+      expect(await Bun.file(output).text()).toBe("preserve existing sidecar\n");
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  },
+  60_000,
+);
 
 test.skipIf(!lake)(
   "requirements resolve srcDir and reject stale transitive source edits before a rebuild",

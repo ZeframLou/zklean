@@ -1,10 +1,8 @@
 /// <reference path="./assets.d.ts" />
-import wasmPath from "./verifier.wasm" with { type: "file" };
 import profile from "./guest.json";
 import { decodeBase64, statementCommitment } from "./encoding.ts";
+import { groth16Pool } from "./groth16-pool.ts";
 import type { ProofBackend } from "./types.ts";
-
-let module: Promise<WebAssembly.Module> | undefined;
 
 /** The checker key is trusted application configuration, never certificate data. */
 export function groth16Backend(
@@ -17,27 +15,11 @@ export function groth16Backend(
     async verify(certificate) {
       const proof = decodeBase64(certificate.proof);
       if (proof.length !== 260) return false;
-      module ??= Bun.file(wasmPath).arrayBuffer().then(WebAssembly.compile);
-      const instance = await WebAssembly.instantiate(await module);
-      const exports = instance.exports as {
-        memory: WebAssembly.Memory;
-        input_buffer(): number;
-        verify(): number;
-      };
-      const input = new Uint8Array(
-        exports.memory.buffer,
-        exports.input_buffer(),
-        324,
-      );
+      const input = new Uint8Array(324);
       input.set(proof);
       input.set(Buffer.from(statementCommitment(certificate), "hex"), 260);
       input.set(Buffer.from(verifierKey.slice(2), "hex"), 292);
-      // Upstream rejects invalid curve encodings; traps also fail closed.
-      try {
-        return exports.verify() === 1;
-      } catch {
-        return false;
-      }
+      return groth16Pool.verify(input);
     },
   };
 }
