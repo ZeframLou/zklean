@@ -58,36 +58,65 @@ policy; `scripts/prove-examples.ts unit` reproduces unit certificates offline.
 Main inventory source/fixtures remain supported. New unit axiom pin is in
 `examples/unit-inventory/axioms.json` and was computed from checked V1.
 
+Additional follow-up implemented since this section was first written:
+- Root SDK runtime pushed at c9a6176; hosted Check is green. A follow-up hardens
+  worker retirement: trapped WASM instances are discarded, retiring threads count
+  against the budget until termination, and an out-of-field key cannot poison a
+  later valid check. Crypto regressions pass; import now round-trips actual String
+  values through export/import/export (including literal escapes), and passes.
+- Latest rebuilt baseline archive passed bare Ubuntu22 checksum + both real proofs
+  with libexec removed: `/tmp/zklean-worker-bare.log`. Latest actual SDK tarball and
+  compiled CLI checks pass: `/tmp/zklean-worker-package.log`.
+- HTTPV currently pins c9a61760abe078b7874233bd74efce7dced3210e; update it to the
+  follow-up runtime commit after pushing. Typecheck and 19 existing/binding tests
+  pass against that SDK (`/tmp/httpv-core-fixes.log`). A full HTTPV check must wait
+  for the four real fixtures, because the mandatory unit crypto test is now added.
+- Real workflow implemented in `examples/unit-flow.ts` using public package APIs.
+  `examples/unit-upgrades.ts`, `tests/unit-crypto.e2e.test.ts`, and the actual npm
+  tarball check all run it. It covers discovery, V1/V2 acceptance, V3 request gating,
+  a weaker verified bridge, and tamper rejection with default Groth16.
+- Canonical real demo artifacts will live in
+  `httpv/examples/unit-inventory/certificates/{v1,v2,v3,bridge}.json` plus
+  `requirements.json`. **The running Python prover queue STILL writes old paths
+  `tests/fixtures/unit/*.certificate.json`. After ALL FOUR SUCCEED, authenticate
+  and move those outputs to the canonical example paths. Do not remove or rename
+  a file while a prover still has it open.** The old duplicate unit requirements
+  snapshot in tests/fixtures/unit can be removed; the canonical one is regenerated
+  from source by `bun run fixtures` already.
+- `scripts/models.ts` now has modelPath/certificatePath metadata; refresh writes
+  native-checked models under tests/fixtures/unit and the canonical public requirement
+  under examples/unit-inventory/certificates. `scripts/check-certificates.ts` must
+  authenticate all four canonical certs and require their statements to equal the
+  freshly checked model fixtures. No skips/fake proofs.
+- HTTPV formal-artifact CI job now checks out the exact SDK development commit,
+  builds its independent CLI/exporter with pinned Lean, regenerates all source
+  fixtures and rejects drift, then checks real certificates. It uses the existing
+  read-only ZKLEAN_READ_TOKEN prerequisite, still absent. .tooling is gitignored.
+- Both README/usage guides explicitly state npm is unpublished and provide local
+  tarball review. HTTPV docs/spec require explicit operation bindings, conservative
+  stable contexts, correct reasons, and document the real single-unit workflow.
+  HTTPV npm files include example models, real demo data, and runnable unit example;
+  no .lake data. No publication/visibility/version changes.
+
 Remaining follow-up:
-1. Finish root docs and push the passing SDK runtime to work, then update HTTPV's
-   full SDK Git pin/lockfile. Keep the projects independent and npm consumer path.
-2. Add HTTPV formal-artifact CI: build/use the independent ZKLean CLI from its
-   pinned private checkout with the existing read-only token; regenerate all
-   source fixtures and git diff them; authenticate the four real unit certs and
-   require exact equality to the freshly checked statements. Do not add secrets
-   using the broader transient session GitHub token.
-3. Add mandatory real unit crypto discovery/upgrade/gating/bridge test and runnable
-   demo using committed real certs. The old signature fixtures stay useful for
-   isolated transport/policy tests. No skips or fake proofs for the real workflow.
-4. Update all HTTPV docs/spec/examples for required operations and conservative
-   stable operation contexts. Explicitly document unpublished npm packages and
-   local tarball review. Economics must remain honest: measured proof generation
-   is expensive and the complete certs/verification lose on the old samples.
-5. Re-run benchmarks with the worker backend after proving completes, refresh
-   JSON/docs, package baseline Ubuntu22 archive and check native-free compiled
-   worker verification in a bare container. Packed consumers must typecheck and
-   run actual npm tarballs. Latest root package proof checks already pass.
-6. Update final handoff, checks, PR #1 body/title. Push HTTPV only to
-   fix/groth16-verification; no main push or merge. The PR attach tool still hangs
-   but was called during the review. Both worktrees contain authorized changes.
+1. Wait for all real proof reports and authenticate/promote the outputs as above.
+   Record resource reports and actual cycles; don't run heavy guest execution during
+   proving. Run complete HTTPV check, check:certificates, example:unit, and packed
+   consumer against an actual SDK npm tarball with the final runtime.
+2. Re-run the benchmark after proving (uncontended) with the worker backend, update
+   raw JSON and guide. Re-run only affected root checks; full hosted guest checks
+   already validate c9a6176, and the guest/Rust sources haven't changed.
+3. Stage final SDK/npm and HTTPV/npm tarballs, ensure example links/data are actually
+   present, and update docs with measured unit proving resources. The latest root
+   runtime archive already passed the bare-container worker check; documentation
+   data changes can be repackaged from the cached Ubuntu22 builder.
+4. Finish final handoff, push both branches, update draft PR #1 title/body and CI
+   status. Do not merge, publish, create tags, change visibility, or retry main push.
+5. HTTPV hosted CI still needs the user's read-only Actions secret. Never persist
+   the broader/transient session token. The previous user question is pending;
+   no readiness/approval has been supplied. Report the external prerequisite if it
+   remains unavailable. The PR attach tool hangs but has been called.
 
-
-The original Groth16 migration and correctness/security/quality/usability/docs
-work is implemented and locally validated in both repositories. Two real CPU
-Groth16 certificates, quantitative benchmarks, embedded HTTPV integration, npm
-consumer checks, and a fresh Ubuntu 22.04 installation are complete. Remaining
-external prerequisites are HTTPV's missing CI credential and authorized
-publication; no publication or merge was performed.
 
 ## Repositories and constraints
 

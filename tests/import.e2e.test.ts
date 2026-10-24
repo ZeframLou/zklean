@@ -3,17 +3,22 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { leanModule } from "../src/import.ts";
-import { declarationIdentity } from "../src/context.ts";
+import {
+  declarationIdentity,
+  contextMatches,
+  publicContext,
+} from "../src/context.ts";
 import { readModel } from "../src/encoding.ts";
 import { findTools, exportModule } from "../src/tooling.ts";
 import { runLake } from "../src/lean.ts";
-import { checked, binary } from "./helpers.ts";
+import { checked, binary, buildNative } from "./helpers.ts";
 import { runNative } from "../src/native.ts";
-import type { Certificate } from "../src/types.ts";
+import type { Certificate, Specs } from "../src/types.ts";
 
 test.skipIf(!process.env.ZKLEAN_LAKE)(
   "import preserves control characters and literal escape sequences in kernel strings",
   async () => {
+    await buildNative();
     const directory = await mkdtemp(join(tmpdir(), "zklean-import-strings-"));
     try {
       await Bun.write(
@@ -22,7 +27,7 @@ test.skipIf(!process.env.ZKLEAN_LAKE)(
       );
       await Bun.write(
         join(directory, "lakefile.toml"),
-        'name = "ImportStrings"\n[[lean_lib]]\nname = "ImportStrings"\nroots = ["Control"]\n',
+        'name = "ImportStrings"\n[[lean_lib]]\nname = "ImportStrings"\nroots = ["Control", "Remote"]\n',
       );
       // Controls use Lean's Unicode escapes; literal backslashes must also survive.
       await Bun.write(
@@ -45,7 +50,26 @@ test.skipIf(!process.env.ZKLEAN_LAKE)(
         join(directory, "Remote.lean"),
         leanModule({ ...statement, proof: "base64:AA==" }),
       );
-      await runLake(directory, tools.lake!, ["env", "lean", "Remote.lean"]);
+      const received = await exportModule({
+        project: directory,
+        module: "Remote",
+        claims: ["Demo.message_same"],
+        tools,
+      });
+      const originalModel = readModel(statement.specs);
+      const snapshot = (await runNative(binary, "requirements", {
+        export: received,
+        claims: ["Demo.message_same"],
+        allowedAxioms: Object.entries(originalModel.declarations)
+          .filter(([, entry]) => entry.thm)
+          .map(([name]) => name),
+      })) as { specs: Specs };
+      expect(
+        contextMatches(
+          readModel(snapshot.specs),
+          publicContext(originalModel, statement.specs.claims),
+        ),
+      ).toBe(true);
       const source = await Bun.file(
         join(import.meta.dir, "fixtures/identity.ndjson"),
       ).text();

@@ -12,6 +12,7 @@ interface Job {
 interface Slot {
   worker: Worker;
   initialized: boolean;
+  retiring: boolean;
   job?: Job;
   timer?: ReturnType<typeof setTimeout>;
 }
@@ -37,23 +38,36 @@ class Groth16Pool {
   }
 
   private discard(slot: Slot, error: unknown): void {
-    if (!this.workers.delete(slot)) return;
+    if (!this.workers.has(slot) || slot.retiring) return;
     const index = this.idle.indexOf(slot);
     if (index >= 0) this.idle.splice(index, 1);
     clearTimeout(slot.timer);
-    slot.worker.terminate();
     slot.job?.reject(error);
-    this.dispatch();
+    delete slot.job;
+    this.retire(slot);
+  }
+
+  private retire(slot: Slot): void {
+    slot.retiring = true;
+    // Count retiring threads against the budget until termination completes.
+    void Promise.resolve()
+      .then(() => slot.worker.terminate())
+      .catch(() => {})
+      .finally(() => {
+        this.workers.delete(slot);
+        this.dispatch();
+      });
   }
 
   private create(): Slot {
     const slot: Slot = {
       worker: new Worker(workerPath, { name: "zklean-groth16" }),
       initialized: false,
+      retiring: false,
     };
     this.workers.add(slot);
     slot.worker.on("message", (data) => {
-      if (!this.workers.has(slot) || !slot.job) return;
+      if (!this.workers.has(slot) || slot.retiring || !slot.job) return;
       if (typeof data?.valid !== "boolean") {
         this.discard(
           slot,
@@ -64,8 +78,11 @@ class Groth16Pool {
       clearTimeout(slot.timer);
       const job = slot.job;
       delete slot.job;
-      slot.worker.unref();
-      this.idle.push(slot);
+      if (data.reset) this.retire(slot);
+      else {
+        slot.worker.unref();
+        this.idle.push(slot);
+      }
       job.resolve(data.valid);
       this.dispatch();
     });
@@ -94,7 +111,7 @@ class Groth16Pool {
       this.wasm ??= Bun.file(wasmPath).bytes();
       void this.wasm
         .then((wasm) => {
-          if (!this.workers.has(slot)) return;
+          if (!this.workers.has(slot) || slot.retiring) return;
           slot.worker.postMessage({
             input: slot.job!.input,
             ...(slot.initialized ? {} : { wasm }),

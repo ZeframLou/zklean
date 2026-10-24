@@ -144,6 +144,15 @@ test("native and embedded upstream verifiers accept the locally generated Groth1
       { allowedAxioms: [] },
     ),
   ).toMatchObject({ status: "unknown", reason: "invalid-certificate" });
+  const outOfField = groth16Backend(`0x${"f".repeat(64)}`);
+  expect(
+    await createVerifier({ backend: outOfField }).verify(certificate, {
+      allowedAxioms: [],
+    }),
+  ).toMatchObject({ status: "unknown", reason: "invalid-certificate" });
+  expect(
+    await createVerifier().verify(certificate, { allowedAxioms: [] }),
+  ).toMatchObject({ status: "verified", reason: "valid" });
 }, 300_000);
 
 test("authenticated CLI import writes a usable module and rejects tampering without overwriting it", async () => {

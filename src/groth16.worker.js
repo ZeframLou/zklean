@@ -12,7 +12,10 @@ parentPort.on("message", async (data) => {
     try {
       valid = exports.verify() === 1;
     } catch {
-      // Invalid curve encodings and upstream traps fail closed.
+      // A trap can interrupt Rust allocation cleanup. Discard this instance
+      // before another request rather than reusing potentially damaged state.
+      parentPort.postMessage({ valid: false, reset: true });
+      return;
     }
     parentPort.postMessage({ valid });
   } catch (error) {
