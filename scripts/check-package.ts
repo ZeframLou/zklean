@@ -52,6 +52,27 @@ if (result.status !== "verified") throw new Error(JSON.stringify(result));
 console.log("Packed npm SDK verified a real proof without native tools.");
 `,
   );
+  await run([
+    process.execPath,
+    join(root, "node_modules/typescript/bin/tsc"),
+    "--noEmit",
+    "--strict",
+    "--skipLibCheck",
+    "--module",
+    "esnext",
+    "--moduleResolution",
+    "bundler",
+    "--target",
+    "esnext",
+    "--allowImportingTsExtensions",
+    "--resolveJsonModule",
+    "--types",
+    "bun",
+    "--typeRoots",
+    join(root, "node_modules/@types"),
+    "consumer.ts",
+  ]);
+  console.log("Packed npm SDK consumer typechecked.");
   console.log(
     (await run([process.execPath, "consumer.ts"], temporary, true)).trim(),
   );

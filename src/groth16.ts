@@ -1,3 +1,4 @@
+/// <reference path="./assets.d.ts" />
 import wasmPath from "./verifier.wasm" with { type: "file" };
 import profile from "./guest.json";
 import { decodeBase64, statementCommitment } from "./encoding.ts";
