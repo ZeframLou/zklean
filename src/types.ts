@@ -1,22 +1,23 @@
+/** Lean names mapped to declaration identities (64 lowercase hex digits). */
+export type Identified = Readonly<Record<string, string>>;
+
 /** Values authenticated by the pinned SP1 guest. */
-export interface Specs {
-  declarations: string;
-  claims: string[];
-}
-export interface Certificate {
+export interface Statement {
   format: "zklean/1";
-  specs: Specs;
-  axioms: string[];
+  /** Proved propositions. */
+  claims: Identified;
+  /** Non-proof declarations the claims state facts about, such as an operation. */
+  definitions: Identified;
+  /** Every axiom the proofs use. */
+  axioms: Identified;
+}
+export interface Certificate extends Statement {
   proof: string;
 }
 export interface Requirements {
   format: "zklean/requirements/1";
-  specs: Specs;
-}
-export interface PublicModel {
-  format: "lean4/kernel/2";
-  declarations: Record<string, Record<string, Record<string, unknown>>>;
-  nodes: Record<string, Record<string, unknown>>;
+  claims: Identified;
+  definitions: Identified;
 }
 
 /** This is trusted application configuration, never certificate-provided code. */
@@ -30,22 +31,20 @@ export type Reason =
   | "valid"
   | "invalid-certificate"
   | "forbidden-axiom"
-  | "unpinned-axiom"
   | "axiom-mismatch"
   | "verifier-unavailable";
 export interface VerificationResult {
   status: Status;
   reason: Reason;
-  /** Identity of the complete certificate, including its proof and axiom list. */
+  /** Identity of the complete certificate, including its proof. */
   certificateId?: string;
-  /** Identity of the canonical public formal model and certified claims. */
-  modelId?: string;
+  /** Identity of the authenticated statement. */
+  statementId?: string;
   detail?: string;
 }
 export interface VerifyOptions {
-  allowedAxioms: readonly string[];
-  /** Fingerprints of reviewed custom axioms and their complete resolved context. */
-  axiomPins?: Readonly<Record<string, string>>;
+  /** Permitted axioms by name and identity; see `standardAxioms`. */
+  axioms: Identified;
 }
 export interface VerifierOptions {
   backend?: ProofBackend;

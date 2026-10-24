@@ -9,7 +9,6 @@ import {
   statement,
 } from "../src/encoding.ts";
 import { groth16Backend } from "../src/groth16.ts";
-import { readModel } from "../src/encoding.ts";
 
 const samples = 7;
 const paths = process.argv.slice(2);
@@ -40,16 +39,15 @@ for (let i = 0; i < paths.length; i++) {
     `tests/fixtures/${i === 0 ? "identity" : "composition"}.ndjson`,
   ).text();
   // Both reviewed benchmark models use no axioms. Policy is chosen locally.
-  const policy = { allowedAxioms: [] };
+  const policy = { axioms: {} };
   const input = {
     export: exported,
-    claims: certificate.specs.claims,
+    claims: Object.keys(certificate.claims),
     allowedAxioms: [],
   };
   const checked = await runNative(tools.binary, "check", input);
   if (canonical(checked) !== canonical(statement(certificate)))
     throw new Error("certificate does not match its benchmark export");
-  const model = readModel(certificate.specs);
   const verify = (
     backend: typeof native | ReturnType<typeof groth16Backend>,
   ) => {
@@ -64,14 +62,12 @@ for (let i = 0; i < paths.length; i++) {
   };
   results.push({
     example: i === 0 ? "identity" : "composition",
-    claims: certificate.specs.claims,
+    claims: input.claims,
     exportBytes: Buffer.byteLength(exported),
     certificateFileBytes: file.size,
     certificateCanonicalBytes: Buffer.byteLength(canonical(certificate)),
-    publicModelBytes: decodeBase64(certificate.specs.declarations).length,
+    statementBytes: Buffer.byteLength(canonical(statement(certificate))),
     proofBytes: decodeBase64(certificate.proof).length,
-    declarations: Object.keys(model.declarations).length,
-    kernelNodes: Object.keys(model.nodes).length,
     directNanoda: await measure(() => runNative(tools.binary, "check", input)),
     nativeVerification: await measure(verify(native)),
     embeddedVerification: await measure(verify(groth16Backend())),

@@ -49,7 +49,7 @@ try {
     join(temporary, "consumer.ts"),
     `
 import { createVerifier } from "zklean";
-const result = await createVerifier().verify(await Bun.file("certificate.json").json(), { allowedAxioms: [] });
+const result = await createVerifier().verify(await Bun.file("certificate.json").json(), { axioms: {} });
 if (result.status !== "verified") throw new Error(JSON.stringify(result));
 console.log("Packed npm SDK verified a real proof without native tools.");
 `,

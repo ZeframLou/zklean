@@ -7,11 +7,10 @@ Regenerate with `bun scripts/export-examples.ts PATH_TO_LEAN4EXPORT`.
 Fixtures include valid proofs and explicit axiom assumptions. Negative tests
 corrupt proof terms and request absent or axiom declarations as claims.
 Negative tests reject unknown fields, multiple variant tags, and duplicate JSON
-keys (including escaped keys) before the checker and model projection can diverge.
-`proof-data.ndjson` covers a computational definition containing embedded evidence;
-that evidence is retained while standalone theorem bodies are excluded.
-`composition.ndjson` covers multiple polymorphic guarantees, universe parameters,
-and resolved definitions for composed stages and weaker postconditions.
+keys (including escaped keys) before the checker and identity computation can diverge.
+`prop-def.ndjson` checks that a Prop-valued definition keeps its body in its
+identity. `composition.ndjson` covers multiple polymorphic guarantees and
+universe parameters.
 
 `guest.e2e.test.ts` executes the real compiled SP1 guest when
 `ZKLEAN_GUEST_ELF` is provided.
@@ -25,9 +24,7 @@ CI rebuilds the guest and requires its identity to match the fixture.
 
 The crypto E2E tests accept the identity certificate through native, explicit
 WebAssembly, and default SDK verification. They reject altered evidence, a different valid
-model, and wrong keys, without receiving the original Lean proof or guest ELF.
-The authenticated CLI import test also checks compilation and
-preservation of existing output files after authentication fails.
+statement, and wrong keys, without receiving the original Lean proof or guest ELF.
 
 Regenerate using `zklean pin` and `zklean prove` on `identity.ndjson`, then verify
 the resulting certificate with `zklean verify` before replacing the fixture.

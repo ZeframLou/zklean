@@ -1,36 +1,48 @@
 //! Shared checked computation. The SP1 guest and native diagnostics run this code.
 mod json;
 mod model;
-pub use model::{Export, PublicModel};
+pub use model::{Export, Identities};
 
 use anyhow::{bail, ensure, Result};
-use base64::{engine::general_purpose::STANDARD, Engine};
 use nanoda_lib::{env::Declar, parser::parse_export_file, util::Config};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::{collections::BTreeSet, io::Cursor};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    io::Cursor,
+};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ProveInput {
     pub export: String,
     pub claims: Vec<String>,
+    /// Non-proof declarations to identify, such as an API operation.
+    #[serde(default)]
+    pub definitions: Vec<String>,
+    /// The prover's own guard against accidental axioms. Recipients enforce
+    /// their policy separately, against the committed identities.
     pub allowed_axioms: Vec<String>,
+}
+
+/// Lean names mapped to declaration identities.
+pub type Identified = BTreeMap<String, String>;
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Statement {
+    pub format: String,
+    pub claims: Identified,
+    pub definitions: Identified,
+    pub axioms: Identified,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct Specs {
-    pub declarations: String,
-    pub claims: Vec<String>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Statement {
+pub struct Requirements {
     pub format: String,
-    pub specs: Specs,
-    pub axioms: Vec<String>,
+    pub claims: Identified,
+    pub definitions: Identified,
 }
 
 /// Nanoda panics on malformed proofs. In the guest that aborts execution and no
@@ -39,9 +51,14 @@ pub fn check(input: &ProveInput) -> Result<Statement> {
     process(input, true)
 }
 
-/// Export a locally trusted requirement model without asserting its derivability.
-pub fn requirements(input: &ProveInput) -> Result<Specs> {
-    Ok(process(input, false)?.specs)
+/// Identify locally trusted requirements without asserting their derivability.
+pub fn requirements(input: &ProveInput) -> Result<Requirements> {
+    let statement = process(input, false)?;
+    Ok(Requirements {
+        format: "zklean/requirements/1".into(),
+        claims: statement.claims,
+        definitions: statement.definitions,
+    })
 }
 
 fn process(input: &ProveInput, require_proofs: bool) -> Result<Statement> {
@@ -49,6 +66,11 @@ fn process(input: &ProveInput, require_proofs: bool) -> Result<Statement> {
     let mut export = Export::parse(&input.export)?;
     let claims: BTreeSet<_> = input.claims.iter().cloned().collect();
     ensure!(claims.len() == input.claims.len(), "duplicate claims");
+    let definitions: BTreeSet<_> = input.definitions.iter().cloned().collect();
+    ensure!(
+        definitions.len() == input.definitions.len() && claims.is_disjoint(&definitions),
+        "duplicate names"
+    );
     for name in &claims {
         ensure!(
             !require_proofs || export.kind(name)? == "thm",
@@ -69,47 +91,57 @@ fn process(input: &ProveInput, require_proofs: bool) -> Result<Statement> {
     let (checked, _) = parse_export_file(Cursor::new(input.export.as_bytes()), config)
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
     checked.check_all_declars();
-    // Theorems must certify propositions, rather than arbitrary data values.
-    for name in &claims {
-        let mut found = false;
-        for d in checked.declars.values() {
-            let info = *d.info();
-            let rendered = checked.with_ctx(|ctx| render_name(ctx, info.name));
-            if &rendered == name {
-                ensure!(
-                    checked.with_tc_and_declar(info, |tc| tc.is_prop(info.ty).0),
-                    "claim is not a proposition"
-                );
-                found = true;
-            }
-        }
-        ensure!(found, "claim missing from checked environment");
-    }
     for d in checked.declars.values() {
         let info = *d.info();
         if matches!(
             d,
-            Declar::Theorem { .. } | Declar::Definition { .. } | Declar::Opaque { .. }
+            Declar::Axiom { .. }
+                | Declar::Theorem { .. }
+                | Declar::Definition { .. }
+                | Declar::Opaque { .. }
         ) && checked.with_tc_and_declar(info, |tc| tc.is_prop(info.ty).0)
         {
             export
-                .proof_names
+                .props
                 .insert(checked.with_ctx(|ctx| render_name(ctx, info.name)));
         }
     }
-    let axioms = export.axioms(&claims)?;
+    // Claims must be proofs: their type has type Prop.
+    for name in &claims {
+        export.kind(name)?;
+        ensure!(
+            export.props.contains(name),
+            "claim is not a proposition: {name}"
+        );
+    }
+    // Requirements are assumed, so only certified proofs report their axioms.
+    let axioms = if require_proofs {
+        export.axioms(&claims)?
+    } else {
+        BTreeSet::new()
+    };
     if let Some(name) = axioms.iter().find(|n| !permitted.contains(n)) {
         bail!("forbidden axiom: {name}");
     }
-    let roots = claims.union(&axioms).cloned().collect();
-    let model = export.public_model(&roots)?;
+    // Identified definitions must be part of what the claims state, not
+    // helpers reached only through proofs, and must not be proofs themselves.
+    let public = export.closure(&claims, true)?;
+    for name in &definitions {
+        ensure!(
+            public.contains(name) && !export.props.contains(name),
+            "definition is not in the claims' statements: {name}"
+        );
+    }
+    ensure!(axioms.is_disjoint(&definitions), "duplicate names");
+    let mut ids = Identities::new(&export);
+    let mut identify = |names: &BTreeSet<String>| -> Result<Identified> {
+        names.iter().map(|n| Ok((n.clone(), ids.of(n)?))).collect()
+    };
     Ok(Statement {
         format: "zklean/1".into(),
-        specs: Specs {
-            declarations: format!("base64:{}", STANDARD.encode(canonical(&model)?)),
-            claims: claims.into_iter().collect(),
-        },
-        axioms: axioms.into_iter().collect(),
+        claims: identify(&claims)?,
+        definitions: identify(&definitions)?,
+        axioms: identify(&axioms)?,
     })
 }
 

@@ -1,4 +1,4 @@
-import { object, parseSpecs, readModel } from "./encoding.ts";
+import { distinct, identified, keys, object } from "./encoding.ts";
 import type { Requirements } from "./types.ts";
 
 /** Load a requirements snapshot from an object or a JSON file. Regenerate the
@@ -9,12 +9,14 @@ export async function loadRequirements(
   const r = object(
     typeof input === "string" ? await Bun.file(input).json() : input,
   );
-  if (
-    r.format !== "zklean/requirements/1" ||
-    Object.keys(r).sort().join(",") !== "format,specs"
-  )
+  keys(r, ["format", "claims", "definitions"]);
+  if (r.format !== "zklean/requirements/1")
     throw new Error("invalid requirements format");
-  const specs = parseSpecs(r.specs);
-  readModel(specs);
-  return structuredClone({ format: r.format, specs });
+  const requirements: Requirements = {
+    format: r.format,
+    claims: identified(r.claims),
+    definitions: identified(r.definitions),
+  };
+  distinct(requirements.claims, requirements.definitions);
+  return structuredClone(requirements);
 }

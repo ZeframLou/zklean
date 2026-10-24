@@ -1,6 +1,6 @@
 /// <reference path="./assets.d.ts" />
 import profile from "./guest.json";
-import { decodeBase64, statementCommitment } from "./encoding.ts";
+import { decodeBase64, statementId } from "./encoding.ts";
 import { verifyGroth16 } from "./groth16-worker-host.ts";
 import type { ProofBackend } from "./types.ts";
 
@@ -17,7 +17,7 @@ export function groth16Backend(
       if (proof.length !== 260) return false;
       const input = new Uint8Array(324);
       input.set(proof);
-      input.set(Buffer.from(statementCommitment(certificate), "hex"), 260);
+      input.set(Buffer.from(statementId(certificate), "hex"), 260);
       input.set(Buffer.from(verifierKey.slice(2), "hex"), 292);
       return verifyGroth16(input);
     },

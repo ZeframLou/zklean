@@ -35,6 +35,12 @@ export const examples = [
     axioms: [],
   },
   {
+    module: "PropDef",
+    file: "prop-def",
+    claims: ["Demo.assumed"],
+    axioms: [],
+  },
+  {
     module: "ProofData",
     file: "proof-data",
     claims: ["Demo.checked_true"],

@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 import { inventoryAxioms } from "../examples/inventory.ts";
 import { runNative } from "../src/native.ts";
-import type { Certificate } from "../src/types.ts";
+import type { Statement } from "../src/types.ts";
 
 export { inventoryAxioms };
 
@@ -21,12 +21,14 @@ export async function input(
   module: string,
   claims = ["Inventory.reservation_safe"],
   allowedAxioms: string[] = inventoryAxioms,
+  definitions: string[] = [],
 ) {
   return {
     export: await Bun.file(
       resolve(root, `tests/fixtures/${module}.ndjson`),
     ).text(),
     claims,
+    definitions,
     allowedAxioms,
   };
 }
@@ -34,11 +36,12 @@ export async function checked(
   module: string,
   claims?: string[],
   axioms?: string[],
+  definitions?: string[],
 ) {
   await buildNative();
   return (await runNative(
     binary,
     "check",
-    await input(module, claims, axioms),
-  )) as Omit<Certificate, "proof">;
+    await input(module, claims, axioms, definitions),
+  )) as Statement;
 }

@@ -21,9 +21,8 @@ pub struct Request {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Certificate {
-    pub format: String,
-    pub specs: zklean_core::Specs,
-    pub axioms: Vec<String>,
+    #[serde(flatten)]
+    pub statement: Statement,
     pub proof: String,
 }
 impl Request {
@@ -51,7 +50,10 @@ pub fn run(input: &str) -> Result<Value> {
         .certificate
         .as_ref()
         .context("missing certificate")?;
-    ensure!(c.format == "zklean/1", "unsupported certificate format");
+    ensure!(
+        c.statement.format == "zklean/1",
+        "unsupported certificate format"
+    );
     let Some(encoded) = c.proof.strip_prefix("base64:") else {
         return Ok(json!({"valid": false}));
     };
@@ -62,13 +64,8 @@ pub fn run(input: &str) -> Result<Value> {
     let Ok(bytes) = STANDARD.decode(encoded) else {
         return Ok(json!({"valid": false}));
     };
-    let statement = Statement {
-        format: c.format.clone(),
-        specs: c.specs.clone(),
-        axioms: c.axioms.clone(),
-    };
     let valid = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        zklean_verifier::verify(&bytes, &commitment(&statement), &request.verifier_key)
+        zklean_verifier::verify(&bytes, &commitment(&c.statement), &request.verifier_key)
     }))
     .unwrap_or(false);
     Ok(json!({"valid": valid}))

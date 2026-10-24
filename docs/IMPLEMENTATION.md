@@ -1,6 +1,6 @@
 # Implementation and trust boundary
 
-The TypeScript package provides certificate decoding, model snapshots, verifier
+The TypeScript package provides certificate decoding, requirement snapshots, verifier
 policy, and the CLI. The Rust workspace supplies the shared Nanoda checker,
 upstream Groth16 verifier, and local SP1 CPU prover and executor.
 `crates/guest` is built with the SP1 toolchain. Embedded pairing checks run one at a time in a background

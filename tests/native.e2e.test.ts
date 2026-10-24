@@ -1,39 +1,90 @@
 import { resolve } from "node:path";
 import { beforeAll, expect, test } from "bun:test";
-import {
-  canonical,
-  decodeBase64,
-  readModel,
-  statementCommitment,
-} from "../src/encoding.ts";
+import { statementId } from "../src/encoding.ts";
 import { nativeBackend, runNative } from "../src/native.ts";
 import { binary, buildNative, checked, input } from "./helpers.ts";
 
 beforeAll(buildNative, 300_000);
 
-test("Nanoda checks a Lean export and produces a canonical proof-free closed model", async () => {
-  const value = await checked("v1");
-  expect(value.axioms).toEqual(["propext"]);
-  const text = Buffer.from(decodeBase64(value.specs.declarations)).toString();
-  expect(canonical(JSON.parse(text))).toBe(text);
-  const model = readModel(value.specs);
-  expect(model.format).toBe("lean4/kernel/2");
+const hex = /^[0-9a-f]{64}$/;
+
+test("a checked statement is a few hundred bytes of identities, not a model", async () => {
+  const value = await checked("v1", undefined, undefined, [
+    "Inventory.POST_reservations",
+  ]);
+  expect(Object.keys(value.claims)).toEqual(["Inventory.reservation_safe"]);
+  expect(Object.keys(value.definitions)).toEqual([
+    "Inventory.POST_reservations",
+  ]);
+  expect(Object.keys(value.axioms)).toEqual(["propext"]);
+  for (const id of [
+    ...Object.values(value.claims),
+    ...Object.values(value.definitions),
+    ...Object.values(value.axioms),
+  ])
+    expect(id).toMatch(hex);
+  const exported = (await input("v1")).export;
+  expect(JSON.stringify(value).length * 500).toBeLessThan(exported.length);
+});
+
+test("identities ignore binder names but bind constant names and bodies", async () => {
+  const base = await input("identity", ["Demo.identity"], []);
+  const original = await checked("identity", ["Demo.identity"], []);
+  // Binder display names are presentation only.
+  const renamedBinder = base.export.replace(
+    /("forallE":\{"binderInfo":"default","body":\d+,"name":)(\d+)/,
+    "$10",
+  );
   expect(
-    model.declarations["Inventory.reservation_safe"]!.thm,
-  ).not.toHaveProperty("value");
-  expect(model.declarations["Inventory.POST_reservations"]).toBeDefined();
-  expect(model.declarations).toHaveProperty("Nat");
-  const originalNodes = (await input("v1")).export
-    .split("\n")
-    .filter((line) => /"i[nel]":/.test(line)).length;
-  expect(Object.keys(model.nodes).length).toBeLessThan(originalNodes);
-  expect(model.declarations["Option"]!.inductive).toBeDefined();
-  expect(model.declarations["Option.some"]).toEqual({
-    inductiveMember: { group: "Option" },
-  });
-  expect(model.declarations["Option.rec"]).toEqual({
-    inductiveMember: { group: "Option" },
-  });
+    await runNative(binary, "check", { ...base, export: renamedBinder }),
+  ).toEqual(original);
+  // The claim's own name is part of its identity.
+  const renamed = (await runNative(binary, "check", {
+    ...base,
+    claims: ["Demo.renamed"],
+    export: base.export.replace('"str":"identity"', '"str":"renamed"'),
+  })) as typeof original;
+  expect(renamed.claims["Demo.renamed"]).not.toBe(
+    original.claims["Demo.identity"],
+  );
+});
+
+test("a Prop-valued definition keeps its body in its identity", async () => {
+  const request = {
+    ...(await input("prop-def", ["Demo.assumed"], [], ["Demo.Ok"])),
+  };
+  const before = (await runNative(binary, "requirements", request)) as {
+    claims: Record<string, string>;
+    definitions: Record<string, string>;
+  };
+  // Same name and type (Prop), different body: Demo.Yes becomes Demo.Yes → Demo.Yes.
+  // Kernel node indices are contiguous and precede their uses.
+  const changed = request.export
+    .replace(
+      '{"const":{"name":9,"us":[]},"ie":14}',
+      '{"const":{"name":9,"us":[]},"ie":15}',
+    )
+    .replace('"name":10,"type":14}', '"name":10,"type":15}')
+    .replace(
+      '{"def":{"all":[9],"hints":{"regular":1},"levelParams":[],"name":9,"safety":"safe","type":0,"value":1}}',
+      '{"forallE":{"binderInfo":"default","body":1,"name":7,"type":1},"ie":14}\n{"def":{"all":[9],"hints":{"regular":1},"levelParams":[],"name":9,"safety":"safe","type":0,"value":14}}',
+    );
+  expect(changed).not.toBe(request.export);
+  const after = (await runNative(binary, "requirements", {
+    ...request,
+    export: changed,
+  })) as typeof before;
+  expect(after.definitions["Demo.Ok"]).not.toBe(before.definitions["Demo.Ok"]);
+  expect(after.claims["Demo.assumed"]).not.toBe(before.claims["Demo.assumed"]);
+});
+
+test("definitions must be stated by the claims and must not be proofs", async () => {
+  await expect(
+    checked("v1", undefined, undefined, ["Nat.sub_add_cancel"]),
+  ).rejects.toThrow("not in the claims' statements");
+  await expect(
+    checked("v1", undefined, undefined, ["Inventory.reservation_safe"]),
+  ).rejects.toThrow("duplicate names");
 });
 
 test("invalid proof terms, missing claims, and axiom claims are rejected", async () => {
@@ -75,48 +126,31 @@ test("invalid proof terms, missing claims, and axiom claims are rejected", async
   ).rejects.toThrow();
 });
 
-test("computational definitions retain embedded evidence without standalone theorem bodies", async () => {
-  const statement = await checked("proof-data", ["Demo.checked_true"]);
-  const model = readModel(statement.specs);
-  expect(model.declarations["Demo.checked"]!.def!.value).toBeString();
-  expect(model.declarations["Demo.checked_true"]!.thm).not.toHaveProperty(
-    "value",
-  );
-  expect(model.declarations["Demo.CheckedValue"]).toBeDefined();
-});
-
-test("polymorphic stage guarantees retain definitions and multiple certified claims", async () => {
+test("polymorphic stage guarantees certify multiple claims", async () => {
   const value = await checked(
     "composition",
     ["Pipeline.compose", "Pipeline.weaken"],
     [],
   );
-  expect(value.axioms).toEqual([]);
-  const model = readModel(value.specs);
-  expect(model.declarations["Pipeline.Preserves"]!.def!.value).toBeString();
-  expect(model.declarations["Pipeline.compose"]!.thm!.levelParams).toHaveLength(
-    3,
-  );
-  expect(model.declarations["Pipeline.weaken"]!.thm!.levelParams).toHaveLength(
-    2,
-  );
+  expect(value.axioms).toEqual({});
+  expect(Object.keys(value.claims)).toEqual([
+    "Pipeline.compose",
+    "Pipeline.weaken",
+  ]);
   const native = (await runNative(binary, "commitment", value)) as {
     commitment: string;
   };
-  expect(native.commitment).toBe(
-    statementCommitment({ ...value, proof: "base64:AA==" }),
-  );
+  expect(native.commitment).toBe(statementId(value));
 });
 
-test("reports the exact used axioms, including their public declarations", async () => {
+test("reports exactly the used axioms", async () => {
   const claims = ["Inventory.assumed_safe"];
   const allowed = ["Trusted.evidence", "Trusted.stock_policy"];
   await expect(
     runNative(binary, "check", await input("axioms", claims)),
   ).rejects.toThrow();
   const value = await checked("axioms", claims, allowed);
-  expect(value.axioms).toEqual(allowed);
-  expect(readModel(value.specs).declarations["Trusted.evidence"]).toBeDefined();
+  expect(Object.keys(value.axioms)).toEqual(allowed);
   const request = await input("axioms", claims, allowed);
   request.export +=
     '{"in":6,"str":{"pre":0,"str":"Unused"}}\n{"axiom":{"isUnsafe":false,"levelParams":[],"name":6,"type":0}}\n';
@@ -148,12 +182,10 @@ test("native and TypeScript use identical authenticated statement bytes", async 
   const native = (await runNative(binary, "commitment", value)) as {
     commitment: string;
   };
-  expect(statementCommitment({ ...value, proof: "base64:AA==" })).toBe(
-    native.commitment,
-  );
+  expect(statementId(value)).toBe(native.commitment);
   // Pinned cross-language vector also guards accidental encoding changes.
-  expect(statementCommitment({ ...value, proof: "base64:AA==" })).toBe(
-    "b0c3e5826e5ca0f8f3b51da955b86bb9b1a132c59f569372119e508623366ed5",
+  expect(statementId(value)).toBe(
+    "79bca612cc9add1d3e608a85b9222f0dcd14aee41a6d10872e600d7b3f814835",
   );
 });
 

@@ -1,19 +1,11 @@
-//! Lossless kernel serialization with content-addressed Name/Level/Expr nodes.
-//! Proof-only nodes disappear when projecting the public dependency closure.
+//! Strict lean4export parsing and content identities of kernel declarations.
+//! An identity hashes a declaration's meaning together with its whole public
+//! dependency closure, so equal identities mean equal statements and definitions.
 use anyhow::{bail, ensure, Context, Result};
-use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct PublicModel {
-    pub format: String,
-    pub declarations: BTreeMap<String, Value>,
-    pub nodes: BTreeMap<String, Value>,
-}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum Table {
@@ -26,8 +18,8 @@ use Table::*;
 pub struct Export {
     nodes: BTreeMap<(Table, u64), Value>,
     declarations: BTreeMap<String, (String, Arc<Value>)>,
-    /// Proposition-valued definitions and opaques are also proof terms.
-    pub proof_names: BTreeSet<String>,
+    /// Declarations whose type is a proposition, as decided by the checker.
+    pub props: BTreeSet<String>,
 }
 
 impl Export {
@@ -35,7 +27,7 @@ impl Export {
         let mut out = Self {
             nodes: BTreeMap::new(),
             declarations: BTreeMap::new(),
-            proof_names: BTreeSet::new(),
+            props: BTreeSet::new(),
         };
         let mut declarations = Vec::new();
         for (line, text) in text.lines().enumerate() {
@@ -135,7 +127,7 @@ impl Export {
         })
     }
 
-    fn closure(&self, claims: &BTreeSet<String>, public: bool) -> Result<BTreeSet<String>> {
+    pub fn closure(&self, claims: &BTreeSet<String>, public: bool) -> Result<BTreeSet<String>> {
         let mut pending: Vec<_> = claims.iter().cloned().collect();
         let mut seen = BTreeSet::new();
         let mut visited_nodes = BTreeSet::new();
@@ -199,7 +191,7 @@ impl Export {
     }
 
     fn project(&self, kind: &str, data: &Value, public: bool, name: &str) -> (String, Value) {
-        if public && (kind == "thm" || self.proof_names.contains(name)) {
+        if public && (kind == "thm" || self.props.contains(name)) {
             return (
                 "thm".into(),
                 json!({"name": data["name"], "levelParams": data["levelParams"], "type": data["type"]}),
@@ -229,57 +221,115 @@ impl Export {
             .filter(|n| self.kind(n).unwrap() == "axiom")
             .collect())
     }
+}
 
-    pub fn public_model(&self, claims: &BTreeSet<String>) -> Result<PublicModel> {
-        let mut model = PublicModel {
-            format: "lean4/kernel/2".into(),
+fn hash(domain: &str, value: &Value) -> Result<String> {
+    let mut digest = Sha256::new();
+    digest.update(domain.as_bytes());
+    digest.update(crate::canonical(value)?);
+    Ok(format!("{:x}", digest.finalize()))
+}
+
+/// Memoized identities over one parsed export. Expression nodes are hashed
+/// Merkle-style, so shared subterms are hashed once.
+pub struct Identities<'e> {
+    export: &'e Export,
+    declarations: BTreeMap<String, String>,
+    groups: BTreeMap<String, String>,
+    nodes: BTreeMap<(Table, u64, Option<String>), Value>,
+    active: BTreeSet<String>,
+}
+
+impl<'e> Identities<'e> {
+    pub fn new(export: &'e Export) -> Self {
+        Self {
+            export,
             declarations: BTreeMap::new(),
+            groups: BTreeMap::new(),
             nodes: BTreeMap::new(),
-        };
-        let mut cache = BTreeMap::new();
-        for name in self.closure(claims, true)? {
-            let (kind, data) = &self.declarations[&name];
-            if kind == "inductive" {
-                let mut members = inductive_indices(data)?
-                    .into_iter()
-                    .map(|index| self.name(index))
-                    .collect::<Result<Vec<_>>>()?;
-                members.sort();
-                let group = members.first().context("empty inductive group")?;
-                if &name != group {
-                    model
-                        .declarations
-                        .insert(name, json!({"inductiveMember": {"group": group}}));
-                    continue;
-                }
-            }
-            let (kind, mut data) = self.project(kind, data, true, &name);
-            visit(&kind, &mut data, &mut |t, i| {
-                self.node(t, i, &mut cache, &mut model.nodes)
-            })?;
-            model.declarations.insert(name, json!({kind: data}));
+            active: BTreeSet::new(),
         }
-        Ok(model)
     }
 
-    fn node(
-        &self,
-        table: Table,
-        index: u64,
-        cache: &mut BTreeMap<(Table, u64), Value>,
-        nodes: &mut BTreeMap<String, Value>,
-    ) -> Result<Value> {
-        if let Some(v) = cache.get(&(table, index)) {
-            return Ok(v.clone());
+    /// Propositions hash only their statement, whatever their declaration
+    /// kind: proofs are irrelevant, and a published `axiom` matches the theorem.
+    pub fn of(&mut self, name: &str) -> Result<String> {
+        if let Some(id) = self.declarations.get(name) {
+            return Ok(id.clone());
         }
-        let mut row = if table == Name && index == 0 {
-            json!({"anonymous": true})
-        } else if table == Level && index == 0 {
+        ensure!(
+            self.active.insert(name.to_owned()),
+            "cyclic declaration identity: {name}"
+        );
+        let (kind, data) = self
+            .export
+            .declarations
+            .get(name)
+            .with_context(|| format!("unresolved constant {name}"))?;
+        let id = if kind == "inductive" {
+            let group = self.group(data)?;
+            hash(
+                "zklean/declaration/1\0",
+                &json!({"member": {"group": group, "name": name}}),
+            )?
+        } else {
+            let (kind, mut data) = self.export.project(kind, data, true, name);
+            self.rewrite(&kind, &mut data, None)?;
+            let kind = if kind == "thm" {
+                "prop".to_owned()
+            } else {
+                kind
+            };
+            hash("zklean/declaration/1\0", &json!({ kind: data }))?
+        };
+        self.active.remove(name);
+        self.declarations.insert(name.to_owned(), id.clone());
+        Ok(id)
+    }
+
+    /// Mutual inductive types, constructors and recursors form one unit.
+    /// References inside the unit carry no identity, which breaks the cycle.
+    fn group(&mut self, data: &Value) -> Result<String> {
+        let members = inductive_indices(data)?
+            .into_iter()
+            .map(|index| self.export.name(index))
+            .collect::<Result<BTreeSet<_>>>()?;
+        let key = members.first().context("empty inductive group")?.clone();
+        if let Some(id) = self.groups.get(&key) {
+            return Ok(id.clone());
+        }
+        let (_, mut data) = self.export.project("inductive", data, true, &key);
+        for kind in ["types", "ctors", "recs"] {
+            for entry in data[kind].as_array_mut().context("inductive entries")? {
+                entry.as_object_mut().unwrap().remove("all");
+            }
+        }
+        self.rewrite("inductive", &mut data, Some(&key))?;
+        let id = hash("zklean/declaration/1\0", &json!({ "inductive": data }))?;
+        self.groups.insert(key, id.clone());
+        Ok(id)
+    }
+
+    /// Names become strings and child nodes become their hashes.
+    fn rewrite(&mut self, kind: &str, data: &mut Value, group: Option<&str>) -> Result<()> {
+        visit(kind, data, &mut |table, index| match table {
+            Name => Ok(Value::String(self.export.name(index)?)),
+            _ => self.node(table, index, group),
+        })
+    }
+
+    fn node(&mut self, table: Table, index: u64, group: Option<&str>) -> Result<Value> {
+        let key = (table, index, group.map(str::to_owned));
+        if let Some(h) = self.nodes.get(&key) {
+            return Ok(h.clone());
+        }
+        let mut row = if table == Level && index == 0 {
             json!({"zero": true})
         } else {
-            self.nodes
+            self.export
+                .nodes
                 .get(&(table, index))
-                .context("unresolved node")?
+                .context("unresolved kernel node")?
                 .clone()
         };
         let (kind, body) = row
@@ -287,13 +337,61 @@ impl Export {
             .unwrap()
             .iter_mut()
             .next()
-            .context("empty node")?;
-        visit(kind, body, &mut |t, i| self.node(t, i, cache, nodes))?;
-        let hash = format!("{:x}", Sha256::digest(crate::canonical(&row)?));
-        nodes.insert(hash.clone(), row);
-        let value = Value::String(hash);
-        cache.insert((table, index), value.clone());
-        Ok(value)
+            .context("empty kernel node")?;
+        let kind = kind.clone();
+        let node = match kind.as_str() {
+            "natVal" => json!({"natVal": {"value": body, "type": self.of("Nat")?}}),
+            "strVal" => json!({"strVal": {"value": body, "type": self.of("String")?}}),
+            _ => {
+                let reference = match kind.as_str() {
+                    "const" => Some("name"),
+                    "proj" => Some("typeName"),
+                    _ => None,
+                };
+                let target = match reference {
+                    Some(field) => Some(self.export.name(integer(&body[field])?)?),
+                    None => None,
+                };
+                self.rewrite(&kind, body, group)?;
+                // Binder names, binder annotations and let hints do not affect meaning.
+                if ["lam", "forallE", "letE"].contains(&kind.as_str()) {
+                    let body = body.as_object_mut().unwrap();
+                    for field in ["name", "binderInfo", "nondep"] {
+                        body.remove(field);
+                    }
+                }
+                if let Some(target) = target {
+                    let inside = match group {
+                        Some(g) => self.group_of(&target)?.as_deref() == Some(g),
+                        None => false,
+                    };
+                    body["id"] = if inside {
+                        Value::Null
+                    } else {
+                        Value::String(self.of(&target)?)
+                    };
+                }
+                row
+            }
+        };
+        let h = Value::String(hash("zklean/node/1\0", &node)?);
+        self.nodes.insert(key, h.clone());
+        Ok(h)
+    }
+
+    /// The first member name of the inductive group declaring `name`, if any.
+    fn group_of(&self, name: &str) -> Result<Option<String>> {
+        let Some((kind, data)) = self.export.declarations.get(name) else {
+            return Ok(None);
+        };
+        if kind != "inductive" {
+            return Ok(None);
+        }
+        let members = inductive_indices(data)?
+            .into_iter()
+            .map(|index| self.export.name(index))
+            .collect::<Result<BTreeSet<_>>>()?;
+        Ok(members.first().cloned())
     }
 }
 

@@ -53,12 +53,16 @@ test("explicit tool and profile paths fail closed instead of falling back", asyn
 });
 
 test("requirements load only exact JSON snapshots", async () => {
-  const { specs } = await Bun.file(
-    join(import.meta.dir, "fixtures/identity.certificate.json"),
-  ).json();
-  const snapshot = { format: "zklean/requirements/1" as const, specs };
-  expect((await loadRequirements(snapshot)).specs).toEqual(specs);
-  await expect(
-    loadRequirements({ ...snapshot, sourceManifest: {} } as never),
-  ).rejects.toThrow("invalid requirements format");
+  const snapshot = {
+    format: "zklean/requirements/1" as const,
+    claims: { "Demo.identity": "a".repeat(64) },
+    definitions: {},
+  };
+  expect(await loadRequirements(snapshot)).toEqual(snapshot);
+  for (const invalid of [
+    { ...snapshot, sourceManifest: {} },
+    { ...snapshot, claims: { "Demo.identity": "A".repeat(64) } },
+    { ...snapshot, definitions: { "Demo.identity": "b".repeat(64) } },
+  ])
+    await expect(loadRequirements(invalid as never)).rejects.toThrow();
 });

@@ -5,6 +5,9 @@ export interface ProveInput {
   /** NDJSON emitted by the pinned exporter. Standalone theorem bodies are private. */
   export: string;
   claims: string[];
+  /** Non-proof declarations to identify, such as an API operation. */
+  definitions?: string[];
+  /** Prover-side guard; recipients enforce their own policy by identity. */
   allowedAxioms: string[];
 }
 export interface NativeOptions {

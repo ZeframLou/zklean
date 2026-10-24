@@ -3,27 +3,21 @@ export { createVerifier } from "./verifier.ts";
 export { nativeBackend, runNative } from "./native.ts";
 export {
   parseCertificate,
-  readModel,
+  parseStatement,
   certificateId,
-  modelId,
+  statementId,
 } from "./encoding.ts";
 export type { NativeOptions, ProveInput } from "./native.ts";
 export type {
   Certificate,
-  Specs,
+  Statement,
+  Identified,
   Requirements,
-  PublicModel,
   ProofBackend,
   VerifierOptions,
   VerifyOptions,
   VerificationResult,
 } from "./types.ts";
 export { loadRequirements } from "./requirements.ts";
-export {
-  declarationIdentity,
-  contextMatches,
-  publicContext,
-  requirementsFor,
-} from "./context.ts";
-export { checkAxioms } from "./policy.ts";
+export { checkAxioms, standardAxioms } from "./policy.ts";
 export { groth16Backend } from "./groth16.ts";

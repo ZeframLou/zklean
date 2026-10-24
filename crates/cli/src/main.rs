@@ -59,7 +59,7 @@ fn main() -> Result<()> {
         }
         "requirements" => {
             let request: ProveInput = serde_json::from_str(&input)?;
-            serde_json::json!({"format": "zklean/requirements/1", "specs": zklean_core::requirements(&request)?})
+            serde_json::to_value(zklean_core::requirements(&request)?)?
         }
         #[cfg(feature = "prover")]
         "prove" | "identity" => sp1::run(&command, &input)?,

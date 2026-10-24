@@ -8,19 +8,16 @@ import { groth16Backend } from "./groth16.ts";
 import { createVerifier } from "./verifier.ts";
 import { exportModule, findTools, nativeOptions } from "./tooling.ts";
 import type { ProveInput } from "./native.ts";
-import { checkAxioms } from "./policy.ts";
-import type { Certificate, VerifyOptions } from "./types.ts";
-import { leanModule } from "./import.ts";
-import { declarationIdentity } from "./context.ts";
-import { readModel } from "./encoding.ts";
+import { checkAxioms, standardAxioms } from "./policy.ts";
+import type { Statement, VerifyOptions } from "./types.ts";
+import { identified } from "./encoding.ts";
 
 const help = `ZKLean — check and certify Lean contracts
 
-  zklean prove --project DIR --module NAME --claims A,B --out CERT.json [--timeout MS]
+  zklean prove --project DIR --module NAME --claims A,B [--definitions D] --out CERT.json [--timeout MS]
   zklean verify --certificate CERT.json [--axioms A,B]
-  zklean import --certificate CERT.json --out Remote.lean [--axioms A,B]
-  zklean requirements --project DIR --module NAME --claims A,B --out FILE.json
-  zklean check --project DIR --module NAME --claims A,B [--axioms A,B]
+  zklean requirements --project DIR --module NAME --claims A,B [--definitions D] --out FILE.json
+  zklean check --project DIR --module NAME --claims A,B [--definitions D] [--axioms A,B]
 
   zklean export --project DIR --module NAME --out FILE.ndjson [--claims A,B]
   zklean pin --out PROFILE.json [--elf FILE]
@@ -28,7 +25,8 @@ const help = `ZKLean — check and certify Lean contracts
 The installer supplies the prover/verifier, guest, exporter, and pinned Lean.
 Every source command also accepts --export FILE instead of --project/--module.
 Advanced overrides: --config, --binary, --elf, --lake, and --exporter.
-Custom axioms require --axiom-policy FILE containing reviewed declaration fingerprints.
+--axioms names Lean's standard axioms; custom axioms need --axiom-policy FILE
+mapping each reviewed axiom name to its identity.
 `;
 
 const list = (value: string | undefined) =>
@@ -56,6 +54,7 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
         "out",
         "export",
         "claims",
+        "definitions",
         "axioms",
         "axiom-policy",
         "config",
@@ -112,15 +111,23 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
   }
 
   const claims = list(optional("claims"));
+  const custom = optional("axiom-policy")
+    ? identified(await Bun.file(required("axiom-policy")).json())
+    : {};
+  const names = list(optional("axioms"));
   const policy: VerifyOptions = {
-    allowedAxioms: list(optional("axioms")),
-    ...(optional("axiom-policy")
-      ? { axiomPins: await Bun.file(required("axiom-policy")).json() }
-      : {}),
+    axioms: Object.fromEntries(
+      names.map((name) => {
+        const id = custom[name] ?? standardAxioms[name];
+        if (!id) throw new Error(`no identity for axiom ${name}`);
+        return [name, id];
+      }),
+    ),
   };
-  const enforcePolicy = (statement: Pick<Certificate, "specs" | "axioms">) => {
+  const enforcePolicy = (statement: Statement) => {
     const reason = checkAxioms(statement, policy);
-    if (reason) throw new Error(`axiom policy rejected the model: ${reason}`);
+    if (reason)
+      throw new Error(`axiom policy rejected the statement: ${reason}`);
   };
   const exported = async (): Promise<string> => {
     const path = optional("export");
@@ -144,11 +151,12 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
     const input: ProveInput = {
       export: await exported(),
       claims,
-      allowedAxioms: list(optional("axioms")),
+      definitions: list(optional("definitions")),
+      allowedAxioms: names,
     };
     if (command === "prove") {
       enforcePolicy(
-        (await runNative(tools.binary, "check", input)) as Certificate,
+        (await runNative(tools.binary, "check", input)) as Statement,
       );
       console.error(
         "Generating a local Groth16 proof; large models may take hours…",
@@ -162,9 +170,9 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
       }).prove(input);
     } else {
       result = await runNative(tools.binary, command, input);
-      if (command === "check") enforcePolicy(result as Certificate);
+      if (command === "check") enforcePolicy(result as Statement);
     }
-  } else if (["verify", "import"].includes(command)) {
+  } else if (command === "verify") {
     const certificate = parseCertificate(
       await Bun.file(required("certificate")).json(),
     );
@@ -177,31 +185,8 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
           }
         : {}),
     }).verify(certificate, policy);
-    if ((result as { status: string }).status !== "verified") {
+    if ((result as { status: string }).status !== "verified")
       process.exitCode = 1;
-      if (command !== "verify") {
-        process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
-        return;
-      }
-    } else if (command === "import") {
-      const path = required("out");
-      await Bun.write(path, leanModule(certificate));
-      const model = readModel(certificate.specs);
-      await Bun.write(
-        `${path}.axioms.json`,
-        `${JSON.stringify(
-          Object.fromEntries(
-            certificate.specs.claims.map((name) => [
-              name,
-              declarationIdentity(model, name),
-            ]),
-          ),
-          null,
-          2,
-        )}\n`,
-      );
-      return;
-    }
   } else {
     throw new Error(`unknown command: ${command}\n${help}`);
   }

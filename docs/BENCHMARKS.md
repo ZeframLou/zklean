@@ -1,22 +1,23 @@
 # Measure complete certificates and verification
 
-These two measured examples have 260-byte Groth16 evidence, but their complete
-certificates are larger than the original Lean exports. Direct Nanoda checking
-is faster than either cryptographic verifier on these workloads. The results
-establish working proof generation and verification; they do not establish a
-general size or speed advantage.
+A certificate holds one 32-byte identity per claim, definition and used axiom,
+plus 260 bytes of Groth16 evidence. Its size depends on how many names it lists,
+not on the size of the proofs or definitions behind them.
 
 ## Complete sizes
 
-All sizes are uncompressed bytes. Stored certificates include JSON whitespace;
-canonical certificates omit that whitespace. The public model is encoded as
-base64 inside the certificate, alongside claims, axiom policy, and evidence.
-HTTP wrappers and transport compression are excluded.
+Canonical certificate sizes in bytes, without JSON whitespace or transport
+compression. The evidence has a fixed length, so these sizes are exact.
 
-| Workload | Original export | Stored certificate | Canonical certificate | Decoded public model | Evidence | Declarations / kernel nodes |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Propositional identity | 722 | 3,190 | 3,145 | 2,013 | 260 | 1 / 11 |
-| Polymorphic pipeline composition and weaker postcondition | 7,745 | 37,534 | 37,482 | 27,749 | 260 | 3 / 118 |
+| Workload | Lean export | Certificate | Export / certificate |
+| --- | ---: | ---: | ---: |
+| Propositional identity | 722 | 510 | 1.4× |
+| Polymorphic pipeline composition | 7,742 | 598 | 13× |
+| Inventory reservation (`V1`, with `Init`) | 381,561 | 695 | 549× |
+
+The inventory certificate lists one claim, one operation definition and
+`propext`. Its export includes the proofs of every `Init` lemma the proof uses;
+none of that reaches the certificate.
 
 ## Verification costs
 
@@ -32,13 +33,12 @@ The benchmark independently checks each original export and requires the resulti
 statement to equal the certificate's authenticated statement. Both examples use
 an empty, locally selected axiom allowlist. Every measured cryptographic check
 must succeed. Native measurements include process startup and JSON exchange;
-direct checking includes model projection. SDK verification includes certificate
-schema parsing, model validation, axiom policy, and hashing. File reads and the
+direct checking includes identity computation. SDK verification includes
+certificate parsing, axiom policy, and hashing. File reads and the
 initial JSON decoding happen before timing. The first embedded measurement
 includes worker startup and WebAssembly compilation/instantiation. Later
 measurements, including the pipeline’s first call, reuse an idle worker and its
-instance. Pairing work runs outside the application event loop; the bounded pool
-shares at most two workers across SDK verifier instances.
+instance. Pairing work runs outside the application event loop in one shared worker.
 
 Measurements used a Linux x86-64 AMD EPYC 9V74 virtual machine with a four-CPU
 quota and 16 GiB memory limit, Bun 1.4.4, Rust 1.99.1, and unchanged upstream SP1

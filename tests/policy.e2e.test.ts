@@ -1,10 +1,9 @@
 import { beforeAll, expect, test } from "bun:test";
 import {
-  declarationIdentity,
-  readModel,
   checkAxioms,
   createVerifier,
   nativeBackend,
+  standardAxioms,
 } from "../src/index.ts";
 import { binary, buildNative, checked, input } from "./helpers.ts";
 import { runNative } from "../src/native.ts";
@@ -13,15 +12,15 @@ beforeAll(buildNative, 300_000);
 
 test("standard axiom permissions reject a different proposition under the same name", async () => {
   const real = await checked("v1");
-  expect(checkAxioms(real, { allowedAxioms: ["propext"] })).toBeUndefined();
+  const propext = { propext: standardAxioms.propext! };
+  expect(checkAxioms(real, { axioms: propext })).toBeUndefined();
+  expect(checkAxioms(real, { axioms: {} })).toBe("forbidden-axiom");
   const spoof = (await runNative(
     binary,
     "check",
     await input("axiom-spoof", ["Spoof.everything"], ["propext"]),
   )) as typeof real;
-  expect(checkAxioms(spoof, { allowedAxioms: ["propext"] })).toBe(
-    "axiom-mismatch",
-  );
+  expect(checkAxioms(spoof, { axioms: propext })).toBe("axiom-mismatch");
   const child = Bun.spawn(
     [
       process.execPath,
@@ -41,23 +40,16 @@ test("standard axiom permissions reject a different proposition under the same n
   expect(stderr).toContain("axiom-mismatch");
 });
 
-test("custom axiom permissions require independently reviewed context fingerprints", async () => {
+test("custom axioms are permitted only by their reviewed identities", async () => {
   const names = ["Trusted.evidence", "Trusted.stock_policy"];
   const statement = await checked("axioms", ["Inventory.assumed_safe"], names);
-  expect(checkAxioms(statement, { allowedAxioms: names })).toBe(
-    "unpinned-axiom",
+  expect(checkAxioms(statement, { axioms: standardAxioms })).toBe(
+    "forbidden-axiom",
   );
-  const model = readModel(statement.specs);
-  const axiomPins = Object.fromEntries(
-    names.map((name) => [name, declarationIdentity(model, name)]),
-  );
-  expect(
-    checkAxioms(statement, { allowedAxioms: names, axiomPins }),
-  ).toBeUndefined();
+  expect(checkAxioms(statement, { axioms: statement.axioms })).toBeUndefined();
   expect(
     checkAxioms(statement, {
-      allowedAxioms: names,
-      axiomPins: { ...axiomPins, "Trusted.evidence": "0".repeat(64) },
+      axioms: { ...statement.axioms, "Trusted.evidence": "0".repeat(64) },
     }),
   ).toBe("axiom-mismatch");
 });
@@ -85,7 +77,7 @@ test("concurrent consumers share one real cryptographic verification", async () 
   });
   const results = await Promise.all(
     Array.from({ length: 8 }, () =>
-      verifier.verify(certificate, { allowedAxioms: [] }),
+      verifier.verify(certificate, { axioms: {} }),
     ),
   );
   expect(results.every((result) => result.status === "verified")).toBe(true);

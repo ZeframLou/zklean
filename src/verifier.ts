@@ -1,4 +1,4 @@
-import { certificateId, modelId, parseCertificate } from "./encoding.ts";
+import { certificateId, parseCertificate, statementId } from "./encoding.ts";
 import { checkAxioms } from "./policy.ts";
 import { groth16Backend } from "./groth16.ts";
 import type {
@@ -19,17 +19,15 @@ export function createVerifier(options: VerifierOptions = {}) {
     value: unknown,
     policy: VerifyOptions,
   ): Promise<VerificationResult> {
-    let identity: { certificateId: string; modelId: string };
+    let identity: { certificateId: string; statementId: string };
     let key: string;
     let check: () => Promise<boolean>;
     try {
       const certificate = parseCertificate(value);
       identity = {
         certificateId: certificateId(certificate),
-        modelId: modelId(certificate.specs),
+        statementId: statementId(certificate),
       };
-      // Policy checks traverse untrusted model data, so they stay inside the
-      // data-validation boundary.
       const policyError = checkAxioms(certificate, policy);
       if (policyError)
         return { ...identity, status: "unknown", reason: policyError };

@@ -4,11 +4,13 @@
 
 ## 1. Purpose
 
-ZKLean generates cryptographic certificates that Lean propositions have
-valid derivations under explicitly declared axioms. Recipients verify the
-certificate without receiving or rechecking the original Lean proof terms.
-The proof of checking is succinct; the accompanying public model has a size
-determined by its definitions and dependency closure.
+ZKLean certifies that Lean propositions have valid derivations under explicitly
+declared axioms. A certificate names each certified proposition by a content
+**identity**, a hash of its statement and everything the statement depends on,
+and carries a 260-byte Groth16 proof that a pinned checker accepted the
+derivation. Recipients verify it without the proof terms, the definitions, or a
+Lean installation. A certificate is a few hundred bytes whatever the size of
+the proofs.
 
 ZKLean is usable independently of HTTP. The separate
 [HTTPV protocol](https://github.com/ZeframLou/httpv) discovers API certificates
@@ -17,140 +19,115 @@ and checks their compatibility with client requirements.
 ## 2. Conventions and security model
 
 The terms MUST, MUST NOT, SHOULD, and MAY follow RFC 2119 and RFC 8174.
-A specification is a Lean proposition; a certificate contains its public formal
-model, actual axioms, and a cryptographic proof of successful checking.
 
-Verification depends on the soundness of the trusted checker and cryptographic
-proving system. Clients MUST pin a trusted verifier identity and explicitly
-permit every axiom used by the certified derivation. Certificates establish
-properties of the mathematical model; they do not attest to deployed code or
-prove that individual responses implement it.
+Verification depends on the soundness of the trusted checker and the
+cryptographic proving system. Clients MUST pin a trusted verifier key and permit
+each axiom by name and identity. An identity fixes a proposition's meaning: equal
+identities denote the same statement about the same definitions. Certificates
+establish properties of the mathematical model; they do not attest to deployed
+code.
 
 ## 3. Certificates
 
-
 ### 3.1. Architecture
 
-ZKLean uses three existing components:
-
-- **lean4export:** Exports Lean 4 declarations, proof terms, and dependencies.
-- **Nanoda:** Independently verifies exported Lean proof terms.
-- **SP1:** Generates succinct cryptographic proofs attesting to successful verification.
-
 ```text
-Lean specifications + proofs + axioms
-                  |
-             lean4export
-                  |
-           Nanoda inside SP1
-                  |
-       Certificate: model + succinct proof
+Lean specifications + proofs
+            |
+       lean4export
+            |
+   Nanoda inside SP1: check, then compute identities
+            |
+   Certificate: identities + Groth16 proof
 ```
 
-No custom theorem language, intermediate representation, or proof system is required beyond serialization of Lean's existing kernel expressions.
+- **lean4export** exports Lean 4 declarations and their dependencies.
+- **Nanoda** independently checks the exported kernel terms.
+- **SP1** proves that the checker accepted them and computed the committed identities.
 
-### 3.2. Certificate Generation
-
-ZKLean accepts public specifications, their proofs, and the permitted axioms.
+### 3.2. Certificate generation
 
 The SP1 guest MUST:
 
-1. Validate the exported Lean declarations and dependency environment using Nanoda.
-2. Check every proof against its corresponding specification.
-3. Identify the axioms relied upon by the verified dependency closure.
-4. Reject undeclared axioms and invalid dependencies.
-5. Cryptographically bind the public formal model and actual axiom list to the SP1 proof.
+1. Check the entire exported environment with Nanoda.
+2. Require every claim to be a theorem whose type is a proposition.
+3. Collect every axiom the claims' proofs use, and reject axioms the prover did
+   not permit.
+4. Require every listed definition to occur in the claims' statements, through
+   types and definition bodies only, and not to be a proof.
+5. Reject a name that occurs in more than one of claims, definitions and axioms.
+6. Commit the identities of the claims, definitions and axioms.
 
-One proof covers the entire specification set.
-
-### 3.3. Certificate Format
+### 3.3. Certificate format
 
 ```json
 {
   "format": "zklean/1",
-  "specs": {
-    "declarations": "base64:...",
-    "claims": ["Inventory.reservation_safe"]
-  },
-  "axioms": ["propext"],
-  "proof": "base64:..."
+  "claims": { "Inventory.reservation_safe": "b682…698a" },
+  "definitions": { "Inventory.POST_reservations": "93a7…315d" },
+  "axioms": { "propext": "dba3…d434" },
+  "proof": "base64:…"
 }
 ```
 
-Fields:
+- `claims`: certified propositions, by Lean name and identity.
+- `definitions`: non-proof declarations the claims state facts about, such as
+  an API operation. It MAY be empty.
+- `axioms`: every axiom the proofs use.
+- `proof`: the Groth16 proof of the statement.
 
-- `format`: Certificate format identifier.
-- `specs`: Self-contained public Lean formal model.
-  - `declarations`: Canonically serialized Lean kernel declarations necessary to interpret the specified propositions, including their types and definitions.
-  - `claims`: Names of the propositions whose derivability is certified.
-- `axioms`: Exact list of axioms relied upon by the checked proofs.
-- `proof`: Succinct SP1 proof.
+[ENCODING.md](docs/ENCODING.md) defines identities, the committed statement and
+the proof encoding.
 
-**The `specs` field MUST contain everything necessary to interpret the formal model**, including the relevant dependency closure of definitions, types, and axiom declarations. It MUST exclude standalone theorem bodies and unrelated declarations. Proof subexpressions inside computational definitions MAY remain when they are part of the exact declaration needed to interpret the model; proof profiles MUST state whether they provide witness privacy.
+### 3.4. Verification
 
-Lean's built-in semantics are fixed by the trusted proof-checker implementation. The public model MUST NOT rely on unresolved or unauthenticated external definitions.
+Verification succeeds only when:
 
-Clients MUST be able to deserialize `specs` into a well-defined Lean formal model suitable for subsequent compatibility proofs.
+- the certificate is well formed,
+- every `axioms` entry equals an entry of the client's policy, by name and identity, and
+- the Groth16 proof verifies against the pinned verifier key and the statement digest.
 
-All security-relevant values MUST use deterministic, versioned encoding and be cryptographically bound to the proof.
+A verifier MUST NOT accept a verifier key from the certificate.
 
-Verification MUST use a trusted, pinned SP1 verifier identity rather than one arbitrarily supplied by a certificate.
+Certificates MAY be generated offline and reused indefinitely.
 
-The implementation uses SP1 5.2.4 Groth16 proofs under a locally pinned checker key and the upstream circuit verification key. A certificate MUST NOT select either key. Verification MUST reject other proof formats, including legacy compressed STARK proofs.
+## 4. Requirements
 
-### 3.4. Verification API
+A requirement is what a recipient's own proofs assume:
 
-```typescript
-prove(specs, proofs, allowedAxioms): Certificate
-
-verify(
-  certificate,
-  allowedAxioms
-): boolean
+```json
+{
+  "format": "zklean/requirements/1",
+  "claims": { "Client.stock_conserved": "…" },
+  "definitions": { "Inventory.POST_reservations": "…" }
+}
 ```
 
-Verification succeeds only when the SP1 proof is valid, its authenticated public values match the certificate, and all actual axioms are permitted by the client. Axiom permissions MUST bind the complete declaration and resolved dependency context; a matching name alone is insufficient. The SDK pins Lean's standard axioms and requires explicit reviewed fingerprints for custom axioms.
+`zklean requirements` computes it from local Lean sources. The claims must be
+propositions, but need no proof; they MAY be axioms. Because identities depend
+only on statements, a provider can publish a specification module that states
+its guarantees as axioms. Recipients compile that module, and its identities
+equal the certified theorems' identities.
 
-The original Lean proof terms are not required for certificate verification.
+A certificate satisfies a requirement when every required claim and definition
+appears in it with the same identity.
 
-Certificates MAY be generated offline and reused indefinitely for the same formally checked statements.
-
-## 4. Command-line interface
-
-`zklean prove` builds a Lean module, exports and checks the requested claims,
-generates an SP1 certificate, verifies it, and writes the result. `zklean verify`
-checks a certificate against a locally trusted verifier and explicit axiom policy.
+## 5. Command-line interface
 
 ```sh
-cp -R examples/inventory inventory
-zklean prove --project inventory --module V1 \
-  --claims Inventory.reservation_safe --axioms propext --out reservation.json
+zklean check --project inventory --module V1 \
+  --claims Inventory.reservation_safe --definitions Inventory.POST_reservations \
+  --axioms propext
+zklean prove … --out reservation.json
 zklean verify --certificate reservation.json --axioms propext
+zklean requirements --project client --module Bridge \
+  --claims Client.stock_conserved --out requirements.json
 ```
 
-`zklean check` checks the original argument without generating an SP1 proof.
-`zklean export` exposes the Lean export for build pipelines. `zklean pin` derives
-a verifier profile from a locally built guest. Verification does not require HTTP, a remote service, or the
-original Lean proof terms.
-
-`zklean import` MUST authenticate a certificate and enforce its axiom policy
-before reconstructing declarations through Lean's public API. Certified
-propositions become explicit assumptions for a separate bridge proof; import
-does not certify that bridge. Existing Lean declarations MUST agree with the
-authenticated public context before reuse, ignoring only the exporter's erased
-metadata and binder display annotations. The emitted `<output>.axioms.json`
-binds imported assumptions to their complete resolved contexts for later policy
-checks.
-
-## 5. Requirement snapshots
-
-`zklean requirements` extracts a self-contained formal model for local client
-requirements. It checks the model's declarations but does not certify that the
-requirements themselves have been proved. Applications trust these snapshots
-as their own requirements, not as evidence of a remote guarantee.
-
-Snapshots have the form `{format:"zklean/requirements/1",specs}`. They are
-self-contained; regenerate them when their Lean sources change.
+- `check` checks the derivation and prints the statement, without proving.
+- `prove` also generates the Groth16 proof.
+- `--axioms` names permitted axioms. Lean's standard axioms resolve to pinned
+  identities; others need `--axiom-policy FILE`, a JSON map from name to identity.
 
 ## 6. References
 

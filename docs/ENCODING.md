@@ -1,102 +1,88 @@
 # ZKLean v1 encoding profile
 
-This profile uses **SP1 5.2.4 Groth16 over BN254**. The local CPU prover uses
-SP1's published circuit artifacts and native gnark backend. Verification is
-offline and requires no proving artifacts, Lean process, or native executable.
+This profile uses **SP1 5.2.4 Groth16 over BN254**. Verification is offline and
+needs no proving artifacts, Lean process or native executable.
 
-## Canonical public model
+## Canonical JSON
 
-`specs.declarations` is `base64:` followed by padded RFC 4648 base64 of UTF-8
-canonical JSON. Its decoded schema is:
+Canonical JSON sorts object keys by UTF-8 bytes, has no whitespace, uses JSON
+string escaping, and permits only nonnegative safe integers as numbers. No
+Unicode normalization is applied, and unpaired surrogates are rejected. `H(tag, v)`
+is lowercase hex `SHA256(UTF8(tag) || canonicalJSON(v))`.
 
-```json
-{
-  "format": "lean4/kernel/2",
-  "declarations": { "Namespace.claim": { "thm": { "name": "<hash>", "levelParams": [], "type": "<hash>" } } },
-  "nodes": { "<sha256>": { "sort": "<level-hash>" } }
-}
-```
+## Identities
 
-The example is schematic; actual models include every referenced node and
-constant. The schema serializes Lean's existing kernel expressions, names,
-levels, and declarations, using lean4export 3.1.0 field names. Every `in`, `il`,
-and `ie` reference is replaced by a lowercase SHA-256 identity of the referenced
-node's canonical JSON. The index fields are removed. Name zero is
-`{"anonymous":true}` and level zero is `{"zero":true}`. Nodes share a single
-content-addressed table; their variant tags identify their kernel types.
+An identity hashes one declaration's meaning together with its whole dependency
+closure. Each reference to another constant carries that constant's identity, so
+equal identities mean equal names, statements and definitions throughout.
 
-The guest verifies the entire private export with Nanoda before projection.
-Public roots are the requested propositions and **all actually used axioms**.
-The projection follows types, definition bodies, inductive groups, constructors,
-recursors, and implicit Nat/String literal dependencies. Theorems and other
-proposition-valued definition/opaque bodies become `thm` declarations containing
-only `name`, `levelParams`, and `type`. Their proof bodies and nodes reachable
-only from those bodies are excluded. Actual axioms retain `axiom` declarations.
-Axioms used only by private proof terms still have public declarations and types.
-Mutual inductive groups are indivisible. The lexicographically first member stores
-the group once; other declared names use an `inductiveMember` reference to it.
+**Names** are rendered as dotted strings. Ambiguous components (empty, containing
+`.`, or all digits) are rejected.
 
-Deserialization resolves Name/Level/Expr hashes in `nodes`, then constant name
-hashes against `declarations`. `readModel` checks hashes, typed references,
-closure, and absence of unrelated nodes. A compatibility elaborator may admit
-certified propositions as axioms **only after independently verifying their
-certificate and exact resolved context**. The supplied bridge workflow uses
-Lean's own elaborator and exporter, followed by Nanoda in SP1.
+**Nodes** are hashed Merkle-style as `H("zklean/node/1\0", node)`, with every
+child replaced by its hash:
 
-Canonical JSON sorts keys by UTF-8 bytes, has no whitespace, uses JSON string
-escaping, and permits only nonnegative safe integers as numeric data. No
-Unicode normalization is applied. Unpaired Unicode surrogates are rejected.
-Claims and axioms are unique names sorted by UTF-8 bytes. Base64 is canonical
-and padded, including zero unused padding bits. Metadata and original export
-indices do not affect model identities. Ambiguous dotted name components and
-numeric string name components are rejected rather than conflated with Lean's
-numeric name constructor. Export metadata records format 3.1.0; checker semantics
-and enabled Nat/String kernel extensions are fixed by the pinned guest ELF.
+| Node | Hashed form |
+| --- | --- |
+| level | `{zero:true}`, `{succ:h}`, `{max:[h,h]}`, `{imax:[h,h]}`, `{param:"u"}` |
+| `bvar i` | `{bvar:i}` |
+| `sort l` | `{sort:h}` |
+| `const` | `{const:{name, us:[h…], id}}` |
+| `app` | `{app:{fn:h, arg:h}}` |
+| `lam`, `forallE` | `{lam\|forallE:{type:h, body:h}}` |
+| `letE` | `{letE:{type:h, value:h, body:h}}` |
+| `proj` | `{proj:{typeName, idx, struct:h, id}}` |
+| literal | `{natVal:{value:"digits", type:id(Nat)}}`, `{strVal:{value, type:id(String)}}` |
 
-## Authenticated public values
+Binder names, binder annotations and `letE` nondependency hints are dropped:
+they do not affect meaning. `id` is the referenced constant's identity, or `null`
+for a reference inside the inductive group being hashed. Universe parameter names
+are kept, so renaming one changes the identity.
 
-The guest commits exactly 32 bytes:
+**Declarations** are hashed as `H("zklean/declaration/1\0", d)`:
+
+- A declaration whose type is a proposition, as decided by the checker (theorems,
+  and axioms, definitions or opaques that are proofs), is
+  `{prop:{name, levelParams, type:h}}`. Proofs are irrelevant, so its body is
+  omitted, and an `axiom` stating a theorem's proposition has the theorem's identity.
+  A definition whose *value* is a proposition, such as `def Ok : Prop := …`, is not
+  a proof and keeps its body.
+- Other declarations are `{def|opaque|axiom|quot: fields}`. The fields are the
+  lean4export 3.1.0 fields, with names as strings and expressions as node hashes,
+  minus `all` and the quotient `kind`.
+- A mutual inductive group (types, constructors and recursors) is hashed once as
+  `g = H("zklean/declaration/1\0", {inductive:{types, ctors, recs}})`, minus
+  `all` and `isReflexive`. Each member's identity is
+  `H("zklean/declaration/1\0", {member:{group:g, name}})`.
+
+The kernel admits no cycles between declarations except within an inductive
+group, so every identity is well defined.
+
+## Statement and certificate
+
+The guest commits exactly 32 bytes, the statement digest:
 
 ```text
-SHA256(UTF8("zklean/statement/1\0") || canonicalJSON({format,specs,axioms}))
+statementId = H("zklean/statement/1\0", {format, claims, definitions, axioms})
 ```
 
-The certificate's `proof` is `base64:` followed by padded RFC 4648 base64 of
-exactly 260 bytes: SP1's four-byte circuit-key selector and 256-byte uncompressed
-Groth16 proof, as returned by `SP1ProofWithPublicValues.bytes()`. Other SP1 modes
-and proof lengths are rejected. The public specification is transmitted in
-addition to these proof bytes.
+Each of `claims`, `definitions` and `axioms` maps Lean names to identities. A name
+occurs at most once across the three maps.
 
-Both native and WebAssembly verification call the unmodified upstream
-`sp1-verifier` crate. Its circuit key is fixed by version 5.2.4; the checker key
-is SP1's BN254 `vk.bytes32()` encoding, **not** a serialized BabyBear digest.
-The npm package includes the WebAssembly verifier and the trusted checker key
-in `src/guest.json`. Applications can choose a different trusted checker through
-`groth16Backend(key)`; certificate data cannot supply this configuration.
+The certificate's `proof` is `base64:` followed by padded, canonical RFC 4648
+base64 of exactly 260 bytes: SP1's four-byte circuit-key selector and the 256-byte
+uncompressed Groth16 proof, as returned by `SP1ProofWithPublicValues.bytes()`.
+Other SP1 modes and lengths are rejected. The certificate's own identity is
+`H("zklean/certificate/1\0", certificate)`.
 
-A prover additionally pins `elfSha256` and the ELF path. `zklean pin` derives the
-key and digest from the built guest. Verification needs neither the ELF nor its
-serialized SP1 key. SP1's production recursion VK checks remain enabled during
-proving; no mock or development circuit is accepted. Groth16 soundness relies
-on SP1's trusted setup; a new theorem does not require a new setup ceremony.
+## Verifier keys
 
-Every permitted axiom must match its reviewed declaration and complete dependency
-context. The standard fingerprints are generated from the pinned Lean toolchain;
-custom fingerprints are supplied by the recipient. Bound-variable display names
-and binder annotations are ignored for context matching, while constant names,
-definition bodies, and types remain bound. A name-only allowlist is insufficient.
-This profile establishes derivability and integrity; it makes no claim about
-witness privacy beyond upstream SP1's guarantees.
-
-Certificate identity is
-`SHA256("zklean/certificate/1\0" || canonicalJSON(certificate))`.
-Model identity is `SHA256("zklean/model/1\0" || canonicalJSON(specs))`.
-Neither identity depends on arbitrary input JSON property order.
-
-## Requirement snapshots
-
-Local requirements use `{format:"zklean/requirements/1",specs}`. The
-self-contained snapshot is what the application trusts.
-
-[HTTPV](https://github.com/ZeframLou/httpv) defines discovery and compatibility
-checking separately from this certificate profile.
+Native and WebAssembly verification both call the unmodified upstream
+`sp1-verifier` crate. Its circuit key is fixed by version 5.2.4. The checker key
+is SP1's BN254 `vk.bytes32()` encoding of the pinned guest, shipped in
+`src/guest.json`. Applications can choose a different trusted key with
+`groth16Backend(key)`; certificate data cannot select one. A prover additionally
+pins the guest ELF's SHA-256, and `zklean pin` derives both values from a built
+guest. Groth16 soundness relies on SP1's trusted setup; a new theorem needs no
+new ceremony. The profile establishes derivability and integrity; it makes no
+claim of witness privacy beyond upstream SP1's guarantees.

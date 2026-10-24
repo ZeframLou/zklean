@@ -77,6 +77,11 @@ jobs:
           echo "$HOME/.sp1/bin" >> "$GITHUB_PATH"
       - run: bun install --frozen-lockfile
       - run: bash scripts/build-guest.sh
+      # The canonical Linux build defines the pinned guest key; keep it for proving.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zklean-guest-elf
+          path: crates/guest/target/elf-compilation/riscv32im-succinct-zkvm-elf/release/zklean-guest
       - run: bash scripts/prepare-sp1.sh
       - uses: actions/setup-go@v5
         with:
