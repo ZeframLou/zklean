@@ -147,6 +147,8 @@ Run `zklean doctor` to locate bundled tools. Development overrides are
 Explicit flag and environment paths must exist; a missing override fails rather
 than selecting another tool or verifier profile. Discovery applies only when
 no override is supplied.
+Profiles must use `zklean/verifier-profile/1` and SP1 `5.2.4`; unsupported versions,
+unknown fields, malformed keys/digests, and invalid timeout values are rejected.
 Proving uses the checksum-pinned upstream circuit files installed with the CLI;
 `SP1_GROTH16_CIRCUIT_PATH` overrides their root for source builds.
 

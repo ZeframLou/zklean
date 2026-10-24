@@ -1,6 +1,7 @@
 import { dirname, join, resolve } from "node:path";
 import type { NativeOptions } from "./native.ts";
 import { runLake } from "./lean.ts";
+import { object } from "./encoding.ts";
 
 export interface ToolOverrides {
   binary?: string | undefined;
@@ -126,10 +127,46 @@ export async function nativeOptions(
     throw new Error(
       "verifier profile not found; reinstall ZKLean or pass --config",
     );
-  const profile = (await Bun.file(tools.config).json()) as Record<
-    string,
-    unknown
-  >;
+  const profile = object(await Bun.file(tools.config).json());
+  if (
+    profile.format !== "zklean/verifier-profile/1" ||
+    profile.sp1Version !== "5.2.4" ||
+    Object.keys(profile).some(
+      (key) =>
+        ![
+          "format",
+          "sp1Version",
+          "verifierKey",
+          "elfSha256",
+          "elfPath",
+          "timeout",
+        ].includes(key),
+    )
+  )
+    throw new Error("invalid or unsupported verifier profile");
+  if (
+    typeof profile.verifierKey !== "string" ||
+    !/^0x[a-f0-9]{64}$/.test(profile.verifierKey)
+  )
+    throw new Error("invalid verifier profile key");
+  if (
+    profile.elfSha256 !== undefined &&
+    (typeof profile.elfSha256 !== "string" ||
+      !/^[a-f0-9]{64}$/.test(profile.elfSha256))
+  )
+    throw new Error("invalid verifier profile ELF digest");
+  if (
+    profile.elfPath !== undefined &&
+    (typeof profile.elfPath !== "string" || !profile.elfPath)
+  )
+    throw new Error("invalid verifier profile ELF path");
+  if (
+    profile.timeout !== undefined &&
+    (!Number.isSafeInteger(profile.timeout) ||
+      (profile.timeout as number) < 1 ||
+      (profile.timeout as number) > 0x7fffffff)
+  )
+    throw new Error("invalid verifier profile timeout");
   const elfPath = proving
     ? (tools.elf ?? configuredPath(profile.elfPath, tools.config))
     : undefined;

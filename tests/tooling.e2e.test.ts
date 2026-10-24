@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "bun:test";
 import { createSourceManifest, loadRequirements } from "../src/requirements.ts";
-import { findTools } from "../src/tooling.ts";
+import { findTools, nativeOptions } from "../src/tooling.ts";
 import { binary, buildNative } from "./helpers.ts";
 
 const lake = process.env.ZKLEAN_LAKE;
@@ -31,6 +31,22 @@ test("explicit tool and profile paths fail closed instead of falling back", asyn
         "verifier profile not found",
       );
       expect(await new Response(child.stdout).text()).toBe("");
+    }
+    const profile = await Bun.file(
+      join(import.meta.dir, "fixtures/identity.verifier.json"),
+    ).json();
+    const config = join(directory, "profile.json");
+    for (const fields of [
+      { format: "unknown" },
+      { sp1Version: "6.0.0" },
+      { timeout: "86400000" },
+      { timeout: 0 },
+      { veriferKey: profile.verifierKey },
+    ]) {
+      await Bun.write(config, JSON.stringify({ ...profile, ...fields }));
+      await expect(
+        nativeOptions({ ...(await findTools()), config }, false),
+      ).rejects.toThrow("verifier profile");
     }
   } finally {
     await rm(directory, { recursive: true, force: true });
