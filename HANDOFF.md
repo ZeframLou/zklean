@@ -8,26 +8,32 @@ Do not stop after the code fixes: finish real HTTPV crypto workflow, source drif
 CI, packed consumers, portable archive, benchmarks, docs, pushes and PR metadata.
 No subagents are authorized. Preserve all existing publication/privacy constraints.
 
-ZKLean fixes now implemented: explicit tool/profile paths fail closed; source
-requirements retain the pre-export source closure through native checking and
-final artifact capture, reject unrelated --export/--source binding, and preserve
-existing output on a concurrent edit; the default Groth16 backend uses a shared
-two-worker/sixteen-job bounded pool with worker failure/deadline recovery; Lean
-imports use a proper string encoder, private top-level node definitions instead
-of giant nested lets, and the pinned exporter's nondependent-let normalization.
-New regressions pass. Local check: **26 pass, 2 real guest tests intentionally
-skipped while CPU proving is active**, 124 assertions; hosted full checks must
-cover the guest. Actual packed SDK/compiled CLI worker checks passed; latest log
-`/tmp/zklean-worker-package.log`. No Rust/guest changes, so the guest pin is stable.
+ZKLean runtime fixes are pushed at **12134df08dcfac2af4c1b1b8dc363a64bd4eb11e**
+on `work`: explicit tool/profile paths fail closed; strict verifier-profile
+schema validates version/key/digest/timeout; source requirements retain their
+pre-export source closure through native checking; the default Groth16 backend
+uses a shared two-worker/sixteen-job pool outside the event loop with safe
+retirement; Lean imports encode controls correctly and scale via top-level data
+definitions; literal models require implicit Nat/String declarations and policy
+errors remain inside the invalid-data boundary. No Rust/guest changes.
+Local host check: **27 pass, 2 real guest tests intentionally skipped during
+CPU proving**, 136 assertions. Hosted Check/Package green through f650c1f;
+12134df runs are pending. Final compiled CLI/actual packed SDK consumer checks
+passed (native tools unavailable). Final portable archive rebuilt successfully;
+bare Ubuntu22 verification log `/tmp/zklean-final-bare.log`.
 
-HTTPV now requires a nonempty `operations` list on checkCompatibility and watch.
-Every client-selected declaration/context must occur in the remote *claim*
-closure and the requirement closure, before exact/bridge acceptance. Bridges
-cannot supply an absent operation. Cache keys include bindings. Context changes
-in exact mode return incompatible/operation-mismatch; implication mode returns
-unknown/operation-mismatch. Tests/examples are being migrated; latest log is
-`/tmp/httpv-binding-check.log`. A checked renamed Backorders operation plus the
-independent inventory bridge is a regression fixture. Docs are not yet updated.
+HTTPV now explicitly binds the **server-advertised entrypoint** to the client’s
+expected `operation` name and complete certified context. The final API uses
+`Advertisement {operation,certificate}`, `query()` returns an Advertisement,
+`checkCompatibility({advertisement,operation,...})`, and watch requires operation.
+Discovery is `{format:"httpv/1",contracts:{POST:{operation,certificate}}}`.
+Server routes take `{operation,certificate:objectOrPath}` or a provider returning
+the complete pair. Static objects are snapshots. The earlier operations-list
+approach below is obsolete. Binding runs before cache/bridge; changing only the
+advertised entrypoint invalidates acceptance. HTTPV pins the SDK commit above.
+Docs/SPEC/examples have been migrated. Latest filtered tests: **22 pass, 107
+assertions**, `/tmp/httpv-entrypoint-check.log`; mandatory real unit test awaits
+four certificates. Typecheck/format and full Lean fixture regeneration pass.
 
 Real proof work is active, **do not kill it or run large guest execution beside
 it**. Four new single-unit inventory models exercise actual POST /units,
@@ -73,7 +79,7 @@ Additional follow-up implemented since this section was first written:
 - npm files explicitly include the example Lean files/data and unit-flow/upgrades
   entry points, excluding .lake. The installed demo entry resolves canonical data
   relative to its own module, with no private checkout. Packed-consumer script
-  copies this exact public-API workflow and canonical data into a fresh npm app.
+  runs the actual installed example entrypoint and its packaged canonical data.
 - Root SDK runtime pushed at c9a6176; hosted Check is green. A follow-up hardens
   worker retirement: trapped WASM instances are discarded, retiring threads count
   against the budget until termination, and an out-of-field key cannot poison a
