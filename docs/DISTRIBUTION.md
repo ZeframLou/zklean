@@ -26,8 +26,10 @@ not runtime requirements for the CLI. The upstream proving circuit is installed
 automatically from its checksum-pinned official archive, separately from the
 CLI archive. Lean is installed automatically through Elan.
 
-`dist/install.sh`, `dist/README.md`, `dist/docs/`, and `dist/SPEC.md` are the
-public website files. Publish those files to the binary repository's `main`
+`dist/install.sh`, `dist/README.md`, `dist/docs/`, `dist/examples/`,
+`dist/benchmarks/`, and `dist/SPEC.md` are the public website files. The benchmark
+data contains two real certificates, their checker profile, and original example
+exports; the docs include the measured results and generation resource reports. Publish those files to the binary repository's `main`
 branch and upload `zklean-linux-x64.tar.gz` and its `.sha256` file as release
 assets. Keep the source version at `0.1.0`; choose an immutable release tag only
 when publication is explicitly authorized. The public host does not need the

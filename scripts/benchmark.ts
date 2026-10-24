@@ -2,7 +2,12 @@
 import { findTools, nativeOptions } from "../src/tooling.ts";
 import { runNative, nativeBackend } from "../src/native.ts";
 import { createVerifier } from "../src/verifier.ts";
-import { canonical, decodeBase64, parseCertificate } from "../src/encoding.ts";
+import {
+  canonical,
+  decodeBase64,
+  parseCertificate,
+  statement,
+} from "../src/encoding.ts";
 import { groth16Backend } from "../src/groth16.ts";
 import { readModel } from "../src/encoding.ts";
 
@@ -34,7 +39,16 @@ for (let i = 0; i < paths.length; i++) {
   const exported = await Bun.file(
     `tests/fixtures/${i === 0 ? "identity" : "composition"}.ndjson`,
   ).text();
-  const policy = { allowedAxioms: certificate.axioms };
+  // Both reviewed benchmark models use no axioms. Policy is chosen locally.
+  const policy = { allowedAxioms: [] };
+  const input = {
+    export: exported,
+    claims: certificate.specs.claims,
+    allowedAxioms: [],
+  };
+  const checked = await runNative(tools.binary, "check", input);
+  if (canonical(checked) !== canonical(statement(certificate)))
+    throw new Error("certificate does not match its benchmark export");
   const model = readModel(certificate.specs);
   const verify = (
     backend: typeof native | ReturnType<typeof groth16Backend>,
@@ -55,13 +69,7 @@ for (let i = 0; i < paths.length; i++) {
     proofBytes: decodeBase64(certificate.proof).length,
     declarations: Object.keys(model.declarations).length,
     kernelNodes: Object.keys(model.nodes).length,
-    directNanoda: await measure(() =>
-      runNative(tools.binary, "check", {
-        export: exported,
-        claims: certificate.specs.claims,
-        allowedAxioms: certificate.axioms,
-      }),
-    ),
+    directNanoda: await measure(() => runNative(tools.binary, "check", input)),
     nativeVerification: await measure(verify(native)),
     embeddedVerification: await measure(verify(groth16Backend())),
   });

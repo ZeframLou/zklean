@@ -63,6 +63,7 @@ jobs:
             dist/SPEC.md
             dist/docs/
             dist/examples/
+            dist/benchmarks/
             dist/identity.certificate.json
 
   clean-install:

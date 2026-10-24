@@ -220,7 +220,7 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
         (await runNative(tools.binary, "check", input)) as Certificate,
       );
       console.error(
-        "Generating a local Groth16 proof; this may take several minutes…",
+        "Generating a local Groth16 proof; large models may take hours…",
       );
       result = await nativeBackend({
         ...(await nativeOptions(tools, true)),

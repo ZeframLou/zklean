@@ -44,6 +44,8 @@ if (result.status !== "verified") throw new Error(result.reason);
 The SDK runs on [Bun](https://bun.sh/) 1.4.4 or newer. It includes its verifier;
 it needs no native installation, compiler, Lean process, or circuit download.
 Its trusted key is application configuration, never certificate data.
+For TypeScript checking in a Bun application, add `@types/bun` as a development
+dependency if the project does not already include it.
 
 ## Read a received certificate
 
