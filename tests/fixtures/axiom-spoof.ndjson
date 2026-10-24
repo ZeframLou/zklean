@@ -1,0 +1,11 @@
+{"meta":{"exporter":{"name":"lean4export","version":"3.1.0"},"format":{"version":"3.1.0"},"lean":{"githash":"c9afcddf514a6772bd4d649f7cfc04eff0b9f15e","version":"4.36.0-rc1"}}}
+{"in":1,"str":{"pre":0,"str":"propext"}}
+{"in":2,"str":{"pre":0,"str":"P"}}
+{"ie":0,"sort":0}
+{"bvar":0,"ie":1}
+{"forallE":{"binderInfo":"default","body":1,"name":2,"type":0},"ie":2}
+{"axiom":{"isUnsafe":false,"levelParams":[],"name":1,"type":2}}
+{"in":3,"str":{"pre":0,"str":"Spoof"}}
+{"in":4,"str":{"pre":3,"str":"everything"}}
+{"const":{"name":1,"us":[]},"ie":3}
+{"thm":{"all":[4],"levelParams":[],"name":4,"type":2,"value":3}}

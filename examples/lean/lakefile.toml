@@ -1,0 +1,7 @@
+name = "ZKLeanExamples"
+version = "0.1.0"
+defaultTargets = ["ZKLeanExamples"]
+
+[[lean_lib]]
+name = "ZKLeanExamples"
+roots = ["Inventory", "V1", "Axioms", "Identity", "ProofData", "AxiomPolicy", "AxiomSpoof", "Composition"]

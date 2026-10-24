@@ -1,0 +1,39 @@
+{
+  "name": "zklean",
+  "version": "0.1.0",
+  "description": "Succinct proofs of Lean specifications",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ZeframLou/zklean.git"
+  },
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./encoding": "./src/encoding.ts"
+  },
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "check": "bun run typecheck && bun test",
+    "format": "prettier --write src tests/*.ts scripts/*.ts examples/*.ts package.json tsconfig.json",
+    "format:check": "prettier --check src tests/*.ts scripts/*.ts examples/*.ts package.json tsconfig.json",
+    "build:verifier": "bash scripts/build-verifier.sh",
+    "compile": "bun build --compile src/cli.ts --outfile dist/zklean"
+  },
+  "devDependencies": {
+    "@types/bun": "1.3.11",
+    "prettier": "3.6.2",
+    "typescript": "5.9.3"
+  },
+  "engines": {
+    "bun": ">=1.4.4"
+  },
+  "files": [
+    "src",
+    "README.md",
+    "SPEC.md",
+    "docs",
+    "examples/lean/Inventory.lean",
+    "examples/lean/V1.lean"
+  ]
+}

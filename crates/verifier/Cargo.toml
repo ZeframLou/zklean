@@ -1,0 +1,11 @@
+[package]
+name = "zklean-verifier"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+sp1-verifier = "=5.2.4"
+hex = "0.4"

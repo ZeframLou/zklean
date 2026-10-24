@@ -1,0 +1,65 @@
+{
+  "runtime": "1.4.4",
+  "platform": "linux",
+  "architecture": "x64",
+  "samples": 7,
+  "results": [
+    {
+      "example": "identity",
+      "claims": [
+        "Demo.identity"
+      ],
+      "exportBytes": 722,
+      "certificateFileBytes": 3190,
+      "certificateCanonicalBytes": 3145,
+      "publicModelBytes": 2013,
+      "proofBytes": 260,
+      "declarations": 1,
+      "kernelNodes": 11,
+      "directNanoda": {
+        "firstMs": 12.911954000000001,
+        "medianMs": 2.4751970000000014,
+        "minMs": 2.0624409999999997
+      },
+      "nativeVerification": {
+        "firstMs": 280.062408,
+        "medianMs": 281.754734,
+        "minMs": 271.09781399999997
+      },
+      "embeddedVerification": {
+        "firstMs": 358.2031320000001,
+        "medianMs": 348.6855099999998,
+        "minMs": 340.2750329999999
+      }
+    },
+    {
+      "example": "composition",
+      "claims": [
+        "Pipeline.compose",
+        "Pipeline.weaken"
+      ],
+      "exportBytes": 7745,
+      "certificateFileBytes": 37534,
+      "certificateCanonicalBytes": 37482,
+      "publicModelBytes": 27749,
+      "proofBytes": 260,
+      "declarations": 3,
+      "kernelNodes": 118,
+      "directNanoda": {
+        "firstMs": 3.593119000000115,
+        "medianMs": 3.6541189999998096,
+        "minMs": 3.283744999999726
+      },
+      "nativeVerification": {
+        "firstMs": 288.39941999999974,
+        "medianMs": 281.1579500000007,
+        "minMs": 275.3880629999994
+      },
+      "embeddedVerification": {
+        "firstMs": 357.2869529999998,
+        "medianMs": 341.20568000000094,
+        "minMs": 340.778733000001
+      }
+    }
+  ]
+}
