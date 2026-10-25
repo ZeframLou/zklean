@@ -64,6 +64,7 @@ test("requirements load only exact JSON snapshots", async () => {
   expect(await loadRequirements(snapshot)).toEqual(snapshot);
   for (const invalid of [
     { ...snapshot, sourceManifest: {} },
+    { ...snapshot, claims: {} },
     { ...snapshot, claims: { "Demo.identity": "A".repeat(64) } },
   ])
     await expect(loadRequirements(invalid as never)).rejects.toThrow();

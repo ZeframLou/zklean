@@ -12,5 +12,8 @@ export async function loadRequirements(
   keys(r, ["format", "claims"]);
   if (r.format !== "zklean/requirements/1")
     throw new Error("invalid requirements format");
-  return structuredClone({ format: r.format, claims: identified(r.claims) });
+  const claims = identified(r.claims);
+  // An empty requirement would be satisfied by every certificate.
+  if (!Object.keys(claims).length) throw new Error("requirements need claims");
+  return structuredClone({ format: r.format, claims });
 }
