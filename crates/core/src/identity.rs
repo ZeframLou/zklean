@@ -20,6 +20,19 @@ fn hash(domain: &str, value: &Value) -> Result<String> {
     Ok(format!("{:x}", digest.finalize()))
 }
 
+/// A node's identity from its canonical JSON.
+fn digest(node: &str) -> String {
+    let mut digest = Sha256::new();
+    digest.update(b"zklean/node/1\0");
+    digest.update(node.as_bytes());
+    format!("{:x}", digest.finalize())
+}
+
+/// A JSON string, escaped as canonical JSON escapes it.
+fn quote(s: &str) -> String {
+    serde_json::to_string(s).expect("strings serialize")
+}
+
 /// Read a checked export. Declarations whose type is a proposition are
 /// decided by the checker first. Nanoda checks each declaration against only
 /// those before it, so the export is in dependency order and every identity is
@@ -282,14 +295,20 @@ impl<'r, 'c> Reader<'r, 'c, '_> {
         }
     }
 
-    /// A constant reference: its name and identity, or no identity inside the
-    /// inductive group being hashed.
-    fn reference(&mut self, name: NamePtr<'c>, group: Option<NamePtr<'c>>) -> Result<Value> {
+    /// A constant reference as canonical JSON values: its identity, or `null`
+    /// inside the inductive group being hashed, and its name.
+    fn reference(
+        &mut self,
+        name: NamePtr<'c>,
+        group: Option<NamePtr<'c>>,
+    ) -> Result<(String, String)> {
         let inside = group.is_some() && self.group_of(name) == group;
-        Ok(json!({
-            "name": self.render(name)?,
-            "id": if inside { Value::Null } else { Value::String(self.id(name)?) },
-        }))
+        let id = if inside {
+            "null".to_owned()
+        } else {
+            format!(r#""{}""#, self.id(name)?)
+        };
+        Ok((id, quote(&self.render(name)?)))
     }
 
     /// Nodes are hashed Merkle-style, children first. An explicit work stack
@@ -338,61 +357,73 @@ impl<'r, 'c> Reader<'r, 'c, '_> {
     }
 
     /// One node, its children already hashed. Binder names, binder annotations
-    /// and let hints do not affect meaning and are omitted.
+    /// and let hints do not affect meaning and are omitted. Node shapes are
+    /// fixed, so their canonical JSON is written directly, keys in byte order.
     fn hash_node(&mut self, e: ExprPtr<'c>, group: Option<NamePtr<'c>>) -> Result<String> {
         let h = |this: &Self, c: ExprPtr<'c>| this.nodes[&(c, group)].clone();
         let node = match self.ctx.read_expr(e) {
-            Expr::Var { dbj_idx, .. } => json!({"bvar": dbj_idx}),
-            Expr::Sort { level, .. } => json!({"sort": self.level(level)?}),
+            Expr::Var { dbj_idx, .. } => format!(r#"{{"bvar":{dbj_idx}}}"#),
+            Expr::Sort { level, .. } => format!(r#"{{"sort":"{}"}}"#, self.level(level)?),
             Expr::Const { name, levels, .. } => {
-                let mut r = self.reference(name, group)?;
-                r["us"] = self.levels(levels)?;
-                json!({ "const": r })
+                let (id, name) = self.reference(name, group)?;
+                let us = self.levels(levels)?;
+                format!(r#"{{"const":{{"id":{id},"name":{name},"us":{us}}}}}"#)
             }
-            Expr::App { fun, arg, .. } => {
-                json!({"app": {"fn": h(self, fun), "arg": h(self, arg)}})
-            }
+            Expr::App { fun, arg, .. } => format!(
+                r#"{{"app":{{"arg":"{}","fn":"{}"}}}}"#,
+                h(self, arg),
+                h(self, fun)
+            ),
             Expr::Pi {
                 binder_type, body, ..
-            } => json!({"forallE": {"type": h(self, binder_type), "body": h(self, body)}}),
+            } => format!(
+                r#"{{"forallE":{{"body":"{}","type":"{}"}}}}"#,
+                h(self, body),
+                h(self, binder_type)
+            ),
             Expr::Lambda {
                 binder_type, body, ..
-            } => json!({"lam": {"type": h(self, binder_type), "body": h(self, body)}}),
+            } => format!(
+                r#"{{"lam":{{"body":"{}","type":"{}"}}}}"#,
+                h(self, body),
+                h(self, binder_type)
+            ),
             Expr::Let {
                 binder_type,
                 val,
                 body,
                 ..
-            } => json!({"letE": {
-                "type": h(self, binder_type),
-                "value": h(self, val),
-                "body": h(self, body)}}),
+            } => format!(
+                r#"{{"letE":{{"body":"{}","type":"{}","value":"{}"}}}}"#,
+                h(self, body),
+                h(self, binder_type),
+                h(self, val)
+            ),
             Expr::Proj {
                 ty_name,
                 idx,
                 structure,
                 ..
             } => {
-                let mut r = self.reference(ty_name, group)?;
-                r["idx"] = json!(idx);
-                r["struct"] = Value::String(h(self, structure));
-                json!({ "proj": r })
+                let (id, name) = self.reference(ty_name, group)?;
+                format!(
+                    r#"{{"proj":{{"id":{id},"idx":{idx},"name":{name},"struct":"{}"}}}}"#,
+                    h(self, structure)
+                )
             }
             Expr::NatLit { ptr, .. } => {
-                let value = self
-                    .ctx
-                    .read_bignum(ptr)
-                    .context("natural literal")?
-                    .to_string();
-                json!({"natVal": {"value": value, "type": self.id(self.lookup("Nat")?.0)?}})
+                let value = self.ctx.read_bignum(ptr).context("natural literal")?;
+                let ty = self.id(self.lookup("Nat")?.0)?;
+                format!(r#"{{"natVal":{{"type":"{ty}","value":"{value}"}}}}"#)
             }
             Expr::StringLit { ptr, .. } => {
-                let value = self.ctx.read_string(ptr).to_string();
-                json!({"strVal": {"value": value, "type": self.id(self.lookup("String")?.0)?}})
+                let value = serde_json::to_string(self.ctx.read_string(ptr).as_ref())?;
+                let ty = self.id(self.lookup("String")?.0)?;
+                format!(r#"{{"strVal":{{"type":"{ty}","value":{value}}}}}"#)
             }
             Expr::Local { .. } => bail!("free variable in export"),
         };
-        hash("zklean/node/1\0", &node)
+        Ok(digest(&node))
     }
 
     fn level(&mut self, l: LevelPtr<'c>) -> Result<String> {
@@ -400,24 +431,29 @@ impl<'r, 'c> Reader<'r, 'c, '_> {
             return Ok(h.clone());
         }
         let node = match self.ctx.read_level(l) {
-            Level::Zero => json!({"zero": true}),
-            Level::Succ(l, _) => json!({"succ": self.level(l)?}),
-            Level::Max(a, b, _) => json!({"max": [self.level(a)?, self.level(b)?]}),
-            Level::IMax(a, b, _) => json!({"imax": [self.level(a)?, self.level(b)?]}),
-            Level::Param(n, _) => json!({"param": self.render(n)?}),
+            Level::Zero => r#"{"zero":true}"#.to_owned(),
+            Level::Succ(l, _) => format!(r#"{{"succ":"{}"}}"#, self.level(l)?),
+            Level::Max(a, b, _) => {
+                format!(r#"{{"max":["{}","{}"]}}"#, self.level(a)?, self.level(b)?)
+            }
+            Level::IMax(a, b, _) => {
+                format!(r#"{{"imax":["{}","{}"]}}"#, self.level(a)?, self.level(b)?)
+            }
+            Level::Param(n, _) => format!(r#"{{"param":{}}}"#, quote(&self.render(n)?)),
         };
-        let h = hash("zklean/node/1\0", &node)?;
+        let h = digest(&node);
         self.levels.insert(l, h.clone());
         Ok(h)
     }
 
-    fn levels(&mut self, ls: LevelsPtr<'c>) -> Result<Value> {
+    /// Canonical JSON of the level hashes, as a string for embedding.
+    fn levels(&mut self, ls: LevelsPtr<'c>) -> Result<String> {
         let ls = self.ctx.read_levels(ls);
-        Ok(Value::Array(
-            ls.iter()
-                .map(|l| Ok(Value::String(self.level(*l)?)))
-                .collect::<Result<_>>()?,
-        ))
+        let hashes = ls
+            .iter()
+            .map(|l| Ok(format!(r#""{}""#, self.level(*l)?)))
+            .collect::<Result<Vec<_>>>()?;
+        Ok(format!("[{}]", hashes.join(",")))
     }
 
     fn params(&mut self, ls: LevelsPtr<'c>) -> Result<Value> {
