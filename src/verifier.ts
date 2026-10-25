@@ -19,7 +19,7 @@ export function createVerifier(options: VerifierOptions = {}) {
     value: unknown,
     policy: VerifyOptions,
   ): Promise<VerificationResult> {
-    let identity: { statementId: string };
+    let identity: Pick<VerificationResult, "statementId">;
     let key: string;
     let check: () => Promise<boolean>;
     try {

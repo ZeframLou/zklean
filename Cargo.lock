@@ -5300,7 +5300,6 @@ name = "zklean-core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "base64 0.22.1",
  "nanoda_lib",
  "serde",
  "serde_json",
@@ -5314,7 +5313,6 @@ dependencies = [
  "anyhow",
  "base64 0.22.1",
  "bincode",
- "hex",
  "libc",
  "serde",
  "serde_json",

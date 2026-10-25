@@ -60,12 +60,14 @@ use, and commit the identities of the claims and those axioms.
 - `axioms`: every axiom the proofs use, by name and identity. A name occurs in at
   most one of `claims` and `axioms`.
 - `proof`: the Groth16 proof of `{format, claims, axioms}`.
-- `source`: the `https` or `file` URL of one lean4export file that contains every
-  claim and axiom with everything they depend on.
+- `source`: the `https` URL of one lean4export file that contains every claim and
+  axiom with everything they depend on.
 
 The source is not part of the proved statement. It is an untrusted pointer: a
-recipient checks the file with Nanoda and accepts it only if it reproduces every
-certified identity. A wrong source can make that check fail, but cannot make a
+recipient verifies the certificate, then checks the file with Nanoda and accepts
+it only if it reproduces every certified identity. A source matched against an
+unverified certificate means nothing, since a forger can choose identities that
+match any file. A wrong source can make that check fail, but cannot make a
 different statement match, and a source can move without re-proving.
 
 `zklean prove` writes the export it proved from next to the certificate, ready
@@ -100,31 +102,11 @@ A requirement lists the propositions a recipient's own proofs assume:
 proposition, proved or stated as an axiom. A certificate satisfies a requirement
 when every required claim appears in it with the same identity.
 
-## 5. Command-line interface
-
-```sh
-zklean check --project inventory --module V1 \
-  --claims Inventory.reservation_safe --axioms propext
-zklean prove … --source https://acme.example/reservation.ndjson --out reservation.json
-zklean verify --certificate reservation.json --axioms propext
-zklean fetch --certificate reservation.json --out reservation.ndjson
-zklean requirements --project client --module Remote \
-  --claims Inventory.reservation_safe --out requirements.json
-```
-
-- `check` checks the derivation and prints the statement, without proving.
-- `prove` also generates the Groth16 proof and writes the certificate and its
-  source export. `--source` is the URL where that export will be published.
-- `verify` checks the proof and axiom policy.
-- `fetch` downloads the source, checks it, and saves it only if it reproduces
-  every identity. Nothing fetched is executed.
-- `--axioms` names permitted axioms. Lean's standard axioms resolve to pinned
-  identities; others need `--axiom-policy FILE`, a JSON map from name to identity.
-
-## 6. References
+## 5. References
 
 - [Lean 4](https://github.com/leanprover/lean4)
 - [lean4export](https://github.com/leanprover/lean4export)
 - [Nanoda](https://github.com/ammkrn/nanoda_lib)
 - [SP1](https://github.com/succinctlabs/sp1)
 - [Encoding profile](docs/ENCODING.md)
+- [Usage guide](docs/USAGE.md), for the command-line interface

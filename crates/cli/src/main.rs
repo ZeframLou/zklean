@@ -4,10 +4,8 @@ use zklean_core::ProveInput;
 
 #[cfg(feature = "execute")]
 mod execute;
-mod identify;
 #[cfg(feature = "prover")]
 mod sp1;
-mod verify;
 
 // Native libraries, including upstream gnark, print diagnostics to fd 1.
 // Reserve the original stdout for our JSON protocol before invoking them.
@@ -27,22 +25,18 @@ fn json_output() -> Result<Box<dyn Write>> {
     }
 }
 
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Identify {
+    export: String,
+    names: Vec<String>,
+}
+
 fn main() -> Result<()> {
     let mut output = json_output()?;
     let command = std::env::args()
         .nth(1)
-        .context("usage: zklean-native check|prove|verify < request.json")?;
-    if command == "prove" {
-        tracing_subscriber::fmt()
-            .with_env_filter(
-                tracing_subscriber::EnvFilter::try_from_default_env()
-                    .unwrap_or_else(|_| "warn,sp1_prover=info,sp1_sdk=info".into()),
-            )
-            .with_writer(io::stderr)
-            .with_span_events(tracing_subscriber::fmt::format::FmtSpan::CLOSE)
-            .with_ansi(false)
-            .init();
-    }
+        .context("usage: zklean-native COMMAND < request.json")?;
     let mut input = String::new();
     io::stdin().read_to_string(&mut input)?;
     let result = match command.as_str() {
@@ -64,8 +58,10 @@ fn main() -> Result<()> {
         }
         #[cfg(feature = "prover")]
         "prove" | "identity" => sp1::run(&command, &input)?,
-        "identify" => identify::run(&input)?,
-        "verify" => verify::run(&input)?,
+        "identify" => {
+            let request: Identify = serde_json::from_str(&input)?;
+            serde_json::to_value(zklean_core::identify(&request.export, &request.names)?)?
+        }
         #[cfg(feature = "execute")]
         "execute" => execute::run(&input)?,
         _ => bail!("unsupported command"),

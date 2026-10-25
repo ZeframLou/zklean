@@ -1,22 +1,12 @@
-import { parseCertificate, statement } from "./encoding.ts";
-import type { Certificate, ProofBackend } from "./types.ts";
+import { parseCertificate } from "./encoding.ts";
+import { profile, type Tools } from "./tooling.ts";
+import type { Certificate } from "./types.ts";
 
 export interface ProveInput {
-  /** NDJSON emitted by the pinned exporter. Standalone theorem bodies are private. */
+  /** NDJSON emitted by the pinned lean4export. */
   export: string;
   claims: string[];
 }
-export interface NativeOptions {
-  binary: string;
-  elfPath?: string;
-  elfSha256?: string;
-  /** Pinned guest-key fingerprint from zklean pin. */
-  verifierKey: string;
-  timeout?: number;
-  /** Optional native proving diagnostics, delivered without changing evidence. */
-  onProgress?: (text: string) => void;
-}
-
 /** Process boundary keeps Nanoda's panic-based rejection out of the Bun host.
  * No shell is used. Configuration is supplied by the application, never input. */
 export async function runNative(
@@ -66,65 +56,25 @@ export async function runNative(
     clearTimeout(timer);
   }
 }
-export function nativeBackend(options: NativeOptions): ProofBackend & {
-  prove(input: ProveInput, source: string): Promise<Certificate>;
-} {
-  if (
-    options.timeout !== undefined &&
-    (!Number.isSafeInteger(options.timeout) ||
-      options.timeout < 1 ||
-      options.timeout > 0x7fffffff)
-  )
-    throw new Error(
-      "native timeout must be an integer from 1 to 2147483647 milliseconds",
-    );
-  if (!/^0x[a-f0-9]{64}$/.test(options.verifierKey))
-    throw new Error("pin the SP1 guest verification key");
-  if (
-    (options.elfPath !== undefined || options.elfSha256 !== undefined) &&
-    (!options.elfPath || !/^[a-f0-9]{64}$/.test(options.elfSha256 ?? ""))
-  ) {
-    throw new Error(
-      "pin both the guest ELF path and SHA-256 when providing an ELF",
-    );
-  }
-  const binary = options.binary;
-  const timeout = options.timeout;
-  const config = {
-    elfPath: options.elfPath,
-    elfSha256: options.elfSha256,
-    verifierKey: options.verifierKey,
-  };
-  return {
-    identity: `sp1:5.2.4:groth16:${options.verifierKey}`,
-    async prove(input, source) {
-      if (!config.elfPath || !config.elfSha256)
-        throw new Error("proving requires a pinned guest ELF");
-      const proved = (await runNative(
-        binary,
-        "prove",
-        { ...config, input },
-        timeout ?? 3_600_000,
-        options.onProgress,
-      )) as object;
-      return parseCertificate({ ...proved, source });
-    },
-    async verify(value) {
-      const result = await runNative(
-        binary,
-        "verify",
-        {
-          ...config,
-          certificate: { ...statement(value), proof: value.proof },
-        },
-        timeout,
-      );
-      return (
-        typeof result === "object" &&
-        result !== null &&
-        "valid" in result &&
-        result.valid === true
-      );
-    },
-  };
+/** Prove a checked statement with the pinned guest. Proving needs the guest
+ * ELF named by the profile's digest; verification never does. */
+export async function prove(
+  input: ProveInput,
+  source: string,
+  options: { tools: Tools; timeout?: number | undefined },
+): Promise<Certificate> {
+  const { tools } = options;
+  if (!tools.elf) throw new Error("guest ELF not found; set ZKLEAN_GUEST_ELF");
+  const { verifierKey, elfSha256 } = await profile(tools);
+  const timeout = options.timeout ?? 3_600_000;
+  if (!Number.isSafeInteger(timeout) || timeout < 1 || timeout > 0x7fffffff)
+    throw new Error("timeout must be an integer from 1 to 2147483647 ms");
+  const proved = (await runNative(
+    tools.binary,
+    "prove",
+    { elfPath: tools.elf, elfSha256, verifierKey, input },
+    timeout,
+    (text) => process.stderr.write(text),
+  )) as object;
+  return parseCertificate({ ...proved, source });
 }

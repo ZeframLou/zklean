@@ -4,54 +4,43 @@ import { join } from "node:path";
 import { expect, test } from "bun:test";
 import { loadRequirements } from "../src/requirements.ts";
 import { parseCertificate } from "../src/encoding.ts";
-import { download, matchSource } from "../src/fetch.ts";
-import { binary, checked } from "./helpers.ts";
-import { pathToFileURL } from "node:url";
-import { findTools, nativeOptions } from "../src/tooling.ts";
+import { matchSource } from "../src/fetch.ts";
+import { binary, checked, root } from "./helpers.ts";
+import { findTools, profile } from "../src/tooling.ts";
 
 const lake = process.env.ZKLEAN_LAKE;
 
-test("explicit tool and profile paths fail closed instead of falling back", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "zklean-missing-tools-"));
+test("tool overrides and verifier profiles fail closed", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "zklean-tools-"));
+  const saved = { ...process.env };
   try {
     const missing = join(directory, "missing");
-    for (const key of ["binary", "elf", "exporter", "lake", "config"])
-      await expect(findTools({ [key]: missing })).rejects.toThrow("not found");
-    for (const env of [{}, { ZKLEAN_PROFILE: missing }]) {
-      const child = Bun.spawn(
-        [
-          process.execPath,
-          "src/cli.ts",
-          "verify",
-          "--certificate",
-          "tests/fixtures/identity.certificate.json",
-          ...(Object.keys(env).length ? [] : ["--config", missing]),
-        ],
-        { env: { ...process.env, ...env }, stdout: "pipe", stderr: "pipe" },
-      );
-      expect(await child.exited).toBe(1);
-      expect(await new Response(child.stderr).text()).toContain(
-        "verifier profile not found",
-      );
-      expect(await new Response(child.stdout).text()).toBe("");
+    for (const variable of [
+      "ZKLEAN_NATIVE",
+      "ZKLEAN_GUEST_ELF",
+      "ZKLEAN_EXPORTER",
+      "ZKLEAN_LAKE",
+      "ZKLEAN_PROFILE",
+    ]) {
+      process.env[variable] = missing;
+      await expect(findTools()).rejects.toThrow(`${variable} not found`);
+      process.env = { ...saved };
     }
-    const profile = await Bun.file(
-      join(import.meta.dir, "fixtures/identity.verifier.json"),
-    ).json();
-    const config = join(directory, "profile.json");
+    const pinned = await Bun.file(join(root, "src/guest.json")).json();
+    const path = join(directory, "profile.json");
     for (const fields of [
       { format: "unknown" },
       { sp1Version: "6.0.0" },
-      { timeout: "86400000" },
-      { timeout: 0 },
-      { veriferKey: profile.verifierKey },
+      { timeout: 1 },
+      { verifierKey: "0x00" },
     ]) {
-      await Bun.write(config, JSON.stringify({ ...profile, ...fields }));
+      await Bun.write(path, JSON.stringify({ ...pinned, ...fields }));
       await expect(
-        nativeOptions({ ...(await findTools()), config }, false),
+        profile({ ...(await findTools()), profile: path }),
       ).rejects.toThrow("verifier profile");
     }
   } finally {
+    process.env = saved;
     await rm(directory, { recursive: true, force: true });
   }
 });
@@ -78,12 +67,13 @@ const certificate = {
   source: "https://example.com/spec.ndjson",
 };
 
-test("a certificate names one https or file source", () => {
+test("a certificate names one https source", () => {
   expect(parseCertificate(certificate).source).toBe(certificate.source);
   for (const source of [
     undefined,
     "ext::sh -c id",
     "http://example.com/spec.ndjson",
+    "file:///etc/passwd",
     { url: certificate.source },
   ])
     expect(() => parseCertificate({ ...certificate, source })).toThrow();
@@ -91,9 +81,9 @@ test("a certificate names one https or file source", () => {
 
 test("a source export must reproduce every certified identity", async () => {
   const statement = await checked("identity", ["Demo.identity"]);
-  const exported = await download(
-    pathToFileURL(join(import.meta.dir, "fixtures/identity.ndjson")).href,
-  );
+  const exported = await Bun.file(
+    join(import.meta.dir, "fixtures/identity.ndjson"),
+  ).text();
   const sourced = parseCertificate({ ...certificate, ...statement });
   expect(await matchSource(sourced, exported, binary)).toEqual([]);
   const forged = { ...sourced, claims: { "Demo.identity": "d".repeat(64) } };

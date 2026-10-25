@@ -66,7 +66,7 @@ pub enum Declar<'a> {
 /// information to begin the process of checking an inductive declaration.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InductiveData<'a> {
-    pub(crate) info: DeclarInfo<'a>,
+    pub info: DeclarInfo<'a>,
     /// `true` when recursive (that is, the inductive type appears as an argument in a constructor).
     pub(crate) is_recursive: bool,
     /// `true` when this typs is a nested inductive
@@ -74,15 +74,15 @@ pub struct InductiveData<'a> {
     pub(crate) is_nested: bool,
     /// All inductive types in a mutual block must have the same parameters, though this
     /// does not exactly hold for nested inductives.
-    pub(crate) num_params: u16,
+    pub num_params: u16,
     pub(crate) num_indices: u16,
     /// The names of this type, and any other inductive types in a `mutual..end`
     /// block. No nested inductive info is conveyed here.
-    pub(crate) all_ind_names: Arc<[NamePtr<'a>]>,
+    pub all_ind_names: Arc<[NamePtr<'a>]>,
     /// The constructor names for THIS type only. No constructors
     /// from other elements in a mutual block, nothing from any nested
     /// construction.
-    pub(crate) all_ctor_names: Arc<[NamePtr<'a>]>,
+    pub all_ctor_names: Arc<[NamePtr<'a>]>,
 }
 
 impl<'a> InductiveData<'a> {

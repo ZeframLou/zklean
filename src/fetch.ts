@@ -1,4 +1,3 @@
-import { fileURLToPath } from "node:url";
 import { runNative } from "./native.ts";
 import type { Certificate } from "./types.ts";
 
@@ -10,14 +9,29 @@ export interface Mismatch {
   actual: string | undefined;
 }
 
-/** Download a certificate's source export. Nothing fetched is executed. */
-export async function download(url: string): Promise<string> {
-  if (url.startsWith("file:")) return Bun.file(fileURLToPath(url)).text();
-  const response = await fetch(url, { redirect: "follow" });
-  if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
-  const bytes = await response.arrayBuffer();
-  if (bytes.byteLength > MAX_EXPORT_BYTES) throw new Error(`${url}: too large`);
-  return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+/** Download a certificate's source export, bounded in size and time.
+ * Nothing fetched is executed. */
+export async function download(
+  url: string,
+  timeout = 600_000,
+): Promise<string> {
+  const response = await fetch(url, { signal: AbortSignal.timeout(timeout) });
+  if (!response.ok || !response.body)
+    throw new Error(`${url}: HTTP ${response.status}`);
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  const reader = response.body.getReader();
+  for (let read = await reader.read(); !read.done; read = await reader.read()) {
+    size += read.value.byteLength;
+    if (size > MAX_EXPORT_BYTES) {
+      await reader.cancel();
+      throw new Error(`${url}: too large`);
+    }
+    chunks.push(read.value);
+  }
+  return new TextDecoder("utf-8", { fatal: true }).decode(
+    Buffer.concat(chunks),
+  );
 }
 
 /** Check a source export with Nanoda and recompute every certified identity. */

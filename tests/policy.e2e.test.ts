@@ -1,10 +1,5 @@
 import { beforeAll, expect, test } from "bun:test";
-import {
-  checkAxioms,
-  createVerifier,
-  nativeBackend,
-  standardAxioms,
-} from "../src/index.ts";
+import { checkAxioms, createVerifier, standardAxioms } from "../src/index.ts";
 import { binary, buildNative, checked, input } from "./helpers.ts";
 import { runNative } from "../src/native.ts";
 
@@ -53,24 +48,20 @@ test("custom axioms are permitted only by their reviewed identities", async () =
   ).toBe("axiom-mismatch");
 });
 
-test("concurrent consumers share one real cryptographic verification", async () => {
-  const certificate = await Bun.file(
-    new URL("./fixtures/identity.certificate.json", import.meta.url),
-  ).json();
-  const profile = await Bun.file(
-    new URL("./fixtures/identity.verifier.json", import.meta.url),
-  ).json();
-  const native = nativeBackend({
-    binary,
-    verifierKey: profile.verifierKey,
-  });
+test("concurrent checks of one certificate share a single backend run", async () => {
+  const certificate = {
+    ...(await checked("identity", ["Demo.identity"])),
+    proof: "base64:AA==",
+    source: "https://example.com/identity.ndjson",
+  };
   let calls = 0;
   const verifier = createVerifier({
     backend: {
-      identity: native.identity,
-      async verify(value) {
+      identity: "test",
+      async verify() {
         calls++;
-        return native.verify(value);
+        await Bun.sleep(10);
+        return true;
       },
     },
   });
@@ -81,4 +72,4 @@ test("concurrent consumers share one real cryptographic verification", async () 
   );
   expect(results.every((result) => result.status === "verified")).toBe(true);
   expect(calls).toBe(1);
-}, 300_000);
+});

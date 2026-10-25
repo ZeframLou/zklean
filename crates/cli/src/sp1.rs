@@ -1,13 +1,34 @@
 //! Production proving always uses the CPU client, never an environment-selected mock.
-use crate::verify::Request;
 use anyhow::{ensure, Context, Result};
 use base64::{engine::general_purpose::STANDARD, Engine};
+use serde::Deserialize;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use sp1_sdk::{HashableKey, Prover, ProverClient, SP1Stdin};
-use zklean_core::commitment;
+use zklean_core::{commitment, ProveInput};
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct Request {
+    elf_path: String,
+    elf_sha256: String,
+    /// Fingerprint of the trusted guest key; never selected by a certificate.
+    verifier_key: String,
+    input: ProveInput,
+}
 
 pub fn run(command: &str, input: &str) -> Result<Value> {
+    if command == "prove" {
+        tracing_subscriber::fmt()
+            .with_env_filter(
+                tracing_subscriber::EnvFilter::try_from_default_env()
+                    .unwrap_or_else(|_| "warn,sp1_prover=info,sp1_sdk=info".into()),
+            )
+            .with_writer(std::io::stderr)
+            .with_span_events(tracing_subscriber::fmt::format::FmtSpan::CLOSE)
+            .with_ansi(false)
+            .init();
+    }
     // Installed archives keep the upstream proving data beside the bundled
     // tools. An explicit developer override still takes precedence.
     if std::env::var_os("SP1_GROTH16_CIRCUIT_PATH").is_none() {
@@ -34,14 +55,18 @@ pub fn run(command: &str, input: &str) -> Result<Value> {
         );
     }
     let request: Request = serde_json::from_str(input)?;
-    let elf = request.elf()?;
+    let elf = std::fs::read(&request.elf_path).context("read pinned guest ELF")?;
+    ensure!(
+        format!("{:x}", Sha256::digest(&elf)) == request.elf_sha256,
+        "guest ELF digest mismatch"
+    );
     let client = ProverClient::builder().cpu().build();
     let (pk, vk) = client.setup(&elf);
     ensure!(
         vk.bytes32() == request.verifier_key,
         "guest verifier identity mismatch"
     );
-    let input = request.input.context("missing prove input")?;
+    let input = request.input;
     let statement = zklean_core::check(&input)?;
     let mut stdin = SP1Stdin::new();
     stdin.write(&input);

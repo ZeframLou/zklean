@@ -1,10 +1,9 @@
 //! Shared checked computation. The SP1 guest and native diagnostics run this code.
-mod json;
-mod model;
-pub use model::{Export, Identities};
+mod identity;
 
 use anyhow::{ensure, Result};
-use nanoda_lib::{env::Declar, parser::parse_export_file, util::Config};
+use identity::{Environment, Reader};
+use nanoda_lib::{parser::parse_export_file, util::Config};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
@@ -40,49 +39,45 @@ pub struct Requirements {
 /// Nanoda panics on malformed proofs. In the guest that aborts execution and no
 /// proof can be produced. Native callers should execute this in a child process.
 pub fn check(input: &ProveInput) -> Result<Statement> {
-    let export = checked(&input.export)?;
     let claims = names(&input.claims)?;
-    for name in &claims {
-        ensure!(
-            export.kind(name)? == "thm",
-            "claim must name a theorem: {name}"
-        );
-        ensure!(
-            export.props.contains(name),
-            "claim is not a proposition: {name}"
-        );
-    }
-    let axioms = export.axioms(&claims)?;
-    let mut ids = Identities::new(&export);
-    Ok(Statement {
-        format: "zklean/1".into(),
-        claims: ids.all(&claims)?,
-        axioms: ids.all(&axioms)?,
+    checked(&input.export, |env| {
+        for name in &claims {
+            ensure!(
+                env.is_theorem(name)?,
+                "claim must be a theorem of a proposition: {name}"
+            );
+        }
+        let axioms = env.axioms(&claims)?;
+        Ok(Statement {
+            format: "zklean/1".into(),
+            claims: env.identities(&claims)?,
+            axioms: env.identities(&axioms)?,
+        })
     })
 }
 
 /// Identify locally trusted requirements without asserting their derivability:
 /// each claim is a proposition, proved or assumed.
 pub fn requirements(input: &ProveInput) -> Result<Requirements> {
-    let export = checked(&input.export)?;
     let claims = names(&input.claims)?;
-    for name in &claims {
-        export.kind(name)?;
-        ensure!(
-            export.props.contains(name),
-            "claim is not a proposition: {name}"
-        );
-    }
-    Ok(Requirements {
-        format: "zklean/requirements/1".into(),
-        claims: Identities::new(&export).all(&claims)?,
+    checked(&input.export, |env| {
+        for name in &claims {
+            ensure!(
+                env.is_proposition(name)?,
+                "claim is not a proposition: {name}"
+            );
+        }
+        Ok(Requirements {
+            format: "zklean/requirements/1".into(),
+            claims: env.identities(&claims)?,
+        })
     })
 }
 
 /// Identities of any declarations, for matching a source export to a certificate.
 pub fn identify(export: &str, names: &[String]) -> Result<Identified> {
-    let export = checked(export)?;
-    Identities::new(&export).all(&names.iter().cloned().collect())
+    let names = names.iter().cloned().collect();
+    checked(export, |env| env.identities(&names))
 }
 
 fn names(list: &[String]) -> Result<BTreeSet<String>> {
@@ -92,37 +87,20 @@ fn names(list: &[String]) -> Result<BTreeSet<String>> {
     Ok(names)
 }
 
-/// Check the entire supplied environment, so no unauthenticated external state
-/// enters, and record which declarations are proofs: their type is a Prop.
-fn checked(text: &str) -> Result<Export> {
-    let mut export = Export::parse(text)?;
-    // Admit every axiom: the statement reports each one the proofs use, with
-    // its identity, and recipients decide which to accept.
+/// Check the entire export, so no unauthenticated external state enters, then
+/// read it. Every axiom is admitted: statements report each one the proofs
+/// use, with its identity, and recipients decide which to accept.
+fn checked<A>(text: &str, f: impl FnOnce(&mut Reader<'_, '_, '_>) -> Result<A>) -> Result<A> {
     let config: Config = serde_json::from_value(serde_json::json!({
         "unsafe_permit_all_axioms": true,
         "unpermitted_axiom_hard_error": true,
         "num_threads": 1, "nat_extension": true, "string_extension": true,
         "print_axioms": false
     }))?;
-    let (checked, _) = parse_export_file(Cursor::new(text.as_bytes()), config)
+    let (file, _) = parse_export_file(Cursor::new(text.as_bytes()), config)
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
-    checked.check_all_declars();
-    for d in checked.declars.values() {
-        let info = *d.info();
-        if matches!(
-            d,
-            Declar::Axiom { .. }
-                | Declar::Theorem { .. }
-                | Declar::Definition { .. }
-                | Declar::Opaque { .. }
-        ) && checked.with_tc_and_declar(info, |tc| tc.is_prop(info.ty).0)
-        {
-            export
-                .props
-                .insert(checked.with_ctx(|ctx| render_name(ctx, info.name)));
-        }
-    }
-    Ok(export)
+    file.check_all_declars();
+    Environment::new(&file).with(f)
 }
 
 /// Sort recursively instead of relying on serde_json's optional map backend.
@@ -169,31 +147,4 @@ pub fn commitment(statement: &Statement) -> [u8; 32] {
     hash.update(b"zklean/statement/1\0");
     hash.update(canonical(statement).expect("serializable statement"));
     hash.finalize().into()
-}
-
-fn render_name<'t, 'p>(
-    ctx: &nanoda_lib::util::TcCtx<'t, 'p>,
-    name: nanoda_lib::util::NamePtr<'t>,
-) -> String {
-    use nanoda_lib::name::Name;
-    match ctx.read_name(name) {
-        Name::Anon => String::new(),
-        Name::Str(pre, s, _) => {
-            let prefix = render_name(ctx, pre);
-            let part = ctx.read_string(s);
-            if prefix.is_empty() {
-                part.to_string()
-            } else {
-                format!("{prefix}.{part}")
-            }
-        }
-        Name::Num(pre, n, _) => {
-            let prefix = render_name(ctx, pre);
-            if prefix.is_empty() {
-                n.to_string()
-            } else {
-                format!("{prefix}.{n}")
-            }
-        }
-    }
 }

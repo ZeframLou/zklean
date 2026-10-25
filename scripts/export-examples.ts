@@ -2,7 +2,7 @@
 import { resolve } from "node:path";
 import { main } from "../src/cli.ts";
 
-export const examples = [
+const examples = [
   {
     module: "Composition",
     file: "composition",
@@ -33,31 +33,17 @@ export const examples = [
     file: "prop-def",
     claims: ["Demo.assumed"],
   },
-  {
-    module: "ProofData",
-    file: "proof-data",
-    claims: ["Demo.checked_true"],
-  },
 ];
-if (import.meta.main) {
-  const exporter = process.argv[2];
-  if (!exporter)
-    throw new Error(
-      "usage: bun scripts/export-examples.ts PATH_TO_LEAN4EXPORT",
-    );
-  for (const example of examples) {
-    await main([
-      "export",
-      "--project",
-      resolve("examples/lean"),
-      "--module",
-      example.module,
-      "--exporter",
-      resolve(exporter),
-      "--claims",
-      example.claims.join(","),
-      "--out",
-      `tests/fixtures/${example.file}.ndjson`,
-    ]);
-  }
-}
+// The exporter comes from ZKLEAN_EXPORTER or scripts/setup-exporter.sh.
+for (const example of examples)
+  await main([
+    "export",
+    "--project",
+    resolve("examples/lean"),
+    "--module",
+    example.module,
+    "--claims",
+    example.claims.join(","),
+    "--out",
+    `tests/fixtures/${example.file}.ndjson`,
+  ]);

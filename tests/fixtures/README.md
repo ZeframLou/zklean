@@ -1,35 +1,14 @@
 # Test artifacts
 
-The `.ndjson` files are actual lean4export 3.1.0 output from `examples/lean` with
-Lean v4.36.0-rc1 and exporter commit df81913eee5519d5a88ae5b0fd701b5298cc29ab.
-Regenerate with `bun scripts/export-examples.ts PATH_TO_LEAN4EXPORT`.
+The `.ndjson` files are lean4export output for `examples/lean` with Lean
+v4.36.0-rc1 and exporter commit df81913eee5519d5a88ae5b0fd701b5298cc29ab.
+Regenerate them with `bun scripts/export-examples.ts`.
 
-Fixtures include valid proofs and explicit axiom assumptions. Negative tests
-corrupt proof terms and request absent or axiom declarations as claims.
-Negative tests reject unknown fields, multiple variant tags, and duplicate JSON
-keys (including escaped keys) before the checker and identity computation can diverge.
-`prop-def.ndjson` checks that a Prop-valued definition keeps its body in its
-identity. `composition.ndjson` covers multiple polymorphic guarantees and
-universe parameters.
+- `v1.ndjson`: the inventory example, with `Init`.
+- `identity.ndjson`: a one-line theorem, the source of the real certificate.
+- `composition.ndjson`: several polymorphic claims with universe parameters.
+- `axioms.ndjson`, `axiom-spoof.ndjson`: custom axioms, and a fake `propext`.
+- `prop-def.ndjson`: a Prop-valued definition, whose body must be in its identity.
 
-`guest.e2e.test.ts` executes the real compiled SP1 guest when
-`ZKLEAN_GUEST_ELF` is provided.
-
-`identity.certificate.json` and `composition.certificate.json` contain real locally
-generated SP1 5.2.4 Groth16 proofs. Each has 260 bytes of evidence: the circuit
-selector and Groth16 proof. Both use the SDK's pinned checker identity; a
-certificate cannot select a verification key.
-`identity.verifier.json` records the BN254 checker key, ELF digest, and SP1 version.
-CI rebuilds the guest and requires its identity to match the fixture.
-
-The crypto E2E tests accept the identity certificate through native, explicit
-WebAssembly, and default SDK verification. They reject altered evidence, a different valid
-statement, and wrong keys, without receiving the original Lean proof or guest ELF.
-
-Regenerate using `zklean pin` and `zklean prove` on `identity.ndjson`, then verify
-the resulting certificate with `zklean verify` before replacing the fixture.
-
-The composition certificate authenticates `Pipeline.compose` and `Pipeline.weaken`
-with no axioms. The benchmark checks both real certificates against their original
-exports and verifies them through native and WebAssembly backends. See
-[measured sizes, timings, and generation resources](../../docs/BENCHMARKS.md).
+`identity.certificate.json` is a real SP1 5.2.4 Groth16 certificate for
+`identity.ndjson`, proved with the guest pinned in `src/guest.json`.

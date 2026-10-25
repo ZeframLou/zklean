@@ -1,0 +1,399 @@
+//! Content identities of declarations in a checked Nanoda environment. An
+//! identity hashes a declaration's meaning with its whole dependency closure,
+//! so equal identities mean equal names, statements and definitions.
+use anyhow::{bail, ensure, Context, Result};
+use nanoda_lib::{
+    env::Declar,
+    expr::Expr,
+    level::Level,
+    name::Name,
+    util::{ExportFile, ExprPtr, LevelPtr, LevelsPtr, NamePtr, TcCtx},
+};
+use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+
+fn hash(domain: &str, value: &Value) -> Result<String> {
+    let mut digest = Sha256::new();
+    digest.update(domain.as_bytes());
+    digest.update(crate::canonical(value)?);
+    Ok(format!("{:x}", digest.finalize()))
+}
+
+/// A checked environment and the declarations whose type is a proposition.
+pub struct Environment<'p> {
+    file: &'p ExportFile<'p>,
+    props: HashSet<NamePtr<'p>>,
+}
+
+impl<'p> Environment<'p> {
+    pub fn new(file: &'p ExportFile<'p>) -> Self {
+        let mut props = HashSet::new();
+        for (name, d) in &file.declars {
+            if matches!(
+                d,
+                Declar::Axiom { .. }
+                    | Declar::Theorem { .. }
+                    | Declar::Definition { .. }
+                    | Declar::Opaque { .. }
+            ) {
+                let info = *d.info();
+                if file.with_tc_and_declar(info, |tc| tc.is_prop(info.ty).0) {
+                    props.insert(*name);
+                }
+            }
+        }
+        Self { file, props }
+    }
+
+    pub fn with<A>(&self, f: impl FnOnce(&mut Reader<'_, '_, 'p>) -> Result<A>) -> Result<A> {
+        self.file.with_ctx(|ctx| {
+            let mut names = HashMap::new();
+            let mut declars = HashMap::new();
+            for (name, d) in &self.file.declars {
+                names.insert(render(ctx, *name)?, *name);
+                declars.insert(*name, d);
+            }
+            f(&mut Reader {
+                ctx,
+                declars,
+                props: &self.props,
+                names,
+                ids: HashMap::new(),
+                groups: HashMap::new(),
+                nodes: HashMap::new(),
+                active: HashSet::new(),
+            })
+        })
+    }
+}
+
+pub struct Reader<'r, 'c, 'p> {
+    ctx: &'r mut TcCtx<'c, 'p>,
+    declars: HashMap<NamePtr<'c>, &'r Declar<'c>>,
+    props: &'r HashSet<NamePtr<'c>>,
+    names: HashMap<String, NamePtr<'c>>,
+    ids: HashMap<NamePtr<'c>, String>,
+    groups: HashMap<NamePtr<'c>, String>,
+    nodes: HashMap<(ExprPtr<'c>, Option<NamePtr<'c>>), String>,
+    active: HashSet<NamePtr<'c>>,
+}
+
+impl<'r, 'c> Reader<'r, 'c, '_> {
+    fn lookup(&self, name: &str) -> Result<(NamePtr<'c>, &'r Declar<'c>)> {
+        let ptr = *self
+            .names
+            .get(name)
+            .with_context(|| format!("unresolved declaration {name}"))?;
+        Ok((ptr, self.declars[&ptr]))
+    }
+
+    /// A theorem whose type is a proposition.
+    pub fn is_theorem(&self, name: &str) -> Result<bool> {
+        let (ptr, d) = self.lookup(name)?;
+        Ok(matches!(d, Declar::Theorem { .. }) && self.props.contains(&ptr))
+    }
+
+    /// Any declaration whose type is a proposition, proved or assumed.
+    pub fn is_proposition(&self, name: &str) -> Result<bool> {
+        Ok(self.props.contains(&self.lookup(name)?.0))
+    }
+
+    pub fn identities(&mut self, names: &BTreeSet<String>) -> Result<BTreeMap<String, String>> {
+        names
+            .iter()
+            .map(|n| Ok((n.clone(), self.id(self.lookup(n)?.0)?)))
+            .collect()
+    }
+
+    /// Every axiom the declarations depend on, through types, values and proofs.
+    pub fn axioms(&mut self, roots: &BTreeSet<String>) -> Result<BTreeSet<String>> {
+        let mut pending = roots
+            .iter()
+            .map(|n| Ok(self.lookup(n)?.0))
+            .collect::<Result<Vec<_>>>()?;
+        let (mut seen, mut exprs, mut axioms) = (HashSet::new(), HashSet::new(), BTreeSet::new());
+        while let Some(name) = pending.pop() {
+            if !seen.insert(name) {
+                continue;
+            }
+            let d = self.declars[&name];
+            let mut roots = vec![d.info().ty];
+            match d {
+                Declar::Axiom { .. } => {
+                    axioms.insert(render(self.ctx, name)?);
+                }
+                Declar::Theorem { val, .. }
+                | Declar::Definition { val, .. }
+                | Declar::Opaque { val, .. } => roots.push(*val),
+                Declar::Inductive(i) => {
+                    pending.extend(i.all_ind_names.iter().chain(i.all_ctor_names.iter()))
+                }
+                Declar::Constructor(c) => pending.push(c.inductive_name),
+                Declar::Recursor(r) => {
+                    pending.extend(r.all_inductives.iter());
+                    roots.extend(r.rec_rules.iter().map(|rule| rule.val));
+                }
+                Declar::Quot { .. } => {}
+            }
+            while let Some(e) = roots.pop() {
+                if !exprs.insert(e) {
+                    continue;
+                }
+                match self.ctx.read_expr(e) {
+                    Expr::Const { name, .. } => pending.push(name),
+                    Expr::Proj {
+                        ty_name, structure, ..
+                    } => {
+                        pending.push(ty_name);
+                        roots.push(structure);
+                    }
+                    Expr::NatLit { .. } => pending.push(self.lookup("Nat")?.0),
+                    Expr::StringLit { .. } => pending.push(self.lookup("String")?.0),
+                    Expr::App { fun, arg, .. } => roots.extend([fun, arg]),
+                    Expr::Pi {
+                        binder_type, body, ..
+                    }
+                    | Expr::Lambda {
+                        binder_type, body, ..
+                    } => roots.extend([binder_type, body]),
+                    Expr::Let {
+                        binder_type,
+                        val,
+                        body,
+                        ..
+                    } => roots.extend([binder_type, val, body]),
+                    Expr::Var { .. } | Expr::Sort { .. } => {}
+                    Expr::Local { .. } => bail!("free variable in export"),
+                }
+            }
+        }
+        Ok(axioms)
+    }
+
+    fn id(&mut self, name: NamePtr<'c>) -> Result<String> {
+        if let Some(id) = self.ids.get(&name) {
+            return Ok(id.clone());
+        }
+        ensure!(self.active.insert(name), "cyclic declaration identity");
+        let d = self.declars[&name];
+        let id = if let Some(first) = self.group_of(name) {
+            let group = self.group(first)?;
+            hash(
+                "zklean/declaration/1\0",
+                &json!({"member": {"group": group, "name": render(self.ctx, name)?}}),
+            )?
+        } else {
+            let info = *d.info();
+            let mut fields = json!({
+                "name": render(self.ctx, name)?,
+                "levelParams": self.params(info.uparams)?,
+                "type": self.node(info.ty, None)?,
+            });
+            // A proof is irrelevant: a proposition is identified by its statement.
+            let kind = if self.props.contains(&name) {
+                "prop"
+            } else {
+                match d {
+                    Declar::Definition { val, .. } | Declar::Opaque { val, .. } => {
+                        fields["value"] = Value::String(self.node(*val, None)?);
+                        if matches!(d, Declar::Definition { .. }) {
+                            "def"
+                        } else {
+                            "opaque"
+                        }
+                    }
+                    Declar::Axiom { .. } => "axiom",
+                    Declar::Quot { .. } => "quot",
+                    _ => bail!("unexpected declaration kind"),
+                }
+            };
+            hash("zklean/declaration/1\0", &json!({ kind: fields }))?
+        };
+        self.active.remove(&name);
+        self.ids.insert(name, id.clone());
+        Ok(id)
+    }
+
+    /// The kernel's input for a mutual inductive block: its universe
+    /// parameters, parameter count, and types with their constructors.
+    /// Recursors are derived from these, and references inside the block
+    /// carry no identity, which breaks the cycle.
+    fn group(&mut self, first: NamePtr<'c>) -> Result<String> {
+        if let Some(id) = self.groups.get(&first) {
+            return Ok(id.clone());
+        }
+        let Declar::Inductive(head) = self.declars[&first] else {
+            bail!("inductive group without an inductive type");
+        };
+        let mut types = Vec::new();
+        for ty in head.all_ind_names.iter() {
+            let Declar::Inductive(i) = self.declars[ty] else {
+                bail!("inductive group member is not an inductive type");
+            };
+            let mut ctors = Vec::new();
+            for ctor in i.all_ctor_names.iter() {
+                let ty = self.declars[ctor].info().ty;
+                ctors.push(
+                    json!({"name": render(self.ctx, *ctor)?, "type": self.node(ty, Some(first))?}),
+                );
+            }
+            types.push(json!({
+                "name": render(self.ctx, *ty)?,
+                "type": self.node(i.info.ty, Some(first))?,
+                "ctors": ctors,
+            }));
+        }
+        let id = hash(
+            "zklean/declaration/1\0",
+            &json!({"inductive": {
+                "levelParams": self.params(head.info.uparams)?,
+                "numParams": head.num_params,
+                "types": types,
+            }}),
+        )?;
+        self.groups.insert(first, id.clone());
+        Ok(id)
+    }
+
+    /// The first type of the inductive block declaring `name`, if any.
+    fn group_of(&self, name: NamePtr<'c>) -> Option<NamePtr<'c>> {
+        match self.declars.get(&name)? {
+            Declar::Inductive(i) => Some(i.all_ind_names[0]),
+            Declar::Constructor(c) => match self.declars.get(&c.inductive_name)? {
+                Declar::Inductive(i) => Some(i.all_ind_names[0]),
+                _ => None,
+            },
+            Declar::Recursor(r) => Some(r.all_inductives[0]),
+            _ => None,
+        }
+    }
+
+    /// A constant reference: its name and identity, or no identity inside the
+    /// inductive group being hashed.
+    fn reference(&mut self, name: NamePtr<'c>, group: Option<NamePtr<'c>>) -> Result<Value> {
+        let inside = group.is_some() && self.group_of(name) == group;
+        Ok(json!({
+            "name": render(self.ctx, name)?,
+            "id": if inside { Value::Null } else { Value::String(self.id(name)?) },
+        }))
+    }
+
+    /// Nodes are hashed Merkle-style. Binder names, binder annotations and let
+    /// hints do not affect meaning and are omitted.
+    fn node(&mut self, e: ExprPtr<'c>, group: Option<NamePtr<'c>>) -> Result<String> {
+        if let Some(h) = self.nodes.get(&(e, group)) {
+            return Ok(h.clone());
+        }
+        let node = match self.ctx.read_expr(e) {
+            Expr::Var { dbj_idx, .. } => json!({"bvar": dbj_idx}),
+            Expr::Sort { level, .. } => json!({"sort": self.level(level)?}),
+            Expr::Const { name, levels, .. } => {
+                let mut r = self.reference(name, group)?;
+                r["us"] = self.levels(levels)?;
+                json!({ "const": r })
+            }
+            Expr::App { fun, arg, .. } => {
+                json!({"app": {"fn": self.node(fun, group)?, "arg": self.node(arg, group)?}})
+            }
+            Expr::Pi {
+                binder_type, body, ..
+            } => json!({"forallE": {
+                "type": self.node(binder_type, group)?, "body": self.node(body, group)?}}),
+            Expr::Lambda {
+                binder_type, body, ..
+            } => json!({"lam": {
+                "type": self.node(binder_type, group)?, "body": self.node(body, group)?}}),
+            Expr::Let {
+                binder_type,
+                val,
+                body,
+                ..
+            } => json!({"letE": {
+                "type": self.node(binder_type, group)?,
+                "value": self.node(val, group)?,
+                "body": self.node(body, group)?}}),
+            Expr::Proj {
+                ty_name,
+                idx,
+                structure,
+                ..
+            } => {
+                let mut r = self.reference(ty_name, group)?;
+                r["idx"] = json!(idx);
+                r["struct"] = Value::String(self.node(structure, group)?);
+                json!({ "proj": r })
+            }
+            Expr::NatLit { ptr, .. } => {
+                let value = self
+                    .ctx
+                    .read_bignum(ptr)
+                    .context("natural literal")?
+                    .to_string();
+                json!({"natVal": {"value": value, "type": self.id(self.lookup("Nat")?.0)?}})
+            }
+            Expr::StringLit { ptr, .. } => {
+                let value = self.ctx.read_string(ptr).to_string();
+                json!({"strVal": {"value": value, "type": self.id(self.lookup("String")?.0)?}})
+            }
+            Expr::Local { .. } => bail!("free variable in export"),
+        };
+        let h = hash("zklean/node/1\0", &node)?;
+        self.nodes.insert((e, group), h.clone());
+        Ok(h)
+    }
+
+    fn level(&mut self, l: LevelPtr<'c>) -> Result<String> {
+        let node = match self.ctx.read_level(l) {
+            Level::Zero => json!({"zero": true}),
+            Level::Succ(l, _) => json!({"succ": self.level(l)?}),
+            Level::Max(a, b, _) => json!({"max": [self.level(a)?, self.level(b)?]}),
+            Level::IMax(a, b, _) => json!({"imax": [self.level(a)?, self.level(b)?]}),
+            Level::Param(n, _) => json!({"param": render(self.ctx, n)?}),
+        };
+        hash("zklean/node/1\0", &node)
+    }
+
+    fn levels(&mut self, ls: LevelsPtr<'c>) -> Result<Value> {
+        let ls = self.ctx.read_levels(ls);
+        Ok(Value::Array(
+            ls.iter()
+                .map(|l| Ok(Value::String(self.level(*l)?)))
+                .collect::<Result<_>>()?,
+        ))
+    }
+
+    fn params(&mut self, ls: LevelsPtr<'c>) -> Result<Value> {
+        let ls = self.ctx.read_levels(ls);
+        let mut names = Vec::new();
+        for l in ls.iter() {
+            let Level::Param(n, _) = self.ctx.read_level(*l) else {
+                bail!("universe parameter is not a name");
+            };
+            names.push(Value::String(render(self.ctx, n)?));
+        }
+        Ok(Value::Array(names))
+    }
+}
+
+/// Dotted Lean name. Components that would make the rendering ambiguous (empty,
+/// containing a dot, or all digits like a numeric component) are rejected.
+fn render<'c>(ctx: &TcCtx<'c, '_>, name: NamePtr<'c>) -> Result<String> {
+    let (prefix, part) = match ctx.read_name(name) {
+        Name::Anon => return Ok(String::new()),
+        Name::Str(pre, s, _) => {
+            let s = ctx.read_string(s).to_string();
+            ensure!(
+                !s.is_empty() && !s.contains('.') && !s.chars().all(|c| c.is_ascii_digit()),
+                "ambiguous name component"
+            );
+            (render(ctx, pre)?, s)
+        }
+        Name::Num(pre, n, _) => (render(ctx, pre)?, n.to_string()),
+    };
+    Ok(if prefix.is_empty() {
+        part
+    } else {
+        format!("{prefix}.{part}")
+    })
+}

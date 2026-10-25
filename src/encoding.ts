@@ -78,7 +78,7 @@ export function parseStatement(value: unknown): Statement {
 export function parseCertificate(value: unknown): Certificate {
   const { proof, source, ...rest } = object(value);
   if (decodeBase64(proof).length === 0) throw new Error("empty proof");
-  if (typeof source !== "string" || !/^(https|file):\/\/\S+$/.test(source))
+  if (typeof source !== "string" || !/^https:\/\/\S+$/.test(source))
     throw new Error("invalid certificate source");
   // Own the validated data so caller mutation cannot alter an in-flight check.
   return { ...parseStatement(rest), proof: proof as string, source };

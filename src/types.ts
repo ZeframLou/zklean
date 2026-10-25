@@ -12,8 +12,8 @@ export interface Statement {
 export interface Certificate extends Statement {
   /** Groth16 proof that the pinned checker accepted the statement. */
   proof: string;
-  /** URL (https or file) of a lean4export file containing every claim and
-   * axiom. Untrusted: it must reproduce the certified identities. */
+  /** https URL of a lean4export file containing every claim and axiom.
+   * Untrusted: it must reproduce the certified identities. */
   source: string;
 }
 export interface Requirements {
