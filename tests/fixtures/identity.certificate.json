@@ -3,8 +3,7 @@
   "claims": {
     "Demo.identity": "b1daf96ccf270647ee70f044fefae31c916d7556380b5b75916376fc7bafc732"
   },
-  "definitions": {},
   "axioms": {},
-  "proof": "base64:pFlMWQAJODKMywwn9oAB43XawU/KzdIc+zuGZQppLeH3/4phHlXmaFF2LjboQN9leZVxWDf0TsSEgc90bluwzWm7xS8WZZ15n0uHDCqIVKrTXmzDM0vq6I2FMdkg/sfOkGOARyXuoJF0+RW57Mffe8RMj+5Sd4aSRhxK1gJvmJaPnnNPKy/C+Sax/9TE6J3DRT+CqPxk7Iwg+6p90AYPKV7wEKEBhQpGOi45Oi+etoruJlOsY/oQQHGdyef5t9VXUIsB6A4zzWu8eHX46DNyu4HEExUCqGnpRXrJrHbTKbti3rU1F6uDsc7652Mz7YB5J0qGFRecbV1480w0Rw9WkW1p2NI=",
+  "proof": "base64:Q4iiHAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAC+FDumYl01swA5QzQgUsJjAW/reRm0oVzJA0FfyU1IAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAmD963O/UuPyn3e/j8pBhPScwRweRFU7qQaFaRVszeCBSRVWkb+aq8WOgWib0XitBNjVEORpjKNkIFXuZ817jgMq9qowSq0Kc71diwlKLFDf85C3AaGxFwPW0WVJ7yurx0uAhg4dzlkfBENFdiA4qFF8ixNVR196ykpUsmRrg4lCnFMaWp16QCnpGSyevyI9tp8eXKv7QaiXmfDWE8xwVYvXWBHZi5DrI48zITRPuk+3mNujkslJrWT1E/fH7SB0yyRsRzgbiLFL102vdaXLxqzLU2fmCu7v1kp1JKVSJ6HLJebMqThCf0rSfHe02s9kVURkx4ojpXH8pRyJwMk3nQ=",
   "source": "https://raw.githubusercontent.com/ZeframLou/zklean/main/tests/fixtures/identity.ndjson"
 }
