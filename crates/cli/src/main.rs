@@ -38,7 +38,17 @@ struct Export {
     export: String,
 }
 
+/// Checking recurses over expressions and dependencies, so run it with far more
+/// stack than the main thread's.
 fn main() -> Result<()> {
+    std::thread::Builder::new()
+        .stack_size(1 << 30)
+        .spawn(run)?
+        .join()
+        .map_err(|_| anyhow::anyhow!("zklean-native panicked"))?
+}
+
+fn run() -> Result<()> {
     let mut output = json_output()?;
     let command = std::env::args()
         .nth(1)

@@ -236,6 +236,11 @@ impl<'r, 'c> Reader<'r, 'c, '_> {
             let Declar::Inductive(i) = self.declars[ty] else {
                 bail!("inductive group member is not an inductive type");
             };
+            // Members are found through their own lists, which must agree.
+            ensure!(
+                i.all_ind_names == head.all_ind_names,
+                "inductive block members list the block differently"
+            );
             let mut ctors = Vec::new();
             for ctor in i.all_ctor_names.iter() {
                 let ty = self.declars[ctor].info().ty;

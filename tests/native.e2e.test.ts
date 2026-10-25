@@ -190,3 +190,55 @@ test("an ambiguous export with duplicate JSON keys is rejected", async () => {
     }),
   ).rejects.toThrow();
 });
+
+test("the pinned constants are exactly those the checker treats by name", async () => {
+  const quoted = (text: string) =>
+    [...text.matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+  const nanoda = await Bun.file("vendor/nanoda/src/util.rs").text();
+  const cached = [...nanoda.matchAll(/self\.find_name\("([^"]+)"\)/g)].map(
+    (m) => m[1],
+  );
+  const lib = await Bun.file("crates/core/src/lib.rs").text();
+  const pinned = quoted(
+    lib.slice(
+      lib.indexOf("pub const KERNEL"),
+      lib.indexOf("];", lib.indexOf("pub const KERNEL")),
+    ),
+  );
+  const script = await Bun.file("scripts/pin.ts").text();
+  const listed = quoted(
+    script.slice(
+      script.indexOf("const kernel"),
+      script.indexOf("];", script.indexOf("const kernel")),
+    ),
+  );
+  const table = Object.keys(
+    await Bun.file("crates/core/src/kernel.json").json(),
+  );
+  for (const names of [pinned, listed, table])
+    expect([...names].sort()).toEqual([...cached].sort());
+});
+
+test("inductive metadata in an export is checked, not trusted", async () => {
+  const request = await input("prop-def", ["Demo.assumed"]);
+  await expect(
+    runNative(binary, "requirements", {
+      ...request,
+      export: request.export.replace('"isRec":false', '"isRec":true'),
+    }),
+  ).rejects.toThrow();
+  // Members of a mutual block must list it in the same order.
+  const claims = ["Shapes.even_zero"];
+  const mutual = await input("mutual", claims);
+  const lines = mutual.export.split("\n").map((line) => {
+    if (!line.includes('"inductive"')) return line;
+    const row = JSON.parse(line);
+    const types = row.inductive.types;
+    if (types.length !== 2) return line;
+    types[1].all = [...types[1].all].reverse();
+    return JSON.stringify(row);
+  });
+  await expect(
+    runNative(binary, "check", { ...mutual, export: lines.join("\n") }),
+  ).rejects.toThrow();
+});
