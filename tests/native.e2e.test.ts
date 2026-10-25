@@ -243,9 +243,11 @@ test("inductive metadata in an export is checked, not trusted", async () => {
   ).rejects.toThrow();
 });
 
-test("identities do not recurse through long dependency chains", async () => {
-  // zklean-native runs with the SP1 guest's 2 MiB stack, so passing here
-  // means the guest can prove it too.
+test("identities recurse through neither dependency chains nor deep terms", async () => {
+  // zklean-native checks with about the SP1 guest's 2 MiB stack.
   const value = await checked("chain", ["Chain.top"]);
   expect(Object.keys(value.claims)).toEqual(["Chain.top"]);
+  // Nor over expression depth: a 5,000-deep let chain within Nanoda's limit.
+  const deep = await checked("deep", ["Deep.f_ok"]);
+  expect(Object.keys(deep.claims)).toEqual(["Deep.f_ok"]);
 });

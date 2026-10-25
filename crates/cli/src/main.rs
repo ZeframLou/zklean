@@ -38,16 +38,18 @@ struct Export {
     export: String,
 }
 
-/// Run with the SP1 guest's 2 MiB stack, so whatever checks here can be proved.
-fn main() -> Result<()> {
+/// Checking runs with about the SP1 guest's 2 MiB stack, so an export that
+/// checks here is unlikely to exhaust the guest's. Native and RISC-V frames
+/// differ, so the limit is approximate.
+fn guest_stack<T: Send + 'static>(f: impl FnOnce() -> Result<T> + Send + 'static) -> Result<T> {
     std::thread::Builder::new()
         .stack_size(2 << 20)
-        .spawn(run)?
+        .spawn(f)?
         .join()
-        .map_err(|_| anyhow::anyhow!("zklean-native panicked"))?
+        .map_err(|_| anyhow::anyhow!("check panicked"))?
 }
 
-fn run() -> Result<()> {
+fn main() -> Result<()> {
     let mut output = json_output()?;
     let command = std::env::args()
         .nth(1)
@@ -57,7 +59,7 @@ fn run() -> Result<()> {
     let result = match command.as_str() {
         "check" => {
             let request: ProveInput = serde_json::from_str(&input)?;
-            serde_json::to_value(zklean_core::check(&request)?)?
+            serde_json::to_value(guest_stack(move || zklean_core::check(&request))?)?
         }
         // The statement digest, so tests can compare Rust and TypeScript.
         "commitment" => {
@@ -70,17 +72,21 @@ fn run() -> Result<()> {
         }
         "requirements" => {
             let request: ProveInput = serde_json::from_str(&input)?;
-            serde_json::to_value(zklean_core::requirements(&request)?)?
+            serde_json::to_value(guest_stack(move || zklean_core::requirements(&request))?)?
         }
         #[cfg(feature = "prover")]
         "prove" | "identity" => sp1::run(&command, &input)?,
         "kernel" => {
             let request: Export = serde_json::from_str(&input)?;
-            serde_json::to_value(zklean_core::kernel_identities(&request.export)?)?
+            serde_json::to_value(guest_stack(move || {
+                zklean_core::kernel_identities(&request.export)
+            })?)?
         }
         "identify" => {
             let request: Identify = serde_json::from_str(&input)?;
-            serde_json::to_value(zklean_core::identify(&request.export, &request.names)?)?
+            serde_json::to_value(guest_stack(move || {
+                zklean_core::identify(&request.export, &request.names)
+            })?)?
         }
         #[cfg(feature = "execute")]
         "execute" => execute::run(&input)?,

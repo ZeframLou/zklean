@@ -44,6 +44,11 @@ const examples = [
     claims: ["Chain.top"],
   },
   {
+    module: "Deep",
+    file: "deep",
+    claims: ["Deep.f_ok"],
+  },
+  {
     module: "PropDef",
     file: "prop-def",
     claims: ["Demo.assumed"],

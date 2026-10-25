@@ -213,7 +213,6 @@ impl<'r, 'c> Reader<'r, 'c, '_> {
                 _ if self.props.contains(&name) => ("prop", None),
                 Declar::Definition { val, .. } => ("def", Some(*val)),
                 Declar::Opaque { val, .. } => ("opaque", Some(*val)),
-                Declar::Theorem { val, .. } => ("thm", Some(*val)),
                 Declar::Axiom { .. } => ("axiom", None),
                 Declar::Quot { .. } => ("quot", None),
                 _ => bail!("unexpected declaration kind"),
@@ -293,12 +292,55 @@ impl<'r, 'c> Reader<'r, 'c, '_> {
         }))
     }
 
-    /// Nodes are hashed Merkle-style. Binder names, binder annotations and let
-    /// hints do not affect meaning and are omitted.
-    fn node(&mut self, e: ExprPtr<'c>, group: Option<NamePtr<'c>>) -> Result<String> {
-        if let Some(h) = self.nodes.get(&(e, group)) {
-            return Ok(h.clone());
+    /// Nodes are hashed Merkle-style, children first. An explicit work stack
+    /// keeps deep expressions from exhausting the guest's stack.
+    fn node(&mut self, root: ExprPtr<'c>, group: Option<NamePtr<'c>>) -> Result<String> {
+        let mut work = vec![root];
+        while let Some(&e) = work.last() {
+            if self.nodes.contains_key(&(e, group)) {
+                work.pop();
+                continue;
+            }
+            let pending: Vec<_> = self
+                .children(e)
+                .into_iter()
+                .filter(|c| !self.nodes.contains_key(&(*c, group)))
+                .collect();
+            if pending.is_empty() {
+                work.pop();
+                let h = self.hash_node(e, group)?;
+                self.nodes.insert((e, group), h);
+            } else {
+                work.extend(pending);
+            }
         }
+        Ok(self.nodes[&(root, group)].clone())
+    }
+
+    fn children(&self, e: ExprPtr<'c>) -> Vec<ExprPtr<'c>> {
+        match self.ctx.read_expr(e) {
+            Expr::App { fun, arg, .. } => vec![fun, arg],
+            Expr::Pi {
+                binder_type, body, ..
+            }
+            | Expr::Lambda {
+                binder_type, body, ..
+            } => vec![binder_type, body],
+            Expr::Let {
+                binder_type,
+                val,
+                body,
+                ..
+            } => vec![binder_type, val, body],
+            Expr::Proj { structure, .. } => vec![structure],
+            _ => vec![],
+        }
+    }
+
+    /// One node, its children already hashed. Binder names, binder annotations
+    /// and let hints do not affect meaning and are omitted.
+    fn hash_node(&mut self, e: ExprPtr<'c>, group: Option<NamePtr<'c>>) -> Result<String> {
+        let h = |this: &Self, c: ExprPtr<'c>| this.nodes[&(c, group)].clone();
         let node = match self.ctx.read_expr(e) {
             Expr::Var { dbj_idx, .. } => json!({"bvar": dbj_idx}),
             Expr::Sort { level, .. } => json!({"sort": self.level(level)?}),
@@ -308,25 +350,23 @@ impl<'r, 'c> Reader<'r, 'c, '_> {
                 json!({ "const": r })
             }
             Expr::App { fun, arg, .. } => {
-                json!({"app": {"fn": self.node(fun, group)?, "arg": self.node(arg, group)?}})
+                json!({"app": {"fn": h(self, fun), "arg": h(self, arg)}})
             }
             Expr::Pi {
                 binder_type, body, ..
-            } => json!({"forallE": {
-                "type": self.node(binder_type, group)?, "body": self.node(body, group)?}}),
+            } => json!({"forallE": {"type": h(self, binder_type), "body": h(self, body)}}),
             Expr::Lambda {
                 binder_type, body, ..
-            } => json!({"lam": {
-                "type": self.node(binder_type, group)?, "body": self.node(body, group)?}}),
+            } => json!({"lam": {"type": h(self, binder_type), "body": h(self, body)}}),
             Expr::Let {
                 binder_type,
                 val,
                 body,
                 ..
             } => json!({"letE": {
-                "type": self.node(binder_type, group)?,
-                "value": self.node(val, group)?,
-                "body": self.node(body, group)?}}),
+                "type": h(self, binder_type),
+                "value": h(self, val),
+                "body": h(self, body)}}),
             Expr::Proj {
                 ty_name,
                 idx,
@@ -335,7 +375,7 @@ impl<'r, 'c> Reader<'r, 'c, '_> {
             } => {
                 let mut r = self.reference(ty_name, group)?;
                 r["idx"] = json!(idx);
-                r["struct"] = Value::String(self.node(structure, group)?);
+                r["struct"] = Value::String(h(self, structure));
                 json!({ "proj": r })
             }
             Expr::NatLit { ptr, .. } => {
@@ -352,9 +392,7 @@ impl<'r, 'c> Reader<'r, 'c, '_> {
             }
             Expr::Local { .. } => bail!("free variable in export"),
         };
-        let h = hash("zklean/node/1\0", &node)?;
-        self.nodes.insert((e, group), h.clone());
-        Ok(h)
+        hash("zklean/node/1\0", &node)
     }
 
     fn level(&mut self, l: LevelPtr<'c>) -> Result<String> {

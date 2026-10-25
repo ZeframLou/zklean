@@ -59,8 +59,7 @@ for a reference inside the inductive group being hashed.
   identity. A definition whose *value* is a proposition, such as
   `def Ok : Prop := …`, is not a proof and keeps its value.
 - Otherwise a definition is `{def:{name, levelParams, type, value}}`, an opaque
-  `{opaque:{…}}` and a theorem whose type is not a proposition `{thm:{…}}`
-  likewise, an axiom `{axiom:{name, levelParams, type}}` and a
+  `{opaque:{…}}` likewise, an axiom `{axiom:{name, levelParams, type}}` and a
   quotient primitive `{quot:{name, levelParams, type}}`. Reducibility hints do
   not affect meaning and are omitted; Nanoda rejects unsafe and partial
   declarations.

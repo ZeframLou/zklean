@@ -4,4 +4,4 @@ defaultTargets = ["ZKLeanExamples"]
 
 [[lean_lib]]
 name = "ZKLeanExamples"
-roots = ["Inventory", "V1", "Axioms", "Identity", "AxiomPolicy", "AxiomSpoof", "Composition", "PropDef", "Mutual", "MutualVariant", "MutualSwapped", "KernelSpoof", "V1Spec", "Chain"]
+roots = ["Inventory", "V1", "Axioms", "Identity", "AxiomPolicy", "AxiomSpoof", "Composition", "PropDef", "Mutual", "MutualVariant", "MutualSwapped", "KernelSpoof", "V1Spec", "Chain", "Deep"]

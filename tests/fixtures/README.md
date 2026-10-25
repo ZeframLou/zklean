@@ -13,7 +13,8 @@ Regenerate them with `bun scripts/export-examples.ts`.
   and reordered, and a nested inductive.
 - `kernel-spoof.ndjson`: a redefined `Nat.gcd` that would prove `False`.
 - `v1-spec.ndjson`: the inventory claim stated as an axiom, without its proof.
-- `chain.ndjson`: a 2,000-deep chain of definitions.
+- `chain.ndjson`, `deep.ndjson`: a 2,000-deep chain of definitions and a
+  5,000-deep `let` chain.
 
 `identity.certificate.json` is a real SP1 5.2.4 Groth16 certificate for
 `identity.ndjson`, which must be re-proved whenever the guest in
