@@ -24,7 +24,14 @@ pub fn run(input: &str) -> Result<Value> {
         .execute(elf.into(), stdin)
         .run()
         .context("guest execution failed")?;
-    let statement = zklean_core::check(&request.input)?;
+    // Execution succeeds even when the guest panics; only the exit code says so.
+    ensure!(
+        report.exit_code == 0,
+        "guest execution failed with exit code {}",
+        report.exit_code
+    );
+    let input = request.input;
+    let statement = crate::guest_stack(move || zklean_core::check(&input))?;
     ensure!(
         public_values.as_slice() == commitment(&statement),
         "guest/native commitment mismatch"

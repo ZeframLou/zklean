@@ -38,12 +38,12 @@ struct Export {
     export: String,
 }
 
-/// Checking runs with about the SP1 guest's 2 MiB stack, so an export that
-/// checks here is unlikely to exhaust the guest's. Native and RISC-V frames
-/// differ, so the limit is approximate.
+/// Nanoda recurses over terms. The SP1 6 guest's stack shares most of its
+/// 2 GiB address space with the heap, so checking runs with a comparably large
+/// stack, and a checker panic becomes an error.
 fn guest_stack<T: Send + 'static>(f: impl FnOnce() -> Result<T> + Send + 'static) -> Result<T> {
     std::thread::Builder::new()
-        .stack_size(2 << 20)
+        .stack_size(1 << 30)
         .spawn(f)?
         .join()
         .map_err(|_| anyhow::anyhow!("check panicked"))?

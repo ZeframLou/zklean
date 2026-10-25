@@ -75,6 +75,8 @@ export function parseStatement(value: unknown): Statement {
     throw new Error("duplicate declaration name");
   return structuredClone(statement);
 }
+/** The SP1 release whose verifier and guest this profile pins. */
+export const SP1_VERSION = "6.10.0";
 /** SP1 6's Groth16 encoding: a 4-byte circuit-key selector, the exit code,
  * verifier-key root and proof nonce (32 bytes each), and the 256-byte proof. */
 export const PROOF_BYTES = 356;

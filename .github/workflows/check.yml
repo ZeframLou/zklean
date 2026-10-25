@@ -87,7 +87,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: '1.24'
-      - run: sudo apt-get install -y protobuf-compiler
+      - run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
       - run: cargo build --release --locked -p zklean-native --features prover,execute
       # The committed verifier profile must be this guest's.
       - run: ZKLEAN_GUEST_ELF="$PWD/crates/guest/target/elf-compilation/riscv64im-succinct-zkvm-elf/release/zklean-guest" bun src/cli.ts pin --out /tmp/guest.json

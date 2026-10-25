@@ -312,7 +312,7 @@ impl<'r, 'c> Reader<'r, 'c, '_> {
     }
 
     /// Nodes are hashed Merkle-style, children first. An explicit work stack
-    /// keeps deep expressions from exhausting the guest's stack.
+    /// keeps deep expressions from exhausting the stack.
     fn node(&mut self, root: ExprPtr<'c>, group: Option<NamePtr<'c>>) -> Result<String> {
         let mut work = vec![root];
         while let Some(&e) = work.last() {

@@ -31,14 +31,19 @@ test("the pinned verifier accepts the real Groth16 certificate and nothing else"
     '"str":"renamed"',
   );
   const renamed = (await runNative(binary, "check", request)) as Certificate;
-  const altered = Buffer.from(certificate.proof.slice(7), "base64");
-  altered[40] = altered[40]! ^ 1;
+  const proof = Buffer.from(certificate.proof.slice(7), "base64");
+  // Selector, exit code, verifier-key root, nonce and Groth16 proof.
+  const altered = [0, 35, 40, 80, 200].map((byte) => {
+    const copy = Buffer.from(proof);
+    copy[byte] = copy[byte]! ^ 1;
+    return { ...certificate, proof: `base64:${copy.toString("base64")}` };
+  });
   for (const forged of [
     { ...renamed, proof: certificate.proof, source: certificate.source },
-    { ...certificate, proof: `base64:${altered.toString("base64")}` },
+    ...altered,
     {
       ...certificate,
-      proof: `base64:${altered.subarray(1).toString("base64")}`,
+      proof: `base64:${proof.subarray(1).toString("base64")}`,
     },
     { ...certificate, axioms: { propext: standardAxioms.propext! } },
   ])

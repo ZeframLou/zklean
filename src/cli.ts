@@ -8,7 +8,12 @@ import { createVerifier } from "./verifier.ts";
 import { exportModule, findTools, profile } from "./tooling.ts";
 import { checkAxioms, standardAxioms } from "./policy.ts";
 import type { Statement, Policy } from "./types.ts";
-import { identified, parseCertificate, parseSource } from "./encoding.ts";
+import {
+  SP1_VERSION,
+  identified,
+  parseCertificate,
+  parseSource,
+} from "./encoding.ts";
 import { download, matchSource } from "./fetch.ts";
 
 const help = `ZKLean — check and certify Lean propositions
@@ -121,7 +126,7 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
       });
       return output({
         format: "zklean/verifier-profile/1",
-        sp1Version: "6.10.0",
+        sp1Version: SP1_VERSION,
         ...(identity as object),
       });
     }

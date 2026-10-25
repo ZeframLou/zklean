@@ -1,27 +1,12 @@
-import { beforeAll, expect, test } from "bun:test";
-import { binary, input, root } from "./helpers.ts";
+import { expect, test } from "bun:test";
+import { input } from "./helpers.ts";
 import { runNative } from "../src/native.ts";
+import { findTools } from "../src/tooling.ts";
 
+// A dedicated CI job builds the real ELF with cargo-prove and zklean-native
+// with the execute feature. No mock VM is used.
 const elfPath = process.env.ZKLEAN_GUEST_ELF;
-// Dedicated CI job builds this real ELF with cargo-prove. No mock VM is used.
-beforeAll(async () => {
-  if (!elfPath) return;
-  const child = Bun.spawn(
-    [
-      "cargo",
-      "build",
-      "--release",
-      "--locked",
-      "-p",
-      "zklean-native",
-      "--features",
-      "execute",
-    ],
-    { cwd: root, stdout: "inherit", stderr: "inherit" },
-  );
-  if ((await child.exited) !== 0)
-    throw new Error("guest executor build failed");
-}, 300_000);
+const binary = elfPath ? (await findTools()).binary : "";
 
 test.skipIf(!elfPath)(
   "SP1 executes Nanoda and commits the same statement as native checking",

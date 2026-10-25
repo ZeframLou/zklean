@@ -3,7 +3,12 @@ import workerPath from "./groth16.worker.js" with { type: "file" };
 import wasmPath from "./verifier.wasm" with { type: "file" };
 import { Worker } from "node:worker_threads";
 import profile from "./guest.json";
-import { PROOF_BYTES, decodeBase64, statementId } from "./encoding.ts";
+import {
+  PROOF_BYTES,
+  SP1_VERSION,
+  decodeBase64,
+  statementId,
+} from "./encoding.ts";
 import type { ProofBackend } from "./types.ts";
 
 /** The checker key is trusted application configuration, never certificate data. */
@@ -13,9 +18,10 @@ export function groth16Backend(
   if (!/^0x[0-9a-f]{64}$/.test(verifierKey))
     throw new Error("expected a pinned SP1 BN254 guest key");
   return {
-    identity: `sp1:6.10.0:groth16:${verifierKey}`,
+    identity: `sp1:${SP1_VERSION}:groth16:${verifierKey}`,
     async verify(certificate) {
       const proof = decodeBase64(certificate.proof);
+      if (proof.length !== PROOF_BYTES) return false;
       // The WASM verifier's input: proof, statement digest, verifier key.
       const input = new Uint8Array(PROOF_BYTES + 64);
       input.set(proof);

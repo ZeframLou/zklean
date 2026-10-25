@@ -5,39 +5,11 @@ import { resolve } from "node:path";
 import { runNative } from "../src/index.ts";
 import { exportModule, findTools } from "../src/tooling.ts";
 
-const kernel = [
-  "eagerReduce",
-  "Quot",
-  "Quot.mk",
-  "Quot.lift",
-  "Quot.ind",
-  "String",
-  "String.ofList",
-  "Nat",
-  "Nat.zero",
-  "Nat.succ",
-  "Nat.add",
-  "Nat.sub",
-  "Nat.mul",
-  "Nat.pow",
-  "Nat.mod",
-  "Nat.div",
-  "Nat.beq",
-  "Nat.ble",
-  "Nat.gcd",
-  "Nat.xor",
-  "Nat.land",
-  "Nat.lor",
-  "Nat.shiftLeft",
-  "Nat.shiftRight",
-  "Bool.true",
-  "Bool.false",
-  "Char",
-  "Char.ofNat",
-  "List",
-  "List.nil",
-  "List.cons",
-];
+// A native test requires these names to equal the core's KERNEL list, so a
+// new kernel constant is first added to kernel.json by name.
+const kernel = Object.keys(
+  await Bun.file("crates/core/src/kernel.json").json(),
+);
 const claims = [
   "AxiomPolicy.ext",
   "AxiomPolicy.choice_used",

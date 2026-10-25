@@ -1,5 +1,5 @@
-import { dirname, join, resolve } from "node:path";
-import { object } from "./encoding.ts";
+import { join, resolve } from "node:path";
+import { SP1_VERSION, object } from "./encoding.ts";
 
 export interface Tools {
   readonly binary: string;
@@ -9,11 +9,10 @@ export interface Tools {
   profile: string;
 }
 
-const installed = resolve(dirname(process.execPath), "..");
 const source = resolve(import.meta.dir, "..");
 
 /** An environment override must exist; otherwise the first existing default
- * is used: the installed layout, then the source tree. */
+ * in the source tree is used. */
 async function locate(
   variable: string,
   defaults: string[],
@@ -32,29 +31,22 @@ export async function findTools(): Promise<Tools> {
   const elan = process.env.ELAN_HOME ?? join(process.env.HOME ?? "", ".elan");
   const [binary, elf, exporter, lake, profile] = await Promise.all([
     locate("ZKLEAN_NATIVE", [
-      join(installed, "libexec", "zklean-native"),
       join(source, "target", "release", "zklean-native"),
     ]),
     locate("ZKLEAN_GUEST_ELF", [
-      join(installed, "libexec", "zklean-guest"),
       join(
         source,
         "crates/guest/target/elf-compilation/riscv64im-succinct-zkvm-elf/release/zklean-guest",
       ),
     ]),
     locate("ZKLEAN_EXPORTER", [
-      join(installed, "libexec", "lean4export"),
       join(source, ".tooling/lean4export/.lake/build/bin/lean4export"),
     ]),
     locate("ZKLEAN_LAKE", [
-      join(installed, "libexec", "lean", "bin", "lake"),
       join(elan, "bin", "lake"),
       ...(Bun.which("lake") ? [Bun.which("lake")!] : []),
     ]),
-    locate("ZKLEAN_PROFILE", [
-      join(installed, "share", "zklean", "verifier.json"),
-      join(source, "src", "guest.json"),
-    ]),
+    locate("ZKLEAN_PROFILE", [join(source, "src", "guest.json")]),
   ]);
   if (!profile)
     throw new Error("verifier profile not found; set ZKLEAN_PROFILE");
@@ -79,7 +71,7 @@ export async function profile(
   const p = object(await Bun.file(tools.profile).json());
   if (
     p.format !== "zklean/verifier-profile/1" ||
-    p.sp1Version !== "6.10.0" ||
+    p.sp1Version !== SP1_VERSION ||
     Object.keys(p).length !== 4 ||
     typeof p.verifierKey !== "string" ||
     !/^0x[a-f0-9]{64}$/.test(p.verifierKey) ||

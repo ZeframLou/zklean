@@ -205,17 +205,10 @@ test("the pinned constants are exactly those the checker treats by name", async 
       lib.indexOf("];", lib.indexOf("pub const KERNEL")),
     ),
   );
-  const script = await Bun.file("scripts/pin.ts").text();
-  const listed = quoted(
-    script.slice(
-      script.indexOf("const kernel"),
-      script.indexOf("];", script.indexOf("const kernel")),
-    ),
-  );
   const table = Object.keys(
     await Bun.file("crates/core/src/kernel.json").json(),
   );
-  for (const names of [pinned, listed, table])
+  for (const names of [pinned, table])
     expect([...names].sort()).toEqual([...cached].sort());
 });
 
@@ -244,7 +237,6 @@ test("inductive metadata in an export is checked, not trusted", async () => {
 });
 
 test("identities recurse through neither dependency chains nor deep terms", async () => {
-  // zklean-native checks with about the SP1 guest's 2 MiB stack.
   const value = await checked("chain", ["Chain.top"]);
   expect(Object.keys(value.claims)).toEqual(["Chain.top"]);
   // Nor over expression depth: a 5,000-deep let chain within Nanoda's limit.

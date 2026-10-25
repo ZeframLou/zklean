@@ -10,7 +10,7 @@ which produces a **cryptographic proof** that the checker accepted the
 argument. A certificate names each proved claim and each axiom it uses by a
 content **identity**, a hash of the declaration and everything it depends on,
 and links to one Lean export holding those definitions. The realistic inventory
-example below has a 381 KB Lean export and a certificate of about 650 bytes.
+example below has a 381 KB Lean export and a certificate under 1 KB.
 
 ## Trust model
 
