@@ -9,6 +9,8 @@ Regenerate them with `bun scripts/export-examples.ts`.
 - `composition.ndjson`: several polymorphic claims with universe parameters.
 - `axioms.ndjson`, `axiom-spoof.ndjson`: custom axioms, and a fake `propext`.
 - `prop-def.ndjson`: a Prop-valued definition, whose body must be in its identity.
+- `mutual*.ndjson`: a mutual block, the same block with a renamed constructor
+  and reordered, and a nested inductive.
 
 `identity.certificate.json` is a real SP1 5.2.4 Groth16 certificate for
 `identity.ndjson`, proved with the guest pinned in `src/guest.json`.

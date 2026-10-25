@@ -57,7 +57,8 @@ are kept, so renaming one changes the identity.
 - A mutual inductive block is hashed once, as the kernel's input for it:
   `g = H("zklean/declaration/1\0", {inductive:{levelParams, numParams, types}})`,
   where `types` lists each type's `{name, type, ctors:[{name, type}]}` in block
-  order. Recursors are derived from this input and checked by Nanoda, so they
+  order. Order is part of the identity, because it fixes the order of the
+  recursors' motives; declaring a mutual block in another order changes it. Recursors are derived from this input and checked by Nanoda, so they
   are not hashed. Each type, constructor and recursor of the block has identity
   `H("zklean/declaration/1\0", {member:{group:g, name}})`.
 

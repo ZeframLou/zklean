@@ -13,7 +13,7 @@ export async function runNative(
   binary: string,
   command: string,
   input: unknown,
-  timeout = 120_000,
+  timeout = 600_000,
   onProgress?: (text: string) => void,
 ): Promise<unknown> {
   const child = Bun.spawn([binary, command], {

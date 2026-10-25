@@ -34,7 +34,7 @@ As with the guest, CI's Linux build of the verifier is canonical: after changing
 
 `crates/guest` runs `zklean_core::check` inside SP1. Its verifier key depends on
 the exact ELF, and Cargo hashes package paths into the build, so
-`scripts/build-guest.sh` builds from a fixed path. The canonical ELF is the one
+`scripts/build-guest.sh` builds from a fixed path, on Linux. The canonical ELF is the one
 CI's guest job uploads as the `zklean-guest-elf` artifact; `zklean pin` derives
 `src/guest.json` from it. Any change to `crates/core` or `vendor/nanoda` changes
 the key and invalidates `tests/fixtures/identity.certificate.json`.

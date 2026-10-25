@@ -6,7 +6,7 @@ digest=6cbc2c155c41001e81efd81119bd3d4f32313fcd3184df383d50225315b73104
 temporary="$(mktemp)"
 trap 'rm -f "$temporary"' EXIT
 curl -fsSL "${ZKLEAN_CIRCUIT_URL:-https://sp1-circuits.s3-us-east-2.amazonaws.com/v5.0.0-groth16.tar.gz}" -o "$temporary"
-printf '%s  %s\n' "$digest" "$temporary" | sha256sum -c -
+printf '%s  %s\n' "$digest" "$temporary" | shasum -a 256 -c -
 mkdir -p "$root"
 tar -xzf "$temporary" -C "$root"
 printf '%s\n' "$digest" > "$root/.archive-sha256"

@@ -126,3 +126,23 @@ test("native and TypeScript use identical authenticated statement bytes", async 
     "88537ad60a85bd6648c26f0c8f4424936ff3aef3f2508a5ebaae4321174ecd83",
   );
 });
+
+test("a mutual block is identified as one unit, and a nested type stands alone", async () => {
+  const claims = ["Shapes.even_zero", "Shapes.leaf_eq"];
+  const [base, variant, swapped] = await Promise.all(
+    ["mutual", "mutual-variant", "mutual-swapped"].map((file) =>
+      checked(file, claims),
+    ),
+  );
+  // Renaming a constructor of Odd changes a claim that mentions only Even.
+  expect(variant.claims["Shapes.even_zero"]).not.toBe(
+    base.claims["Shapes.even_zero"],
+  );
+  // Block order fixes the recursors' motive order, so it is part of identity.
+  expect(swapped.claims["Shapes.even_zero"]).not.toBe(
+    base.claims["Shapes.even_zero"],
+  );
+  // The nested Tree is independent of the mutual block.
+  expect(variant.claims["Shapes.leaf_eq"]).toBe(base.claims["Shapes.leaf_eq"]);
+  expect(swapped.claims["Shapes.leaf_eq"]).toBe(base.claims["Shapes.leaf_eq"]);
+});

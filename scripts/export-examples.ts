@@ -33,6 +33,21 @@ const examples = [
     file: "prop-def",
     claims: ["Demo.assumed"],
   },
+  {
+    module: "Mutual",
+    file: "mutual",
+    claims: ["Shapes.even_zero", "Shapes.leaf_eq"],
+  },
+  {
+    module: "MutualVariant",
+    file: "mutual-variant",
+    claims: ["Shapes.even_zero", "Shapes.leaf_eq"],
+  },
+  {
+    module: "MutualSwapped",
+    file: "mutual-swapped",
+    claims: ["Shapes.even_zero", "Shapes.leaf_eq"],
+  },
 ];
 // The exporter comes from ZKLEAN_EXPORTER or scripts/setup-exporter.sh.
 for (const example of examples)
