@@ -38,8 +38,12 @@ const build = Bun.spawnSync(
   { stdout: "inherit", stderr: "inherit" },
 );
 if (build.exitCode !== 0) throw new Error("native build failed");
-const { axioms } = (await runNative(tools.binary, "check", {
-  export: await exported(claims),
-  claims,
-})) as { axioms: Record<string, string> };
+const { axioms } = (await runNative(
+  resolve("target/release/zklean-native"),
+  "check",
+  {
+    export: await exported(claims),
+    claims,
+  },
+)) as { axioms: Record<string, string> };
 await write("src/axioms.json", axioms);

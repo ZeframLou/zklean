@@ -31,6 +31,7 @@ jobs:
           name: zklean-verifier-wasm
           path: src/verifier.wasm
       - run: git diff --exit-code -- src/verifier.wasm
+      - run: bun run format:check
       - run: cargo fmt --check -p zklean-core -p zklean-native -p zklean-verifier
       - run: cargo clippy --locked -p zklean-core -p zklean-native -p zklean-verifier -- -D warnings
       # Compile outside Bun's test-hook timeout on cold runners.
@@ -70,6 +71,8 @@ jobs:
       # No rust-cache: SP1's executor runner builds a helper binary inside the
       # registry sources, which the cache does not restore.
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
       - run: rustup toolchain install 1.96.0 --profile minimal
       - name: Install pinned SP1 toolchain
         run: |
@@ -87,6 +90,7 @@ jobs:
         with:
           go-version: '1.24'
       - run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+      - run: cargo clippy --release --locked -p zklean-native --features prover,execute -- -D warnings
       - run: cargo build --release --locked -p zklean-native --features prover,execute
       # The committed verifier profile must be this guest's.
       - run: ZKLEAN_GUEST_ELF="$PWD/crates/guest/target/elf-compilation/riscv64im-succinct-zkvm-elf/release/zklean-guest" bun src/cli.ts pin --out /tmp/guest.json

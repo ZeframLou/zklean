@@ -31,7 +31,7 @@ bun src/cli.ts check --project examples/lean --module V1 \
 ```
 
 `check` prints the certificate's statement. `prove` also generates the Groth16
-proof, which takes tens of minutes and several GB of memory:
+proof, which takes tens of minutes to hours and several GB of memory:
 
 ```sh
 bun src/cli.ts prove --project examples/lean --module V1 \

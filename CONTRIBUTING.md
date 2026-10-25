@@ -40,10 +40,12 @@ CI's guest job uploads as the `zklean-guest-elf` artifact; `zklean pin` derives
 `src/guest.json` from it. Any change to `crates/core` or `vendor/nanoda` changes
 the key and invalidates `tests/fixtures/identity.certificate.json`.
 
-To re-prove that certificate, build the prover with
-`GOFLAGS=-buildvcs=false cargo build --release --locked -p zklean-native --features prover,execute`
-and run `zklean prove` on `tests/fixtures/identity.ndjson` with
-`ZKLEAN_GUEST_ELF` set to the CI ELF. The first proof downloads SP1's Groth16
+To re-prove that certificate, build the prover in its own directory, since the
+tests rebuild `target/release` without features:
+`GOFLAGS=-buildvcs=false cargo build --release --locked -p zklean-native --features prover,execute --target-dir target/prover`.
+Then run `zklean prove` on `tests/fixtures/identity.ndjson` with
+`ZKLEAN_NATIVE=target/prover/release/zklean-native` and `ZKLEAN_GUEST_ELF` set
+to the CI ELF; the same two variables run `tests/guest.e2e.test.ts`. The first proof downloads SP1's Groth16
 circuit files.
 
 Nanoda is vendored with visibility-only changes; see `vendor/nanoda/UPSTREAM.md`.

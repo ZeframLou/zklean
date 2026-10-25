@@ -55,7 +55,10 @@ pub fn run(command: &str, input: &str) -> Result<Value> {
         "guest verifier identity mismatch"
     );
     let input = request.input;
-    let statement = zklean_core::check(&input)?;
+    let statement = {
+        let input = input.clone();
+        crate::guest_stack(move || zklean_core::check(&input))?
+    };
     let mut stdin = SP1Stdin::new();
     stdin.write(&input);
     let proof = client.prove(&pk, stdin).groth16().run()?;

@@ -3,22 +3,12 @@ import { runNative } from "../src/native.ts";
 import type { Statement } from "../src/types.ts";
 
 export const root = resolve(import.meta.dir, "..");
-// Tests build into their own directory, leaving a prover build in place.
-export const binary = resolve(root, "target/test/release/zklean-native");
+export const binary = resolve(root, "target/release/zklean-native");
 let built: Promise<void> | undefined;
 export function buildNative(): Promise<void> {
   return (built ??= (async () => {
     const child = Bun.spawn(
-      [
-        "cargo",
-        "build",
-        "--release",
-        "--locked",
-        "-p",
-        "zklean-native",
-        "--target-dir",
-        "target/test",
-      ],
+      ["cargo", "build", "--release", "--locked", "-p", "zklean-native"],
       { cwd: root, stderr: "inherit", stdout: "inherit" },
     );
     if ((await child.exited) !== 0) throw new Error("native build failed");
