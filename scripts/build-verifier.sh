@@ -4,6 +4,6 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 RUSTFLAGS="--remap-path-prefix=$PWD=/zklean --remap-path-prefix=${CARGO_HOME:-$HOME/.cargo}=/cargo" \
-  cargo +1.91.1 build --release --locked -p zklean-verifier --target wasm32-unknown-unknown
+  cargo +1.96.0 build --release --locked -p zklean-verifier --target wasm32-unknown-unknown
 cp target/wasm32-unknown-unknown/release/zklean_verifier.wasm src/verifier.wasm
 chmod 644 src/verifier.wasm

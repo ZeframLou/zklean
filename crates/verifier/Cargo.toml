@@ -7,5 +7,5 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-sp1-verifier = "=5.2.4"
+sp1-verifier = { version = "=6.10.0", default-features = false }
 hex = "0.4"

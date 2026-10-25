@@ -6,12 +6,12 @@ edition = "2021"
 [workspace]
 
 [dependencies]
-sp1-zkvm = "=5.2.4"
+sp1-zkvm = "=6.10.0"
 zklean-core = { path = "../core" }
 
 # SP1's SHA-256 precompile: identities hash every declaration in the export.
 [patch.crates-io]
-sha2 = { git = "https://github.com/sp1-patches/RustCrypto-hashes", package = "sha2", tag = "patch-sha2-0.10.9-sp1-4.0.0" }
+sha2 = { git = "https://github.com/sp1-patches/RustCrypto-hashes", package = "sha2", tag = "patch-sha2-0.10.9-sp1-6.10.0" }
 
 [profile.release]
 overflow-checks = true

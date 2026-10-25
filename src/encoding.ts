@@ -75,6 +75,10 @@ export function parseStatement(value: unknown): Statement {
     throw new Error("duplicate declaration name");
   return structuredClone(statement);
 }
+/** SP1 6's Groth16 encoding: a 4-byte circuit-key selector, the exit code,
+ * verifier-key root and proof nonce (32 bytes each), and the 256-byte proof. */
+export const PROOF_BYTES = 356;
+
 /** An https URL without credentials, as the URL parser normalizes it. */
 export function parseSource(value: unknown): string {
   const url =
@@ -85,9 +89,8 @@ export function parseSource(value: unknown): string {
 }
 export function parseCertificate(value: unknown): Certificate {
   const { proof, source, ...rest } = object(value);
-  // SP1's circuit-key selector and the uncompressed Groth16 proof.
-  if (decodeBase64(proof).length !== 260)
-    throw new Error("proof must be 260 bytes");
+  if (decodeBase64(proof).length !== PROOF_BYTES)
+    throw new Error(`proof must be ${PROOF_BYTES} bytes`);
   // Own the validated data so caller mutation cannot alter an in-flight check.
   return {
     ...parseStatement(rest),

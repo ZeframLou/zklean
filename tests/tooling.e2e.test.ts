@@ -63,13 +63,13 @@ const certificate = {
   format: "zklean/1" as const,
   claims: { "Demo.identity": "b".repeat(64) },
   axioms: {},
-  proof: `base64:${Buffer.alloc(260).toString("base64")}`,
+  proof: `base64:${Buffer.alloc(356).toString("base64")}`,
   source: "https://example.com/spec.ndjson",
 };
 
 test("certificates parse strictly", () => {
   expect(parseCertificate(certificate)).toEqual(certificate);
-  const proof = Buffer.alloc(260);
+  const proof = Buffer.alloc(356);
   for (const changed of [
     { source: undefined },
     { source: "http://example.com/spec.ndjson" },

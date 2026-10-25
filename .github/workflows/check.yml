@@ -23,8 +23,7 @@ jobs:
         with:
           cache-on-failure: true
       - run: bun install --frozen-lockfile
-      - run: bash scripts/prepare-sp1.sh
-      - run: rustup toolchain install 1.91.1 --profile minimal --target wasm32-unknown-unknown
+      - run: rustup toolchain install 1.96.0 --profile minimal --target wasm32-unknown-unknown
       - run: bun run build:verifier
       # CI's build is canonical; the committed binary must match it.
       - uses: actions/upload-artifact@v4
@@ -54,7 +53,6 @@ jobs:
           echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
       - run: bun install --frozen-lockfile
       - run: bash scripts/setup-exporter.sh
-      - run: bash scripts/prepare-sp1.sh
       - run: cargo build --release --locked -p zklean-native
       - run: bun scripts/export-examples.ts
       - run: git diff --exit-code -- tests/fixtures/*.ndjson
@@ -73,11 +71,11 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-      - run: rustup toolchain install 1.91.1 --profile minimal
+      - run: rustup toolchain install 1.96.0 --profile minimal
       - name: Install pinned SP1 toolchain
         run: |
-          curl -fsSL https://raw.githubusercontent.com/succinctlabs/sp1/v5.2.4/sp1up/sp1up -o /tmp/sp1up
-          bash /tmp/sp1up --version v5.2.4
+          curl -fsSL https://raw.githubusercontent.com/succinctlabs/sp1/v6.10.0/sp1up/sp1up -o /tmp/sp1up
+          bash /tmp/sp1up --version v6.10.0
           echo "$HOME/.sp1/bin" >> "$GITHUB_PATH"
       - run: bun install --frozen-lockfile
       - run: bash scripts/build-guest.sh
@@ -85,13 +83,12 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: zklean-guest-elf
-          path: crates/guest/target/elf-compilation/riscv32im-succinct-zkvm-elf/release/zklean-guest
-      - run: bash scripts/prepare-sp1.sh
+          path: crates/guest/target/elf-compilation/riscv64im-succinct-zkvm-elf/release/zklean-guest
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.23.12'
+          go-version: '1.24'
       - run: cargo build --release --locked -p zklean-native --features prover,execute
       # The committed verifier profile must be this guest's.
-      - run: ZKLEAN_GUEST_ELF="$PWD/crates/guest/target/elf-compilation/riscv32im-succinct-zkvm-elf/release/zklean-guest" bun src/cli.ts pin --out /tmp/guest.json
+      - run: ZKLEAN_GUEST_ELF="$PWD/crates/guest/target/elf-compilation/riscv64im-succinct-zkvm-elf/release/zklean-guest" bun src/cli.ts pin --out /tmp/guest.json
       - run: diff /tmp/guest.json src/guest.json
-      - run: ZKLEAN_GUEST_ELF="$PWD/crates/guest/target/elf-compilation/riscv32im-succinct-zkvm-elf/release/zklean-guest" bun test tests/guest.e2e.test.ts
+      - run: ZKLEAN_GUEST_ELF="$PWD/crates/guest/target/elf-compilation/riscv64im-succinct-zkvm-elf/release/zklean-guest" bun test tests/guest.e2e.test.ts

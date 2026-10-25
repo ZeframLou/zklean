@@ -121,7 +121,7 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
       });
       return output({
         format: "zklean/verifier-profile/1",
-        sp1Version: "5.2.4",
+        sp1Version: "6.10.0",
         ...(identity as object),
       });
     }

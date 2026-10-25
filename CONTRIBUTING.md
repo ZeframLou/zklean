@@ -2,15 +2,14 @@
 
 ## Tools
 
-Bun 1.4.4, stable Rust and Rust 1.91.1, the
-[SP1 5.2.4 toolchain](https://github.com/succinctlabs/sp1/tree/v5.2.4)
+Bun 1.4.4, stable Rust and Rust 1.96.0, the
+[SP1 6.10.0 toolchain](https://github.com/succinctlabs/sp1/tree/v6.10.0)
 (`cargo prove`), [Lean 4.36.0-rc1](https://github.com/leanprover/lean4/releases/tag/v4.36.0-rc1)
-with Lake, and, for proving, Go 1.23 and a C compiler.
+with Lake, and, for proving, Go 1.24 and a C compiler.
 
 ```sh
-rustup toolchain install 1.91.1 --profile minimal --target wasm32-unknown-unknown
+rustup toolchain install 1.96.0 --profile minimal --target wasm32-unknown-unknown
 bun install --frozen-lockfile
-bash scripts/prepare-sp1.sh       # checksum-pinned SP1 recursion key map
 bash scripts/setup-exporter.sh    # pinned lean4export
 cargo build --release --locked -p zklean-native
 ```
@@ -25,7 +24,7 @@ ZKLEAN_LAKE="$(command -v lake)" bun run check
 ```
 
 CI also rebuilds the WebAssembly verifier (`bun run build:verifier`, pinned to
-Rust 1.91.1 with remapped paths) and requires it to equal `src/verifier.wasm`,
+Rust 1.96.0 with remapped paths) and requires it to equal `src/verifier.wasm`,
 re-exports the Lean fixtures and re-derives the pinned identities of Lean's own
 definitions (`bun scripts/pin.ts`), requiring both unchanged, and builds the
 guest.
@@ -42,10 +41,9 @@ CI's guest job uploads as the `zklean-guest-elf` artifact; `zklean pin` derives
 the key and invalidates `tests/fixtures/identity.certificate.json`.
 
 To re-prove that certificate, build the prover with
-`GOFLAGS=-buildvcs=false cargo build --release --locked -p zklean-native --features prover,execute`,
-fetch the SP1 circuits with `bash scripts/setup-circuits.sh` (2.9 GB), and run
-`zklean prove` on `tests/fixtures/identity.ndjson` with `ZKLEAN_GUEST_ELF` set to
-the CI ELF. `RAYON_NUM_THREADS`, `GOMAXPROCS`, `GOMEMLIMIT=6GiB` and `GOGC=20`
-bound memory to about 8 GB.
+`GOFLAGS=-buildvcs=false cargo build --release --locked -p zklean-native --features prover,execute`
+and run `zklean prove` on `tests/fixtures/identity.ndjson` with
+`ZKLEAN_GUEST_ELF` set to the CI ELF. The first proof downloads SP1's Groth16
+circuit files.
 
 Nanoda is vendored with visibility-only changes; see `vendor/nanoda/UPSTREAM.md`.

@@ -7,7 +7,7 @@
 ZKLean certifies that Lean propositions have valid derivations. A certificate
 names each certified proposition, and each axiom its proof uses, by an
 **identity**: a hash of the declaration and everything it depends on. It carries
-a 260-byte Groth16 proof that a pinned checker accepted the derivation, and the
+a 356-byte Groth16 proof that a pinned checker accepted the derivation, and the
 URL of one Lean export file holding the definitions behind every identity.
 Recipients verify the proof without the proof terms or a Lean installation. A
 certificate is a few hundred bytes whatever the size of the proofs.

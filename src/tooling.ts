@@ -39,7 +39,7 @@ export async function findTools(): Promise<Tools> {
       join(installed, "libexec", "zklean-guest"),
       join(
         source,
-        "crates/guest/target/elf-compilation/riscv32im-succinct-zkvm-elf/release/zklean-guest",
+        "crates/guest/target/elf-compilation/riscv64im-succinct-zkvm-elf/release/zklean-guest",
       ),
     ]),
     locate("ZKLEAN_EXPORTER", [
@@ -79,7 +79,7 @@ export async function profile(
   const p = object(await Bun.file(tools.profile).json());
   if (
     p.format !== "zklean/verifier-profile/1" ||
-    p.sp1Version !== "5.2.4" ||
+    p.sp1Version !== "6.10.0" ||
     Object.keys(p).length !== 4 ||
     typeof p.verifierKey !== "string" ||
     !/^0x[a-f0-9]{64}$/.test(p.verifierKey) ||

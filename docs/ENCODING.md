@@ -1,6 +1,6 @@
 # ZKLean v1 encoding profile
 
-This profile uses **SP1 5.2.4 Groth16 over BN254**. Identities are computed from
+This profile uses **SP1 6.10.0 Groth16 over BN254**. Identities are computed from
 the environment Nanoda has checked, so the checker and the identities read the
 export through one parser. Verification is offline and needs no proving
 artifacts, Lean process or native executable.
@@ -89,14 +89,15 @@ one of them. The certificate's `source` is not
 committed; it only locates an export that must reproduce these identities.
 
 The certificate's `proof` is `base64:` followed by padded, canonical RFC 4648
-base64 of exactly 260 bytes: SP1's four-byte circuit-key selector and the 256-byte
+base64 of exactly 356 bytes: SP1's four-byte circuit-key selector, the exit code,
+verifier-key root and proof nonce (32 bytes each), and the 256-byte
 uncompressed Groth16 proof, as returned by `SP1ProofWithPublicValues.bytes()`.
 Other SP1 modes and lengths are rejected.
 
 ## Verifier keys
 
 Verification calls the unmodified upstream `sp1-verifier` crate, compiled to
-WebAssembly. Its circuit key is fixed by version 5.2.4. The checker key is SP1's
+WebAssembly. Its circuit key is fixed by version 6.10.0. The checker key is SP1's
 BN254 `vk.bytes32()` encoding of the pinned guest, in `src/guest.json`
 with the guest ELF's SHA-256; `zklean pin` derives both from a built guest.
 Applications can choose a different trusted key with `groth16Backend(key)`;

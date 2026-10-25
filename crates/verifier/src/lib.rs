@@ -1,7 +1,9 @@
 //! The same unmodified upstream Groth16 verifier serves native and npm clients.
 use sp1_verifier::{Groth16Verifier, GROTH16_VK_BYTES};
 
-pub const PROOF_BYTES: usize = 260;
+/// SP1 6's Groth16 encoding: a 4-byte circuit-key selector, the exit code,
+/// verifier-key root and proof nonce (32 bytes each), and the 256-byte proof.
+pub const PROOF_BYTES: usize = 356;
 
 pub fn verify(proof: &[u8], commitment: &[u8; 32], guest_key: &str) -> bool {
     proof.len() == PROOF_BYTES
@@ -25,8 +27,9 @@ mod wasm {
         // The host fills this buffer before calling verify. WASM has no threads
         // or imported callbacks, so it cannot change during the check.
         let input = unsafe { *core::ptr::addr_of!(INPUT) };
-        let commitment = input[260..292].try_into().unwrap();
-        let guest_key = format!("0x{}", hex::encode(&input[292..]));
-        super::verify(&input[..260], &commitment, &guest_key) as u32
+        let (proof, rest) = input.split_at(super::PROOF_BYTES);
+        let (commitment, key) = rest.split_at(32);
+        let guest_key = format!("0x{}", hex::encode(key));
+        super::verify(proof, commitment.try_into().unwrap(), &guest_key) as u32
     }
 }

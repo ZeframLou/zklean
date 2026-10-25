@@ -2,8 +2,8 @@
 use anyhow::{ensure, Context, Result};
 use serde::Deserialize;
 use serde_json::{json, Value};
-use sp1_core_executor::{Executor, Program};
-use sp1_stark::SP1CoreOpts;
+use sp1_sdk::blocking::{Prover, ProverClient};
+use sp1_sdk::SP1Stdin;
 use zklean_core::{commitment, ProveInput};
 
 #[derive(Deserialize)]
@@ -15,19 +15,19 @@ struct Request {
 
 pub fn run(input: &str) -> Result<Value> {
     let request: Request = serde_json::from_str(input)?;
-    let program =
-        Program::from_elf(&request.elf_path).map_err(|e| anyhow::anyhow!(e.to_string()))?;
-    let mut executor = Executor::new(program, SP1CoreOpts::default());
-    executor.max_cycles = Some(1_000_000_000);
-    executor
-        .state
-        .input_stream
-        .push_back(bincode::serialize(&request.input)?);
-    executor.run_fast().context("guest execution failed")?;
+    let elf = std::fs::read(&request.elf_path).context("read guest ELF")?;
+    let mut stdin = SP1Stdin::new();
+    stdin.write(&request.input);
+    let (public_values, report) = ProverClient::builder()
+        .cpu()
+        .build()
+        .execute(elf.into(), stdin)
+        .run()
+        .context("guest execution failed")?;
     let statement = zklean_core::check(&request.input)?;
     ensure!(
-        executor.state.public_values_stream == commitment(&statement),
+        public_values.as_slice() == commitment(&statement),
         "guest/native commitment mismatch"
     );
-    Ok(json!({"statement": statement, "cycles": executor.state.global_clk}))
+    Ok(json!({"statement": statement, "cycles": report.total_instruction_count()}))
 }

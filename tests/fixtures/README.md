@@ -16,6 +16,6 @@ Regenerate them with `bun scripts/export-examples.ts`.
 - `chain.ndjson`, `deep.ndjson`: a 2,000-deep chain of definitions and a
   5,000-deep `let` chain.
 
-`identity.certificate.json` is a real SP1 5.2.4 Groth16 certificate for
+`identity.certificate.json` is a real SP1 6.10.0 Groth16 certificate for
 `identity.ndjson`, which must be re-proved whenever the guest in
 `src/guest.json` changes.

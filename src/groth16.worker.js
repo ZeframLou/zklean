@@ -5,9 +5,11 @@ parentPort.on("message", async (data) => {
   try {
     instance ??= (await WebAssembly.instantiate(data.wasm)).instance;
     const exports = instance.exports;
-    new Uint8Array(exports.memory.buffer, exports.input_buffer(), 324).set(
-      data.input,
-    );
+    new Uint8Array(
+      exports.memory.buffer,
+      exports.input_buffer(),
+      data.input.length,
+    ).set(data.input);
     let valid;
     try {
       valid = exports.verify() === 1;
