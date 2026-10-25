@@ -1,14 +1,15 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { expect, test } from "bun:test";
+import { beforeAll, expect, test } from "bun:test";
 import { loadRequirements, satisfies } from "../src/requirements.ts";
 import { parseCertificate } from "../src/encoding.ts";
 import { download, matchSource } from "../src/fetch.ts";
-import { binary, checked, root } from "./helpers.ts";
+import { binary, buildNative, checked, root } from "./helpers.ts";
 import { findTools, profile } from "../src/tooling.ts";
 
 const lake = process.env.ZKLEAN_LAKE;
+beforeAll(buildNative, 300_000);
 
 test("tool overrides and verifier profiles fail closed", async () => {
   const directory = await mkdtemp(join(tmpdir(), "zklean-tools-"));

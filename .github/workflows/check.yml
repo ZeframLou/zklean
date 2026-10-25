@@ -67,10 +67,9 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: '1.4.4'
+      # No rust-cache: SP1's executor runner builds a helper binary inside the
+      # registry sources, which the cache does not restore.
       - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
       - run: rustup toolchain install 1.96.0 --profile minimal
       - name: Install pinned SP1 toolchain
         run: |
