@@ -9,13 +9,17 @@ export interface Mismatch {
   actual: string | undefined;
 }
 
-/** Download a certificate's source export, bounded in size and time.
+/** Download a certificate's source export, bounded in size and time. Redirects
+ * are refused, so the https rule holds for the address actually fetched.
  * Nothing fetched is executed. */
 export async function download(
   url: string,
   timeout = 600_000,
 ): Promise<string> {
-  const response = await fetch(url, { signal: AbortSignal.timeout(timeout) });
+  const response = await fetch(url, {
+    redirect: "error",
+    signal: AbortSignal.timeout(timeout),
+  });
   if (!response.ok || !response.body)
     throw new Error(`${url}: HTTP ${response.status}`);
   const chunks: Uint8Array[] = [];

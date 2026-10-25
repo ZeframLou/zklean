@@ -61,7 +61,8 @@ use, and commit the identities of the claims and those axioms.
   most one of `claims` and `axioms`.
 - `proof`: the Groth16 proof of `{format, claims, axioms}`.
 - `source`: the `https` URL of one lean4export file that contains every claim and
-  axiom with everything they depend on.
+  axiom with everything they depend on. Clients MUST NOT follow redirects from
+  it, so the URL is the file's final address.
 
 The source is not part of the proved statement. It is an untrusted pointer: a
 recipient verifies the certificate, then checks the file with Nanoda and accepts

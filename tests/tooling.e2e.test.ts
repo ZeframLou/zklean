@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { expect, test } from "bun:test";
 import { loadRequirements } from "../src/requirements.ts";
 import { parseCertificate } from "../src/encoding.ts";
-import { matchSource } from "../src/fetch.ts";
+import { download, matchSource } from "../src/fetch.ts";
 import { binary, checked, root } from "./helpers.ts";
 import { findTools, profile } from "../src/tooling.ts";
 
@@ -90,4 +90,22 @@ test("a source export must reproduce every certified identity", async () => {
   expect(
     (await matchSource(forged, exported, binary)).map((m) => m.name),
   ).toEqual(["Demo.identity"]);
+});
+
+test("source downloads refuse redirects", async () => {
+  const target = Bun.serve({ port: 0, fetch: () => new Response("export") });
+  const redirect = Bun.serve({
+    port: 0,
+    fetch: () => Response.redirect(`http://127.0.0.1:${target.port}/`, 302),
+  });
+  try {
+    // Following the redirect would succeed, so a rejection means it was refused.
+    expect(await download(`http://127.0.0.1:${target.port}/`)).toBe("export");
+    await expect(
+      download(`http://127.0.0.1:${redirect.port}/`),
+    ).rejects.toThrow();
+  } finally {
+    target.stop(true);
+    redirect.stop(true);
+  }
 });
