@@ -2,7 +2,7 @@
 mod identity;
 
 use anyhow::{ensure, Result};
-use identity::{Environment, Reader};
+use identity::Reader;
 use nanoda_lib::{parser::parse_export_file, util::Config};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -80,6 +80,52 @@ pub fn identify(export: &str, names: &[String]) -> Result<Identified> {
     checked(export, |env| env.identities(&names))
 }
 
+/// The checker computes with these constants by name, trusting that they are
+/// Lean's own (natural number and string literals, `Quot`, `eagerReduce`).
+/// An export may define them only as Lean does, or it could prove `False`.
+pub const KERNEL: [&str; 31] = [
+    "eagerReduce",
+    "Quot",
+    "Quot.mk",
+    "Quot.lift",
+    "Quot.ind",
+    "String",
+    "String.ofList",
+    "Nat",
+    "Nat.zero",
+    "Nat.succ",
+    "Nat.add",
+    "Nat.sub",
+    "Nat.mul",
+    "Nat.pow",
+    "Nat.mod",
+    "Nat.div",
+    "Nat.beq",
+    "Nat.ble",
+    "Nat.gcd",
+    "Nat.xor",
+    "Nat.land",
+    "Nat.lor",
+    "Nat.shiftLeft",
+    "Nat.shiftRight",
+    "Bool.true",
+    "Bool.false",
+    "Char",
+    "Char.ofNat",
+    "List",
+    "List.nil",
+    "List.cons",
+];
+
+/// Identities of the `KERNEL` constants an export defines, unpinned: the
+/// source of `kernel.json`.
+pub fn kernel_identities(export: &str) -> Result<Identified> {
+    check_export(export, |env| {
+        let present = env.present(&KERNEL);
+        env.identities(&present)
+    })
+}
+
 fn names(list: &[String]) -> Result<BTreeSet<String>> {
     let names: BTreeSet<_> = list.iter().cloned().collect();
     ensure!(!names.is_empty(), "at least one claim is required");
@@ -87,20 +133,36 @@ fn names(list: &[String]) -> Result<BTreeSet<String>> {
     Ok(names)
 }
 
+/// Check an export and require Lean's own definitions of the `KERNEL`
+/// constants it contains, then read it.
+fn checked<A>(text: &str, f: impl FnOnce(&mut Reader<'_, '_, '_>) -> Result<A>) -> Result<A> {
+    let pinned: Identified = serde_json::from_str(include_str!("kernel.json"))?;
+    check_export(text, |env| {
+        let present = env.present(&KERNEL);
+        for (name, id) in env.identities(&present)? {
+            ensure!(
+                pinned.get(&name) == Some(&id),
+                "{name} differs from Lean's definition"
+            );
+        }
+        f(env)
+    })
+}
+
 /// Check the entire export, so no unauthenticated external state enters, then
 /// read it. Every axiom is admitted: statements report each one the proofs
 /// use, with its identity, and recipients decide which to accept.
-fn checked<A>(text: &str, f: impl FnOnce(&mut Reader<'_, '_, '_>) -> Result<A>) -> Result<A> {
+fn check_export<A>(text: &str, f: impl FnOnce(&mut Reader<'_, '_, '_>) -> Result<A>) -> Result<A> {
     let config: Config = serde_json::from_value(serde_json::json!({
         "unsafe_permit_all_axioms": true,
-        "unpermitted_axiom_hard_error": true,
+        "unpermitted_axiom_hard_error": false,
         "num_threads": 1, "nat_extension": true, "string_extension": true,
         "print_axioms": false
     }))?;
     let (file, _) = parse_export_file(Cursor::new(text.as_bytes()), config)
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
     file.check_all_declars();
-    Environment::new(&file).with(f)
+    identity::read(&file, f)
 }
 
 /// Sort recursively instead of relying on serde_json's optional map backend.

@@ -1,11 +1,7 @@
 import { certificateId, parseCertificate, statementId } from "./encoding.ts";
 import { checkAxioms } from "./policy.ts";
 import { groth16Backend } from "./groth16.ts";
-import type {
-  VerificationResult,
-  VerifierOptions,
-  VerifyOptions,
-} from "./types.ts";
+import type { VerificationResult, VerifierOptions, Policy } from "./types.ts";
 
 /** Local certificate verification has no HTTP or discovery dependency. */
 export function createVerifier(options: VerifierOptions = {}) {
@@ -17,7 +13,7 @@ export function createVerifier(options: VerifierOptions = {}) {
 
   async function verify(
     value: unknown,
-    policy: VerifyOptions,
+    policy: Policy,
   ): Promise<VerificationResult> {
     let identity: Pick<VerificationResult, "statementId">;
     let key: string;

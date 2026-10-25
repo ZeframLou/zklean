@@ -11,6 +11,9 @@ Regenerate them with `bun scripts/export-examples.ts`.
 - `prop-def.ndjson`: a Prop-valued definition, whose body must be in its identity.
 - `mutual*.ndjson`: a mutual block, the same block with a renamed constructor
   and reordered, and a nested inductive.
+- `kernel-spoof.ndjson`: a redefined `Nat.gcd` that would prove `False`.
+- `v1-spec.ndjson`: the inventory claim stated as an axiom, without its proof.
 
 `identity.certificate.json` is a real SP1 5.2.4 Groth16 certificate for
-`identity.ndjson`, proved with the guest pinned in `src/guest.json`.
+`identity.ndjson`, which must be re-proved whenever the guest in
+`src/guest.json` changes.

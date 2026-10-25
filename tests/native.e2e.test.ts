@@ -144,3 +144,49 @@ test("a mutual block is identified as one unit, and a nested type stands alone",
   expect(variant.claims["Shapes.leaf_eq"]).toBe(base.claims["Shapes.leaf_eq"]);
   expect(swapped.claims["Shapes.leaf_eq"]).toBe(base.claims["Shapes.leaf_eq"]);
 });
+
+test("an export may define the checker's built-in constants only as Lean does", async () => {
+  // Its Nat.gcd returns zero, but the checker computes Nat.gcd natively, which
+  // would prove False with no axioms.
+  await expect(checked("kernel-spoof", ["Attack.claim"])).rejects.toThrow(
+    "Nat.gcd differs from Lean's definition",
+  );
+});
+
+test("a claim stated as an axiom has the proved theorem's identity", async () => {
+  const proved = await checked("v1");
+  const stated = (await runNative(
+    binary,
+    "requirements",
+    await input("v1-spec"),
+  )) as { claims: Record<string, string> };
+  expect(stated.claims).toEqual(proved.claims);
+});
+
+test("universe parameter names are part of an identity", async () => {
+  const claims = ["Pipeline.compose", "Pipeline.weaken"];
+  const request = await input("composition", claims);
+  const renamed = request.export.replace(
+    '{"in":3,"str":{"pre":0,"str":"u"}}',
+    '{"in":3,"str":{"pre":0,"str":"u2"}}',
+  );
+  expect(renamed).not.toBe(request.export);
+  const before = await checked("composition", claims);
+  const after = (await runNative(binary, "check", {
+    ...request,
+    export: renamed,
+  })) as typeof before;
+  expect(after.claims["Pipeline.compose"]).not.toBe(
+    before.claims["Pipeline.compose"],
+  );
+});
+
+test("an ambiguous export with duplicate JSON keys is rejected", async () => {
+  const request = await input("identity", ["Demo.identity"]);
+  await expect(
+    runNative(binary, "check", {
+      ...request,
+      export: request.export.replace('"body":3', '"body":3,"body":1'),
+    }),
+  ).rejects.toThrow();
+});

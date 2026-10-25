@@ -20,52 +20,47 @@ fn hash(domain: &str, value: &Value) -> Result<String> {
     Ok(format!("{:x}", digest.finalize()))
 }
 
-/// A checked environment and the declarations whose type is a proposition.
-pub struct Environment<'p> {
+/// Read a checked export. Declarations whose type is a proposition are
+/// decided by the checker first.
+pub fn read<'p, A>(
     file: &'p ExportFile<'p>,
-    props: HashSet<NamePtr<'p>>,
-}
-
-impl<'p> Environment<'p> {
-    pub fn new(file: &'p ExportFile<'p>) -> Self {
-        let mut props = HashSet::new();
-        for (name, d) in &file.declars {
-            if matches!(
-                d,
-                Declar::Axiom { .. }
-                    | Declar::Theorem { .. }
-                    | Declar::Definition { .. }
-                    | Declar::Opaque { .. }
-            ) {
-                let info = *d.info();
-                if file.with_tc_and_declar(info, |tc| tc.is_prop(info.ty).0) {
-                    props.insert(*name);
-                }
+    f: impl FnOnce(&mut Reader<'_, '_, 'p>) -> Result<A>,
+) -> Result<A> {
+    let mut props = HashSet::new();
+    for (name, d) in &file.declars {
+        if matches!(
+            d,
+            Declar::Axiom { .. }
+                | Declar::Theorem { .. }
+                | Declar::Definition { .. }
+                | Declar::Opaque { .. }
+        ) {
+            let info = *d.info();
+            if file.with_tc_and_declar(info, |tc| tc.is_prop(info.ty).0) {
+                props.insert(*name);
             }
         }
-        Self { file, props }
     }
-
-    pub fn with<A>(&self, f: impl FnOnce(&mut Reader<'_, '_, 'p>) -> Result<A>) -> Result<A> {
-        self.file.with_ctx(|ctx| {
-            let mut names = HashMap::new();
-            let mut declars = HashMap::new();
-            for (name, d) in &self.file.declars {
-                names.insert(render(ctx, *name)?, *name);
-                declars.insert(*name, d);
-            }
-            f(&mut Reader {
-                ctx,
-                declars,
-                props: &self.props,
-                names,
-                ids: HashMap::new(),
-                groups: HashMap::new(),
-                nodes: HashMap::new(),
-                active: HashSet::new(),
-            })
-        })
-    }
+    file.with_ctx(|ctx| {
+        let mut reader = Reader {
+            ctx,
+            declars: HashMap::new(),
+            props: &props,
+            names: HashMap::new(),
+            rendered: HashMap::new(),
+            ids: HashMap::new(),
+            groups: HashMap::new(),
+            nodes: HashMap::new(),
+            levels: HashMap::new(),
+            active: HashSet::new(),
+        };
+        for (name, d) in &file.declars {
+            let rendered = reader.render(*name)?;
+            reader.names.insert(rendered, *name);
+            reader.declars.insert(*name, d);
+        }
+        f(&mut reader)
+    })
 }
 
 pub struct Reader<'r, 'c, 'p> {
@@ -73,9 +68,11 @@ pub struct Reader<'r, 'c, 'p> {
     declars: HashMap<NamePtr<'c>, &'r Declar<'c>>,
     props: &'r HashSet<NamePtr<'c>>,
     names: HashMap<String, NamePtr<'c>>,
+    rendered: HashMap<NamePtr<'c>, String>,
     ids: HashMap<NamePtr<'c>, String>,
     groups: HashMap<NamePtr<'c>, String>,
     nodes: HashMap<(ExprPtr<'c>, Option<NamePtr<'c>>), String>,
+    levels: HashMap<LevelPtr<'c>, String>,
     active: HashSet<NamePtr<'c>>,
 }
 
@@ -86,6 +83,15 @@ impl<'r, 'c> Reader<'r, 'c, '_> {
             .get(name)
             .with_context(|| format!("unresolved declaration {name}"))?;
         Ok((ptr, self.declars[&ptr]))
+    }
+
+    /// Which of `names` the export declares.
+    pub fn present(&self, names: &[&str]) -> BTreeSet<String> {
+        names
+            .iter()
+            .filter(|n| self.names.contains_key(**n))
+            .map(|n| n.to_string())
+            .collect()
     }
 
     /// A theorem whose type is a proposition.
@@ -121,7 +127,7 @@ impl<'r, 'c> Reader<'r, 'c, '_> {
             let mut roots = vec![d.info().ty];
             match d {
                 Declar::Axiom { .. } => {
-                    axioms.insert(render(self.ctx, name)?);
+                    axioms.insert(self.render(name)?);
                 }
                 Declar::Theorem { val, .. }
                 | Declar::Definition { val, .. }
@@ -149,7 +155,12 @@ impl<'r, 'c> Reader<'r, 'c, '_> {
                         roots.push(structure);
                     }
                     Expr::NatLit { .. } => pending.push(self.lookup("Nat")?.0),
-                    Expr::StringLit { .. } => pending.push(self.lookup("String")?.0),
+                    // A string literal stands for `String.ofList [Char.ofNat n, …]`.
+                    Expr::StringLit { .. } => {
+                        for name in ["String", "String.ofList", "Char.ofNat", "List"] {
+                            pending.push(self.lookup(name)?.0);
+                        }
+                    }
                     Expr::App { fun, arg, .. } => roots.extend([fun, arg]),
                     Expr::Pi {
                         binder_type, body, ..
@@ -181,33 +192,27 @@ impl<'r, 'c> Reader<'r, 'c, '_> {
             let group = self.group(first)?;
             hash(
                 "zklean/declaration/1\0",
-                &json!({"member": {"group": group, "name": render(self.ctx, name)?}}),
+                &json!({"member": {"group": group, "name": self.render(name)?}}),
             )?
         } else {
             let info = *d.info();
             let mut fields = json!({
-                "name": render(self.ctx, name)?,
+                "name": self.render(name)?,
                 "levelParams": self.params(info.uparams)?,
                 "type": self.node(info.ty, None)?,
             });
             // A proof is irrelevant: a proposition is identified by its statement.
-            let kind = if self.props.contains(&name) {
-                "prop"
-            } else {
-                match d {
-                    Declar::Definition { val, .. } | Declar::Opaque { val, .. } => {
-                        fields["value"] = Value::String(self.node(*val, None)?);
-                        if matches!(d, Declar::Definition { .. }) {
-                            "def"
-                        } else {
-                            "opaque"
-                        }
-                    }
-                    Declar::Axiom { .. } => "axiom",
-                    Declar::Quot { .. } => "quot",
-                    _ => bail!("unexpected declaration kind"),
-                }
+            let (kind, value) = match d {
+                _ if self.props.contains(&name) => ("prop", None),
+                Declar::Definition { val, .. } => ("def", Some(*val)),
+                Declar::Opaque { val, .. } => ("opaque", Some(*val)),
+                Declar::Axiom { .. } => ("axiom", None),
+                Declar::Quot { .. } => ("quot", None),
+                _ => bail!("unexpected declaration kind"),
             };
+            if let Some(val) = value {
+                fields["value"] = Value::String(self.node(val, None)?);
+            }
             hash("zklean/declaration/1\0", &json!({ kind: fields }))?
         };
         self.active.remove(&name);
@@ -235,11 +240,11 @@ impl<'r, 'c> Reader<'r, 'c, '_> {
             for ctor in i.all_ctor_names.iter() {
                 let ty = self.declars[ctor].info().ty;
                 ctors.push(
-                    json!({"name": render(self.ctx, *ctor)?, "type": self.node(ty, Some(first))?}),
+                    json!({"name": self.render(*ctor)?, "type": self.node(ty, Some(first))?}),
                 );
             }
             types.push(json!({
-                "name": render(self.ctx, *ty)?,
+                "name": self.render(*ty)?,
                 "type": self.node(i.info.ty, Some(first))?,
                 "ctors": ctors,
             }));
@@ -260,11 +265,8 @@ impl<'r, 'c> Reader<'r, 'c, '_> {
     fn group_of(&self, name: NamePtr<'c>) -> Option<NamePtr<'c>> {
         match self.declars.get(&name)? {
             Declar::Inductive(i) => Some(i.all_ind_names[0]),
-            Declar::Constructor(c) => match self.declars.get(&c.inductive_name)? {
-                Declar::Inductive(i) => Some(i.all_ind_names[0]),
-                _ => None,
-            },
-            Declar::Recursor(r) => Some(r.all_inductives[0]),
+            Declar::Constructor(c) => self.group_of(c.inductive_name),
+            Declar::Recursor(r) => self.group_of(r.all_inductives[0]),
             _ => None,
         }
     }
@@ -274,7 +276,7 @@ impl<'r, 'c> Reader<'r, 'c, '_> {
     fn reference(&mut self, name: NamePtr<'c>, group: Option<NamePtr<'c>>) -> Result<Value> {
         let inside = group.is_some() && self.group_of(name) == group;
         Ok(json!({
-            "name": render(self.ctx, name)?,
+            "name": self.render(name)?,
             "id": if inside { Value::Null } else { Value::String(self.id(name)?) },
         }))
     }
@@ -344,14 +346,19 @@ impl<'r, 'c> Reader<'r, 'c, '_> {
     }
 
     fn level(&mut self, l: LevelPtr<'c>) -> Result<String> {
+        if let Some(h) = self.levels.get(&l) {
+            return Ok(h.clone());
+        }
         let node = match self.ctx.read_level(l) {
             Level::Zero => json!({"zero": true}),
             Level::Succ(l, _) => json!({"succ": self.level(l)?}),
             Level::Max(a, b, _) => json!({"max": [self.level(a)?, self.level(b)?]}),
             Level::IMax(a, b, _) => json!({"imax": [self.level(a)?, self.level(b)?]}),
-            Level::Param(n, _) => json!({"param": render(self.ctx, n)?}),
+            Level::Param(n, _) => json!({"param": self.render(n)?}),
         };
-        hash("zklean/node/1\0", &node)
+        let h = hash("zklean/node/1\0", &node)?;
+        self.levels.insert(l, h.clone());
+        Ok(h)
     }
 
     fn levels(&mut self, ls: LevelsPtr<'c>) -> Result<Value> {
@@ -370,30 +377,36 @@ impl<'r, 'c> Reader<'r, 'c, '_> {
             let Level::Param(n, _) = self.ctx.read_level(*l) else {
                 bail!("universe parameter is not a name");
             };
-            names.push(Value::String(render(self.ctx, n)?));
+            names.push(Value::String(self.render(n)?));
         }
         Ok(Value::Array(names))
     }
-}
 
-/// Dotted Lean name. Components that would make the rendering ambiguous (empty,
-/// containing a dot, or all digits like a numeric component) are rejected.
-fn render<'c>(ctx: &TcCtx<'c, '_>, name: NamePtr<'c>) -> Result<String> {
-    let (prefix, part) = match ctx.read_name(name) {
-        Name::Anon => return Ok(String::new()),
-        Name::Str(pre, s, _) => {
-            let s = ctx.read_string(s).to_string();
-            ensure!(
-                !s.is_empty() && !s.contains('.') && !s.chars().all(|c| c.is_ascii_digit()),
-                "ambiguous name component"
-            );
-            (render(ctx, pre)?, s)
+    /// Dotted Lean name. Components that would make the rendering ambiguous
+    /// (empty, containing a dot, or all digits like a numeric component) are
+    /// rejected.
+    fn render(&mut self, name: NamePtr<'c>) -> Result<String> {
+        if let Some(r) = self.rendered.get(&name) {
+            return Ok(r.clone());
         }
-        Name::Num(pre, n, _) => (render(ctx, pre)?, n.to_string()),
-    };
-    Ok(if prefix.is_empty() {
-        part
-    } else {
-        format!("{prefix}.{part}")
-    })
+        let (prefix, part) = match self.ctx.read_name(name) {
+            Name::Anon => return Ok(String::new()),
+            Name::Str(pre, s, _) => {
+                let s = self.ctx.read_string(s).to_string();
+                ensure!(
+                    !s.is_empty() && !s.contains('.') && !s.chars().all(|c| c.is_ascii_digit()),
+                    "ambiguous name component"
+                );
+                (self.render(pre)?, s)
+            }
+            Name::Num(pre, n, _) => (self.render(pre)?, n.to_string()),
+        };
+        let rendered = if prefix.is_empty() {
+            part
+        } else {
+            format!("{prefix}.{part}")
+        };
+        self.rendered.insert(name, rendered.clone());
+        Ok(rendered)
+    }
 }

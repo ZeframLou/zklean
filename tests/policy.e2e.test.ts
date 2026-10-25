@@ -51,7 +51,7 @@ test("custom axioms are permitted only by their reviewed identities", async () =
 test("concurrent checks of one certificate share a single backend run", async () => {
   const certificate = {
     ...(await checked("identity", ["Demo.identity"])),
-    proof: "base64:AA==",
+    proof: `base64:${Buffer.alloc(260).toString("base64")}`,
     source: "https://example.com/identity.ndjson",
   };
   let calls = 0;

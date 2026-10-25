@@ -7,8 +7,8 @@ import { groth16Backend } from "./groth16.ts";
 import { createVerifier } from "./verifier.ts";
 import { exportModule, findTools, profile } from "./tooling.ts";
 import { checkAxioms, standardAxioms } from "./policy.ts";
-import type { Statement, VerifyOptions } from "./types.ts";
-import { identified, parseCertificate } from "./encoding.ts";
+import type { Statement, Policy } from "./types.ts";
+import { identified, parseCertificate, parseSource } from "./encoding.ts";
 import { download, matchSource } from "./fetch.ts";
 
 const help = `ZKLean — check and certify Lean propositions
@@ -19,10 +19,11 @@ const help = `ZKLean — check and certify Lean propositions
   zklean verify       --certificate CERT.json [--axioms A,B]
   zklean fetch        --certificate CERT.json [--axioms A,B] [--from FILE] --out SOURCE.ndjson
   zklean requirements --project DIR --module NAME --claims A,B --out FILE.json
-  zklean export       --project DIR --module NAME [--claims A,B] --out FILE.ndjson
+  zklean export       --project DIR --module NAME [--claims NAMES] --out FILE.ndjson
   zklean pin          --out PROFILE.json
 
-Source commands accept --export FILE instead of --project and --module.
+Source commands accept --export FILE instead of --project and --module. For
+export, --claims names any declarations to include with their dependencies.
 --axioms names permitted axioms: Lean's standard axioms, or names given
 identities in --axiom-policy FILE, a JSON object mapping names to identities.
 prove writes CERT.json and CERT.ndjson, the export it proved from; publish the
@@ -75,10 +76,14 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
   const custom = optional("axiom-policy")
     ? identified(await Bun.file(required("axiom-policy")).json())
     : {};
-  const policy: VerifyOptions = {
+  const policy: Policy = {
     axioms: Object.fromEntries(
       list(optional("axioms")).map((name) => {
-        const id = custom[name] ?? standardAxioms[name];
+        const id = Object.hasOwn(custom, name)
+          ? custom[name]
+          : Object.hasOwn(standardAxioms, name)
+            ? standardAxioms[name]
+            : undefined;
         if (!id) throw new Error(`no identity for axiom ${name}`);
         return [name, id];
       }),
@@ -144,8 +149,8 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
       if (command === "check") return output(statement);
       const source = required("source");
       const out = required("out");
-      // Validate the certificate shape before hours of proving.
-      parseCertificate({ ...statement, proof: "base64:AA==", source });
+      // Validate the source before hours of proving.
+      parseSource(source);
       console.error("Generating a Groth16 proof; large models may take hours…");
       const timeout = optional("timeout");
       const certificate = await prove(input, source, {

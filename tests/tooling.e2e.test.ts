@@ -2,7 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "bun:test";
-import { loadRequirements } from "../src/requirements.ts";
+import { loadRequirements, satisfies } from "../src/requirements.ts";
 import { parseCertificate } from "../src/encoding.ts";
 import { download, matchSource } from "../src/fetch.ts";
 import { binary, checked, root } from "./helpers.ts";
@@ -60,36 +60,77 @@ test("requirements load only exact JSON snapshots", async () => {
 });
 
 const certificate = {
-  format: "zklean/1",
+  format: "zklean/1" as const,
   claims: { "Demo.identity": "b".repeat(64) },
   axioms: {},
-  proof: "base64:AA==",
+  proof: `base64:${Buffer.alloc(260).toString("base64")}`,
   source: "https://example.com/spec.ndjson",
 };
 
-test("a certificate names one https source", () => {
-  expect(parseCertificate(certificate).source).toBe(certificate.source);
-  for (const source of [
-    undefined,
-    "ext::sh -c id",
-    "http://example.com/spec.ndjson",
-    "file:///etc/passwd",
-    { url: certificate.source },
+test("certificates parse strictly", () => {
+  expect(parseCertificate(certificate)).toEqual(certificate);
+  const proof = Buffer.alloc(260);
+  for (const changed of [
+    { source: undefined },
+    { source: "http://example.com/spec.ndjson" },
+    { source: "file:///etc/passwd" },
+    { source: "https://user:secret@example.com/spec.ndjson" },
+    { source: "ext::sh -c id" },
+    { proof: `base64:${proof.subarray(1).toString("base64")}` },
+    // Nonzero padding bits decode to the same bytes but are not canonical.
+    { proof: `base64:${proof.toString("base64").replace(/A=$/, "B=")}` },
+    { claims: { "Demo.identity": "B".repeat(64) } },
+    { axioms: { "Demo.identity": "c".repeat(64) } },
+    { extra: true },
   ])
-    expect(() => parseCertificate({ ...certificate, source })).toThrow();
+    expect(() => parseCertificate({ ...certificate, ...changed })).toThrow();
+  // A key containing commas must not pass for several expected keys.
+  const { claims, axioms, ...rest } = certificate;
+  expect(() =>
+    parseCertificate({ ...rest, "axioms,claims": { claims, axioms } }),
+  ).toThrow();
 });
 
-test("a source export must reproduce every certified identity", async () => {
-  const statement = await checked("identity", ["Demo.identity"]);
-  const exported = await Bun.file(
-    join(import.meta.dir, "fixtures/identity.ndjson"),
-  ).text();
-  const sourced = parseCertificate({ ...certificate, ...statement });
-  expect(await matchSource(sourced, exported, binary)).toEqual([]);
-  const forged = { ...sourced, claims: { "Demo.identity": "d".repeat(64) } };
+test("satisfaction is by claim name and identity, never by axiom", () => {
+  const requirements = {
+    format: "zklean/requirements/1" as const,
+    claims: { "Demo.identity": "b".repeat(64) },
+  };
+  expect(satisfies(certificate, requirements)).toBe(true);
   expect(
-    (await matchSource(forged, exported, binary)).map((m) => m.name),
-  ).toEqual(["Demo.identity"]);
+    satisfies({ claims: { "Demo.identity": "c".repeat(64) } }, requirements),
+  ).toBe(false);
+  expect(
+    satisfies(
+      { ...certificate, claims: {}, axioms: requirements.claims } as never,
+      requirements,
+    ),
+  ).toBe(false);
+});
+
+const fixture = (name: string) =>
+  Bun.file(join(import.meta.dir, `fixtures/${name}.ndjson`)).text();
+
+test("a source must reproduce every claim and non-standard axiom", async () => {
+  const shapes = ["Shapes.even_zero", "Shapes.leaf_eq"];
+  const mutual = parseCertificate({
+    ...certificate,
+    ...(await checked("mutual", shapes)),
+  });
+  expect(await matchSource(mutual, await fixture("mutual"), binary)).toEqual(
+    [],
+  );
+  // A different model under the same names does not match.
+  expect(
+    (await matchSource(mutual, await fixture("mutual-variant"), binary)).map(
+      (m) => m.name,
+    ),
+  ).toEqual(["Shapes.even_zero"]);
+  // A specification that states the claim as an axiom, without the proof or
+  // the standard axioms the proof used, matches the proved certificate.
+  const v1 = parseCertificate({ ...certificate, ...(await checked("v1")) });
+  expect(Object.keys(v1.axioms)).toEqual(["propext"]);
+  expect(await matchSource(v1, await fixture("v1-spec"), binary)).toEqual([]);
 });
 
 test("source downloads refuse redirects", async () => {

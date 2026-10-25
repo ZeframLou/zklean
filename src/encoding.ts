@@ -22,18 +22,14 @@ export function canonical(value: unknown): string {
 export function sha256(value: string | Uint8Array): string {
   return new Bun.CryptoHasher("sha256").update(value).digest("hex");
 }
+/** Only the canonical encoding round-trips, so this rejects everything else. */
 export function decodeBase64(value: unknown): Uint8Array {
-  if (
-    typeof value !== "string" ||
-    !/^base64:(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(
-      value,
-    )
-  ) {
+  const bytes =
+    typeof value === "string" && value.startsWith("base64:")
+      ? Buffer.from(value.slice(7), "base64")
+      : undefined;
+  if (!bytes || encodeBase64(bytes) !== value)
     throw new Error("expected canonical base64: encoding");
-  }
-  const bytes = Buffer.from(value.slice(7), "base64");
-  if (encodeBase64(bytes) !== value)
-    throw new Error("noncanonical base64 padding bits");
   return bytes;
 }
 export function encodeBase64(value: Uint8Array | string): string {
@@ -45,7 +41,11 @@ export function object(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 export function keys(value: Record<string, unknown>, expected: string[]): void {
-  if (Object.keys(value).sort().join(",") !== [...expected].sort().join(","))
+  const actual = Object.keys(value);
+  if (
+    actual.length !== expected.length ||
+    !expected.every((key) => Object.hasOwn(value, key))
+  )
     throw new Error("unexpected fields");
 }
 export function identified(value: unknown): Identified {
@@ -54,12 +54,6 @@ export function identified(value: unknown): Identified {
     if (!name || typeof id !== "string" || !/^[0-9a-f]{64}$/.test(id))
       throw new Error("expected Lean names mapped to identities");
   return map as Identified;
-}
-/** Names are unique across the maps, so each name has one meaning. */
-export function distinct(...maps: Identified[]): void {
-  const names = maps.flatMap((map) => Object.keys(map));
-  if (new Set(names).size !== names.length)
-    throw new Error("duplicate declaration name");
 }
 export function parseStatement(value: unknown): Statement {
   const s = object(value);
@@ -72,16 +66,34 @@ export function parseStatement(value: unknown): Statement {
     axioms: identified(s.axioms),
   };
   if (!Object.keys(statement.claims).length) throw new Error("no claims");
-  distinct(statement.claims, statement.axioms);
+  // Each name has one meaning: a claim is never also an axiom.
+  if (
+    Object.keys(statement.claims).some((n) =>
+      Object.hasOwn(statement.axioms, n),
+    )
+  )
+    throw new Error("duplicate declaration name");
   return structuredClone(statement);
+}
+/** An https URL without credentials, as the URL parser normalizes it. */
+export function parseSource(value: unknown): string {
+  const url =
+    typeof value === "string" && URL.canParse(value) && new URL(value);
+  if (!url || url.protocol !== "https:" || url.username || url.password)
+    throw new Error("invalid certificate source");
+  return url.href;
 }
 export function parseCertificate(value: unknown): Certificate {
   const { proof, source, ...rest } = object(value);
-  if (decodeBase64(proof).length === 0) throw new Error("empty proof");
-  if (typeof source !== "string" || !/^https:\/\/\S+$/.test(source))
-    throw new Error("invalid certificate source");
+  // SP1's circuit-key selector and the uncompressed Groth16 proof.
+  if (decodeBase64(proof).length !== 260)
+    throw new Error("proof must be 260 bytes");
   // Own the validated data so caller mutation cannot alter an in-flight check.
-  return { ...parseStatement(rest), proof: proof as string, source };
+  return {
+    ...parseStatement(rest),
+    proof: proof as string,
+    source: parseSource(source),
+  };
 }
 export function statement(c: Statement): Statement {
   return {

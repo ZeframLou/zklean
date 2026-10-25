@@ -7,9 +7,11 @@ artifacts, Lean process or native executable.
 
 ## Canonical JSON
 
-Canonical JSON sorts object keys by UTF-8 bytes, has no whitespace, uses JSON
-string escaping, and permits only nonnegative safe integers as numbers. No
-Unicode normalization is applied, and unpaired surrogates are rejected. `H(tag, v)`
+Canonical JSON sorts object keys by UTF-8 bytes, has no whitespace, and permits
+only nonnegative safe integers as numbers. Strings escape only `"`, `\` and
+characters below U+0020: `\b \f \n \r \t`, and otherwise `\u00xx` in
+lowercase hex. No Unicode normalization is applied, and unpaired surrogates are
+rejected. `H(tag, v)`
 is lowercase hex `SHA256(UTF8(tag) || canonicalJSON(v))`.
 
 ## Identities
@@ -18,8 +20,16 @@ An identity hashes one declaration's meaning together with its whole dependency
 closure. Each reference to another constant carries that constant's identity, so
 equal identities mean equal names, statements and definitions throughout.
 
-**Names** are rendered as dotted strings. Ambiguous components (empty, containing
-`.`, or all digits) are rejected.
+**Names** are rendered as dotted strings. An export containing any ambiguous
+component (empty, containing `.`, or all digits) is rejected.
+
+**Built-in constants.** The checker computes natural-number and string literals,
+`Nat` arithmetic, `Quot` and `eagerReduce` natively, by name. An export may
+contain these 31 constants only with the identities of Lean's own definitions
+at the pinned toolchain, listed in `crates/core/src/kernel.json`; otherwise it
+is rejected, since a redefined `Nat.gcd`, for example, would prove `False`.
+This also fixes the meaning of literals, which stand for `Nat.succ` chains and
+`String.ofList [Char.ofNat …]`.
 
 **Nodes** are hashed Merkle-style as `H("zklean/node/1\0", node)`, with every
 child replaced by its hash:
@@ -38,8 +48,7 @@ child replaced by its hash:
 
 Binder names, binder annotations and `letE` nondependency hints are dropped:
 they do not affect meaning. `id` is the referenced constant's identity, or `null`
-for a reference inside the inductive group being hashed. Universe parameter names
-are kept, so renaming one changes the identity.
+for a reference inside the inductive group being hashed.
 
 **Declarations** are hashed as `H("zklean/declaration/1\0", d)`:
 

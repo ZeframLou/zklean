@@ -40,9 +40,11 @@ Lean module ── lean4export ──> export ── Nanoda in SP1 ──> ident
 
 ### 3.2. Certificate generation
 
-The SP1 guest MUST check the entire export with Nanoda, require every claim to be
-a theorem whose type is a proposition, collect every axiom the claims' proofs
-use, and commit the identities of the claims and those axioms.
+The SP1 guest MUST check the entire export with Nanoda, reject an export that
+defines any constant the checker computes with by name differently from Lean
+(see [ENCODING.md](docs/ENCODING.md)), require every claim to be a theorem whose
+type is a proposition, collect every axiom the claims' proofs use, and commit the
+identities of the claims and those axioms.
 
 ### 3.3. Certificate format
 
@@ -60,13 +62,14 @@ use, and commit the identities of the claims and those axioms.
 - `axioms`: every axiom the proofs use, by name and identity. A name occurs in at
   most one of `claims` and `axioms`.
 - `proof`: the Groth16 proof of `{format, claims, axioms}`.
-- `source`: the `https` URL of one lean4export file that contains every claim and
-  axiom with everything they depend on. Clients MUST NOT follow redirects from
+- `source`: the `https` URL, without credentials, of one lean4export file that
+  contains every claim and every axiom other than Lean's standard ones, with
+  everything they depend on. Clients MUST NOT follow redirects from
   it, so the URL is the file's final address.
 
 The source is not part of the proved statement. It is an untrusted pointer: a
 recipient verifies the certificate, then checks the file with Nanoda and accepts
-it only if it reproduces every certified identity. A source matched against an
+it only if it reproduces the identity of every claim and non-standard axiom. A source matched against an
 unverified certificate means nothing, since a forger can choose identities that
 match any file. A wrong source can make that check fail, but cannot make a
 different statement match, and a source can move without re-proving.
@@ -101,7 +104,8 @@ A requirement lists the propositions a recipient's own proofs assume:
 
 `zklean requirements` computes it from local Lean code. Each claim must be a
 proposition, proved or stated as an axiom. A certificate satisfies a requirement
-when every required claim appears in it with the same identity.
+when every required claim appears among its `claims` with the same identity; an
+entry of `axioms` never satisfies a requirement.
 
 ## 5. References
 

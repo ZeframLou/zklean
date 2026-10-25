@@ -9,6 +9,12 @@ use zklean_core::{commitment, ProveInput};
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct Identity {
+    elf_path: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct Request {
     elf_path: String,
     elf_sha256: String,
@@ -46,8 +52,8 @@ pub fn run(command: &str, input: &str) -> Result<Value> {
     std::env::set_var("FIX_CORE_SHAPES", "true");
     std::env::set_var("FIX_RECURSION_SHAPES", "true");
     if command == "identity" {
-        let request: Value = serde_json::from_str(input)?;
-        let elf = std::fs::read(request["elfPath"].as_str().context("elfPath required")?)?;
+        let request: Identity = serde_json::from_str(input)?;
+        let elf = std::fs::read(&request.elf_path).context("read guest ELF")?;
         let client = ProverClient::builder().cpu().build();
         let (_, vk) = client.setup(&elf);
         return Ok(

@@ -29,6 +29,16 @@ const examples = [
     claims: ["Demo.identity"],
   },
   {
+    module: "KernelSpoof",
+    file: "kernel-spoof",
+    claims: ["Attack.claim"],
+  },
+  {
+    module: "V1Spec",
+    file: "v1-spec",
+    claims: ["Inventory.reservation_safe"],
+  },
+  {
     module: "PropDef",
     file: "prop-def",
     claims: ["Demo.assumed"],

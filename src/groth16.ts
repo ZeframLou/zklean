@@ -16,7 +16,6 @@ export function groth16Backend(
     identity: `sp1:5.2.4:groth16:${verifierKey}`,
     async verify(certificate) {
       const proof = decodeBase64(certificate.proof);
-      if (proof.length !== 260) return false;
       const input = new Uint8Array(324);
       input.set(proof);
       input.set(Buffer.from(statementId(certificate), "hex"), 260);
@@ -33,7 +32,13 @@ let wasm: Promise<Uint8Array> | undefined;
 let queue: Promise<unknown> = Promise.resolve();
 
 function run(input: Uint8Array): Promise<boolean> {
-  wasm ??= Bun.file(wasmPath).bytes();
+  // A failed load is retried on the next check rather than cached.
+  wasm ??= Bun.file(wasmPath)
+    .bytes()
+    .catch((error) => {
+      wasm = undefined;
+      throw error;
+    });
   return wasm.then(
     (bytes) =>
       new Promise<boolean>((resolve, reject) => {

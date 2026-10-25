@@ -9,7 +9,7 @@ pub fn verify(proof: &[u8], commitment: &[u8; 32], guest_key: &str) -> bool {
 }
 
 // A fixed-size ABI avoids allocators, bindgen, and a second implementation of
-// curve arithmetic in JavaScript. Each verification owns its WASM instance.
+// curve arithmetic in JavaScript.
 #[cfg(target_arch = "wasm32")]
 mod wasm {
     const INPUT_BYTES: usize = super::PROOF_BYTES + 32 + 32;

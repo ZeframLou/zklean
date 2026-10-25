@@ -32,6 +32,12 @@ struct Identify {
     names: Vec<String>,
 }
 
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Export {
+    export: String,
+}
+
 fn main() -> Result<()> {
     let mut output = json_output()?;
     let command = std::env::args()
@@ -44,6 +50,7 @@ fn main() -> Result<()> {
             let request: ProveInput = serde_json::from_str(&input)?;
             serde_json::to_value(zklean_core::check(&request)?)?
         }
+        // The statement digest, so tests can compare Rust and TypeScript.
         "commitment" => {
             let statement: zklean_core::Statement = serde_json::from_str(&input)?;
             let digest = zklean_core::commitment(&statement)
@@ -58,6 +65,10 @@ fn main() -> Result<()> {
         }
         #[cfg(feature = "prover")]
         "prove" | "identity" => sp1::run(&command, &input)?,
+        "kernel" => {
+            let request: Export = serde_json::from_str(&input)?;
+            serde_json::to_value(zklean_core::kernel_identities(&request.export)?)?
+        }
         "identify" => {
             let request: Identify = serde_json::from_str(&input)?;
             serde_json::to_value(zklean_core::identify(&request.export, &request.names)?)?

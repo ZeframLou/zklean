@@ -41,7 +41,7 @@ export interface VerificationResult {
   statementId?: string;
   detail?: string;
 }
-export interface VerifyOptions {
+export interface Policy {
   /** Permitted axioms by name and identity; see `standardAxioms`. */
   axioms: Identified;
 }

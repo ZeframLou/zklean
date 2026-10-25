@@ -53,14 +53,16 @@ configuration, never certificate data.
 ## Read a certificate's definitions
 
 An identity hashes a declaration with everything it depends on: every constant
-name, type and definition body, but not binder names. Fetch the source export:
+name and type, and every definition body except proofs, but not binder names.
+Fetch the source export:
 
 ```sh
 zklean fetch --certificate reservation.json --axioms propext --out reservation.ndjson
 ```
 
 `fetch` verifies the certificate, downloads its source, checks it with Nanoda
-and recomputes every identity, and saves the file only if all of them match.
+and recomputes the identity of every claim and non-standard axiom, and saves the
+file only if all of them match.
 `--from FILE` checks a local copy instead. Nothing fetched is executed.
 
 An export holds kernel terms rather than readable Lean. To read the definitions
@@ -77,8 +79,9 @@ zklean requirements --project client --module Remote \
   --claims Inventory.reservation_safe --out requirements.json
 ```
 
-A certificate satisfies the snapshot when every required claim appears in it
-with the same identity. To use a weaker property, derive it in your own proof and
+A certificate satisfies the snapshot when every required claim appears among its
+claims with the same identity (`satisfies(certificate, requirements)` in the SDK,
+after verifying it). To use a weaker property, derive it in your own proof and
 still require the provider's claim. Regenerate the snapshot whenever its Lean
 sources change.
 

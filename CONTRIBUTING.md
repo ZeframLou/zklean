@@ -26,7 +26,9 @@ ZKLEAN_LAKE="$(command -v lake)" bun run check
 
 CI also rebuilds the WebAssembly verifier (`bun run build:verifier`, pinned to
 Rust 1.91.1 with remapped paths) and requires it to equal `src/verifier.wasm`,
-re-exports the Lean fixtures and requires them unchanged, and builds the guest.
+re-exports the Lean fixtures and re-derives the pinned identities of Lean's own
+definitions (`bun scripts/pin.ts`), requiring both unchanged, and builds the
+guest.
 As with the guest, CI's Linux build of the verifier is canonical: after changing
 `crates/verifier`, commit the `zklean-verifier-wasm` artifact CI uploads.
 
