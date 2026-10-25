@@ -18,6 +18,5 @@ const exported = await exportModule({
 const { axioms } = (await runNative(tools.binary, "check", {
   export: exported,
   claims,
-  allowedAxioms: ["propext", "Classical.choice", "Quot.sound"],
 })) as { axioms: Record<string, string> };
 await Bun.write("src/axioms.json", `${JSON.stringify(axioms, null, 2)}\n`);

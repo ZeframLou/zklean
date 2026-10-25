@@ -63,18 +63,17 @@ group, so every identity is well defined.
 The guest commits exactly 32 bytes, the statement digest:
 
 ```text
-statementId = H("zklean/statement/1\0", {format, claims, definitions, axioms})
+statementId = H("zklean/statement/1\0", {format, claims, axioms})
 ```
 
-Each of `claims`, `definitions` and `axioms` maps Lean names to identities. A name
-occurs at most once across the three maps. The certificate's `source` is not
+`claims` and `axioms` each map Lean names to identities. A name occurs in at most
+one of them. The certificate's `source` is not
 committed; it only locates an export that must reproduce these identities.
 
 The certificate's `proof` is `base64:` followed by padded, canonical RFC 4648
 base64 of exactly 260 bytes: SP1's four-byte circuit-key selector and the 256-byte
 uncompressed Groth16 proof, as returned by `SP1ProofWithPublicValues.bytes()`.
-Other SP1 modes and lengths are rejected. The certificate's own identity is
-`H("zklean/certificate/1\0", certificate)`.
+Other SP1 modes and lengths are rejected.
 
 ## Verifier keys
 

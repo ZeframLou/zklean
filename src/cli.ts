@@ -19,14 +19,14 @@ import { download, matchSource } from "./fetch.ts";
 
 const help = `ZKLean — check and certify Lean contracts
 
-  zklean prove --project DIR --module NAME --claims A,B [--definitions D]
+  zklean prove --project DIR --module NAME --claims A,B
       --source URL --out CERT.json [--timeout MS]
   zklean verify --certificate CERT.json [--axioms A,B]
   zklean fetch --certificate CERT.json --out SOURCE.ndjson
-  zklean requirements --project DIR --module NAME --claims A,B [--definitions D] --out FILE.json
-  zklean check --project DIR --module NAME --claims A,B [--definitions D] [--axioms A,B]
+  zklean requirements --project DIR --module NAME --claims A,B --out FILE.json
+  zklean check --project DIR --module NAME --claims A,B [--axioms A,B]
 
-  zklean export --project DIR --module NAME --out FILE.ndjson [--claims A,B] [--definitions D]
+  zklean export --project DIR --module NAME --out FILE.ndjson [--claims A,B]
   zklean pin --out PROFILE.json [--elf FILE]
 
 The installer supplies the prover/verifier, guest, exporter, and pinned Lean.
@@ -63,7 +63,6 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
         "out",
         "export",
         "claims",
-        "definitions",
         "axioms",
         "axiom-policy",
         "config",
@@ -145,7 +144,7 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
     return exportModule({
       project: resolve(required("project")),
       module: required("module"),
-      claims: [...claims, ...list(optional("definitions"))],
+      claims,
       tools,
     });
   };
@@ -161,8 +160,6 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
     const input: ProveInput = {
       export: await exported(),
       claims,
-      definitions: list(optional("definitions")),
-      allowedAxioms: names,
     };
     if (command === "prove") {
       const statement = (await runNative(

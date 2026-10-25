@@ -1,8 +1,8 @@
 # Measure complete certificates and verification
 
-A certificate holds one 32-byte identity per claim, definition and used axiom,
+A certificate holds one 32-byte identity per claim and used axiom,
 plus 260 bytes of Groth16 evidence. Its size depends on how many names it lists,
-not on the size of the proofs or definitions behind them.
+not on the size of the proofs or definitions behind them, plus one source URL.
 
 ## Complete sizes
 
@@ -11,12 +11,12 @@ compression. The evidence has a fixed length, so these sizes are exact.
 
 | Workload | Lean export | Certificate | Export / certificate |
 | --- | ---: | ---: | ---: |
-| Propositional identity | 722 | 510 | 1.4× |
-| Polymorphic pipeline composition | 7,742 | 598 | 13× |
-| Inventory reservation (`V1`, with `Init`) | 381,561 | 695 | 549× |
+| Propositional identity | 722 | 541 | 1.3× |
+| Polymorphic pipeline composition | 7,742 | 632 | 12× |
+| Inventory reservation (`V1`, with `Init`) | 381,561 | 624 | 611× |
 
-The inventory certificate lists one claim, one operation definition and
-`propext`. Its export includes the proofs of every `Init` lemma the proof uses;
+The inventory certificate lists one claim and `propext`, and a 38-character
+source URL. Its export includes the proofs of every `Init` lemma the proof uses;
 none of that reaches the certificate.
 
 ## Verification costs

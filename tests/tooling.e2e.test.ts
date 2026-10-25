@@ -60,13 +60,11 @@ test("requirements load only exact JSON snapshots", async () => {
   const snapshot = {
     format: "zklean/requirements/1" as const,
     claims: { "Demo.identity": "a".repeat(64) },
-    definitions: {},
   };
   expect(await loadRequirements(snapshot)).toEqual(snapshot);
   for (const invalid of [
     { ...snapshot, sourceManifest: {} },
     { ...snapshot, claims: { "Demo.identity": "A".repeat(64) } },
-    { ...snapshot, definitions: { "Demo.identity": "b".repeat(64) } },
   ])
     await expect(loadRequirements(invalid as never)).rejects.toThrow();
 });
@@ -74,7 +72,6 @@ test("requirements load only exact JSON snapshots", async () => {
 const certificate = {
   format: "zklean/1",
   claims: { "Demo.identity": "b".repeat(64) },
-  definitions: {},
   axioms: {},
   proof: "base64:AA==",
   source: "https://example.com/spec.ndjson",
@@ -92,7 +89,7 @@ test("a certificate names one https or file source", () => {
 });
 
 test("a source export must reproduce every certified identity", async () => {
-  const statement = await checked("identity", ["Demo.identity"], []);
+  const statement = await checked("identity", ["Demo.identity"]);
   const exported = await download(
     pathToFileURL(join(import.meta.dir, "fixtures/identity.ndjson")).href,
   );

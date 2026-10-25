@@ -78,10 +78,10 @@ axioms explicitly allowed with `--axioms` are accepted.
 TypeScript library for discovering API specifications and checking whether they
 satisfy a client's requirements.
 
-A certificate names each claim, definition and used axiom by a 32-byte content
+A certificate names each claim and used axiom by a 32-byte content
 identity and carries a 260-byte Groth16 proof, so its size does not grow with
 the proofs. The inventory example's Lean export is 381 KB; its certificate is
-695 bytes. See [Benchmarks](docs/BENCHMARKS.md) for sizes and verification costs.
+624 bytes. See [Benchmarks](docs/BENCHMARKS.md) for sizes and verification costs.
 
 See the [usage guide](docs/USAGE.md), [certificate specification](SPEC.md),
 [proof formats](docs/ENCODING.md), and [source build instructions](docs/DEVELOPMENT.md).

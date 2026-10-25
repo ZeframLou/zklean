@@ -6,22 +6,19 @@ export interface Statement {
   format: "zklean/1";
   /** Proved propositions. */
   claims: Identified;
-  /** Non-proof declarations the claims state facts about, such as an operation. */
-  definitions: Identified;
   /** Every axiom the proofs use. */
   axioms: Identified;
 }
 export interface Certificate extends Statement {
   /** Groth16 proof that the pinned checker accepted the statement. */
   proof: string;
-  /** URL (https or file) of a lean4export file containing every claim,
-   * definition and axiom. Untrusted: it must reproduce the certified identities. */
+  /** URL (https or file) of a lean4export file containing every claim and
+   * axiom. Untrusted: it must reproduce the certified identities. */
   source: string;
 }
 export interface Requirements {
   format: "zklean/requirements/1";
   claims: Identified;
-  definitions: Identified;
 }
 
 /** This is trusted application configuration, never certificate-provided code. */
@@ -40,8 +37,6 @@ export type Reason =
 export interface VerificationResult {
   status: Status;
   reason: Reason;
-  /** Identity of the complete certificate, including its proof. */
-  certificateId?: string;
   /** Identity of the authenticated statement. */
   statementId?: string;
   detail?: string;

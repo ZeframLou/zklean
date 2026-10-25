@@ -26,9 +26,7 @@ beforeAll(async () => {
 test.skipIf(!elfPath)(
   "SP1 executes Nanoda and commits the same statement as native checking",
   async () => {
-    const request = await input("v1", undefined, undefined, [
-      "Inventory.POST_reservations",
-    ]);
+    const request = await input("v1");
     const result = (await runNative(binary, "execute", {
       elfPath,
       input: request,
@@ -40,18 +38,12 @@ test.skipIf(!elfPath)(
 );
 
 test.skipIf(!elfPath)(
-  "the real SP1 guest rejects invalid proofs and forbidden axioms",
+  "the real SP1 guest rejects invalid proofs and ambiguous exports",
   async () => {
     const invalid = await input("identity", ["Demo.identity"]);
     invalid.export = invalid.export.replace('"value":6', '"value":0');
     await expect(
       runNative(binary, "execute", { elfPath, input: invalid }),
-    ).rejects.toThrow("guest execution failed");
-    await expect(
-      runNative(binary, "execute", {
-        elfPath,
-        input: await input("axioms", ["Inventory.assumed_safe"]),
-      }),
     ).rejects.toThrow("guest execution failed");
     const ambiguous = await input("identity", ["Demo.identity"]);
     ambiguous.export = ambiguous.export.replace(

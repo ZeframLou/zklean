@@ -14,7 +14,6 @@ serde_json.workspace = true
 base64.workspace = true
 sha2.workspace = true
 zklean-core = { path = "../core" }
-nanoda_lib = { path = "../../vendor/nanoda" }
 sp1-sdk = { version = "=5.2.4", default-features = false, optional = true }
 zklean-verifier = { path = "../verifier" }
 sp1-core-executor = { version = "=5.2.4", optional = true }

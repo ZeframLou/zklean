@@ -9,17 +9,11 @@ beforeAll(buildNative, 300_000);
 const hex = /^[0-9a-f]{64}$/;
 
 test("a checked statement is a few hundred bytes of identities, not a model", async () => {
-  const value = await checked("v1", undefined, undefined, [
-    "Inventory.POST_reservations",
-  ]);
+  const value = await checked("v1");
   expect(Object.keys(value.claims)).toEqual(["Inventory.reservation_safe"]);
-  expect(Object.keys(value.definitions)).toEqual([
-    "Inventory.POST_reservations",
-  ]);
   expect(Object.keys(value.axioms)).toEqual(["propext"]);
   for (const id of [
     ...Object.values(value.claims),
-    ...Object.values(value.definitions),
     ...Object.values(value.axioms),
   ])
     expect(id).toMatch(hex);
@@ -28,8 +22,8 @@ test("a checked statement is a few hundred bytes of identities, not a model", as
 });
 
 test("identities ignore binder names but bind constant names and bodies", async () => {
-  const base = await input("identity", ["Demo.identity"], []);
-  const original = await checked("identity", ["Demo.identity"], []);
+  const base = await input("identity", ["Demo.identity"]);
+  const original = await checked("identity", ["Demo.identity"]);
   // Binder display names are presentation only.
   const renamedBinder = base.export.replace(
     /("forallE":\{"binderInfo":"default","body":\d+,"name":)(\d+)/,
@@ -50,13 +44,15 @@ test("identities ignore binder names but bind constant names and bodies", async 
 });
 
 test("a Prop-valued definition keeps its body in its identity", async () => {
-  const request = {
-    ...(await input("prop-def", ["Demo.assumed"], [], ["Demo.Ok"])),
-  };
-  const before = (await runNative(binary, "requirements", request)) as {
-    claims: Record<string, string>;
-    definitions: Record<string, string>;
-  };
+  const request = await input("prop-def", ["Demo.assumed"]);
+  const requirements = (export_: string) =>
+    runNative(binary, "requirements", {
+      ...request,
+      export: export_,
+    }) as Promise<{
+      claims: Record<string, string>;
+    }>;
+  const before = await requirements(request.export);
   // Same name and type (Prop), different body: Demo.Yes becomes Demo.Yes → Demo.Yes.
   // Kernel node indices are contiguous and precede their uses.
   const changed = request.export
@@ -70,21 +66,8 @@ test("a Prop-valued definition keeps its body in its identity", async () => {
       '{"forallE":{"binderInfo":"default","body":1,"name":7,"type":1},"ie":14}\n{"def":{"all":[9],"hints":{"regular":1},"levelParams":[],"name":9,"safety":"safe","type":0,"value":14}}',
     );
   expect(changed).not.toBe(request.export);
-  const after = (await runNative(binary, "requirements", {
-    ...request,
-    export: changed,
-  })) as typeof before;
-  expect(after.definitions["Demo.Ok"]).not.toBe(before.definitions["Demo.Ok"]);
+  const after = await requirements(changed);
   expect(after.claims["Demo.assumed"]).not.toBe(before.claims["Demo.assumed"]);
-});
-
-test("definitions must be stated by the claims and must not be proofs", async () => {
-  await expect(
-    checked("v1", undefined, undefined, ["Nat.sub_add_cancel"]),
-  ).rejects.toThrow("not in the claims' statements");
-  await expect(
-    checked("v1", undefined, undefined, ["Inventory.reservation_safe"]),
-  ).rejects.toThrow("duplicate names");
 });
 
 test("invalid proof terms, missing claims, and axiom claims are rejected", async () => {
@@ -114,24 +97,15 @@ test("invalid proof terms, missing claims, and axiom claims are rejected", async
     "one variant",
   );
   await expect(
-    runNative(
-      binary,
-      "check",
-      await input(
-        "axioms",
-        ["Trusted.evidence"],
-        ["Trusted.evidence", "Trusted.stock_policy"],
-      ),
-    ),
+    runNative(binary, "check", await input("axioms", ["Trusted.evidence"])),
   ).rejects.toThrow();
 });
 
 test("polymorphic stage guarantees certify multiple claims", async () => {
-  const value = await checked(
-    "composition",
-    ["Pipeline.compose", "Pipeline.weaken"],
-    [],
-  );
+  const value = await checked("composition", [
+    "Pipeline.compose",
+    "Pipeline.weaken",
+  ]);
   expect(value.axioms).toEqual({});
   expect(Object.keys(value.claims)).toEqual([
     "Pipeline.compose",
@@ -145,13 +119,12 @@ test("polymorphic stage guarantees certify multiple claims", async () => {
 
 test("reports exactly the used axioms", async () => {
   const claims = ["Inventory.assumed_safe"];
-  const allowed = ["Trusted.evidence", "Trusted.stock_policy"];
-  await expect(
-    runNative(binary, "check", await input("axioms", claims)),
-  ).rejects.toThrow();
-  const value = await checked("axioms", claims, allowed);
-  expect(Object.keys(value.axioms)).toEqual(allowed);
-  const request = await input("axioms", claims, allowed);
+  const value = await checked("axioms", claims);
+  expect(Object.keys(value.axioms)).toEqual([
+    "Trusted.evidence",
+    "Trusted.stock_policy",
+  ]);
+  const request = await input("axioms", claims);
   request.export +=
     '{"in":6,"str":{"pre":0,"str":"Unused"}}\n{"axiom":{"isUnsafe":false,"levelParams":[],"name":6,"type":0}}\n';
   const extra = (await runNative(binary, "check", request)) as typeof value;
@@ -185,7 +158,7 @@ test("native and TypeScript use identical authenticated statement bytes", async 
   expect(statementId(value)).toBe(native.commitment);
   // Pinned cross-language vector also guards accidental encoding changes.
   expect(statementId(value)).toBe(
-    "79bca612cc9add1d3e608a85b9222f0dcd14aee41a6d10872e600d7b3f814835",
+    "fd547f58206d0485b678ea1918944fde34f2f7a3b7ce2f0b94a2b003b77e9a21",
   );
 });
 

@@ -3,7 +3,7 @@ mod json;
 mod model;
 pub use model::{Export, Identities};
 
-use anyhow::{bail, ensure, Result};
+use anyhow::{ensure, Result};
 use nanoda_lib::{env::Declar, parser::parse_export_file, util::Config};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -13,16 +13,10 @@ use std::{
 };
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(deny_unknown_fields)]
 pub struct ProveInput {
     pub export: String,
     pub claims: Vec<String>,
-    /// Non-proof declarations to identify, such as an API operation.
-    #[serde(default)]
-    pub definitions: Vec<String>,
-    /// The prover's own guard against accidental axioms. Recipients enforce
-    /// their policy separately, against the committed identities.
-    pub allowed_axioms: Vec<String>,
 }
 
 /// Lean names mapped to declaration identities.
@@ -33,7 +27,6 @@ pub type Identified = BTreeMap<String, String>;
 pub struct Statement {
     pub format: String,
     pub claims: Identified,
-    pub definitions: Identified,
     pub axioms: Identified,
 }
 
@@ -42,53 +35,76 @@ pub struct Statement {
 pub struct Requirements {
     pub format: String,
     pub claims: Identified,
-    pub definitions: Identified,
 }
 
 /// Nanoda panics on malformed proofs. In the guest that aborts execution and no
 /// proof can be produced. Native callers should execute this in a child process.
 pub fn check(input: &ProveInput) -> Result<Statement> {
-    process(input, true)
-}
-
-/// Identify locally trusted requirements without asserting their derivability.
-pub fn requirements(input: &ProveInput) -> Result<Requirements> {
-    let statement = process(input, false)?;
-    Ok(Requirements {
-        format: "zklean/requirements/1".into(),
-        claims: statement.claims,
-        definitions: statement.definitions,
+    let export = checked(&input.export)?;
+    let claims = names(&input.claims)?;
+    for name in &claims {
+        ensure!(
+            export.kind(name)? == "thm",
+            "claim must name a theorem: {name}"
+        );
+        ensure!(
+            export.props.contains(name),
+            "claim is not a proposition: {name}"
+        );
+    }
+    let axioms = export.axioms(&claims)?;
+    let mut ids = Identities::new(&export);
+    Ok(Statement {
+        format: "zklean/1".into(),
+        claims: ids.all(&claims)?,
+        axioms: ids.all(&axioms)?,
     })
 }
 
-fn process(input: &ProveInput, require_proofs: bool) -> Result<Statement> {
-    ensure!(!input.claims.is_empty(), "at least one claim is required");
-    let mut export = Export::parse(&input.export)?;
-    let claims: BTreeSet<_> = input.claims.iter().cloned().collect();
-    ensure!(claims.len() == input.claims.len(), "duplicate claims");
-    let definitions: BTreeSet<_> = input.definitions.iter().cloned().collect();
-    ensure!(
-        definitions.len() == input.definitions.len() && claims.is_disjoint(&definitions),
-        "duplicate names"
-    );
+/// Identify locally trusted requirements without asserting their derivability:
+/// each claim is a proposition, proved or assumed.
+pub fn requirements(input: &ProveInput) -> Result<Requirements> {
+    let export = checked(&input.export)?;
+    let claims = names(&input.claims)?;
     for name in &claims {
+        export.kind(name)?;
         ensure!(
-            !require_proofs || export.kind(name)? == "thm",
-            "claim must name a theorem: {name}"
+            export.props.contains(name),
+            "claim is not a proposition: {name}"
         );
     }
-    // Check the entire supplied environment: no unauthenticated external state.
-    let mut permitted = input.allowed_axioms.clone();
-    if !require_proofs {
-        permitted.extend(input.claims.clone());
-    }
+    Ok(Requirements {
+        format: "zklean/requirements/1".into(),
+        claims: Identities::new(&export).all(&claims)?,
+    })
+}
+
+/// Identities of any declarations, for matching a source export to a certificate.
+pub fn identify(export: &str, names: &[String]) -> Result<Identified> {
+    let export = checked(export)?;
+    Identities::new(&export).all(&names.iter().cloned().collect())
+}
+
+fn names(list: &[String]) -> Result<BTreeSet<String>> {
+    let names: BTreeSet<_> = list.iter().cloned().collect();
+    ensure!(!names.is_empty(), "at least one claim is required");
+    ensure!(names.len() == list.len(), "duplicate claims");
+    Ok(names)
+}
+
+/// Check the entire supplied environment, so no unauthenticated external state
+/// enters, and record which declarations are proofs: their type is a Prop.
+fn checked(text: &str) -> Result<Export> {
+    let mut export = Export::parse(text)?;
+    // Admit every axiom: the statement reports each one the proofs use, with
+    // its identity, and recipients decide which to accept.
     let config: Config = serde_json::from_value(serde_json::json!({
-        "permitted_axioms": permitted,
-        "unpermitted_axiom_hard_error": false,
+        "unsafe_permit_all_axioms": true,
+        "unpermitted_axiom_hard_error": true,
         "num_threads": 1, "nat_extension": true, "string_extension": true,
         "print_axioms": false
     }))?;
-    let (checked, _) = parse_export_file(Cursor::new(input.export.as_bytes()), config)
+    let (checked, _) = parse_export_file(Cursor::new(text.as_bytes()), config)
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
     checked.check_all_declars();
     for d in checked.declars.values() {
@@ -106,43 +122,7 @@ fn process(input: &ProveInput, require_proofs: bool) -> Result<Statement> {
                 .insert(checked.with_ctx(|ctx| render_name(ctx, info.name)));
         }
     }
-    // Claims must be proofs: their type has type Prop.
-    for name in &claims {
-        export.kind(name)?;
-        ensure!(
-            export.props.contains(name),
-            "claim is not a proposition: {name}"
-        );
-    }
-    // Requirements are assumed, so only certified proofs report their axioms.
-    let axioms = if require_proofs {
-        export.axioms(&claims)?
-    } else {
-        BTreeSet::new()
-    };
-    if let Some(name) = axioms.iter().find(|n| !permitted.contains(n)) {
-        bail!("forbidden axiom: {name}");
-    }
-    // Identified definitions must be part of what the claims state, not
-    // helpers reached only through proofs, and must not be proofs themselves.
-    let public = export.closure(&claims, true)?;
-    for name in &definitions {
-        ensure!(
-            public.contains(name) && !export.props.contains(name),
-            "definition is not in the claims' statements: {name}"
-        );
-    }
-    ensure!(axioms.is_disjoint(&definitions), "duplicate names");
-    let mut ids = Identities::new(&export);
-    let mut identify = |names: &BTreeSet<String>| -> Result<Identified> {
-        names.iter().map(|n| Ok((n.clone(), ids.of(n)?))).collect()
-    };
-    Ok(Statement {
-        format: "zklean/1".into(),
-        claims: identify(&claims)?,
-        definitions: identify(&definitions)?,
-        axioms: identify(&axioms)?,
-    })
+    Ok(export)
 }
 
 /// Sort recursively instead of relying on serde_json's optional map backend.

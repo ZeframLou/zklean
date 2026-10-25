@@ -1,12 +1,7 @@
 /** Public API for local Lean model handling, proving, and verification. */
 export { createVerifier } from "./verifier.ts";
 export { nativeBackend, runNative } from "./native.ts";
-export {
-  parseCertificate,
-  parseStatement,
-  certificateId,
-  statementId,
-} from "./encoding.ts";
+export { parseCertificate, parseStatement, statementId } from "./encoding.ts";
 export type { NativeOptions, ProveInput } from "./native.ts";
 export type {
   Certificate,

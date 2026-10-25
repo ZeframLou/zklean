@@ -26,11 +26,7 @@ export async function matchSource(
   exported: string,
   binary: string,
 ): Promise<Mismatch[]> {
-  const expected = {
-    ...certificate.claims,
-    ...certificate.definitions,
-    ...certificate.axioms,
-  };
+  const expected = { ...certificate.claims, ...certificate.axioms };
   const actual = (await runNative(binary, "identify", {
     export: exported,
     names: Object.keys(expected),

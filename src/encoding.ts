@@ -63,17 +63,16 @@ export function distinct(...maps: Identified[]): void {
 }
 export function parseStatement(value: unknown): Statement {
   const s = object(value);
-  keys(s, ["format", "claims", "definitions", "axioms"]);
+  keys(s, ["format", "claims", "axioms"]);
   if (s.format !== "zklean/1")
     throw new Error("unsupported certificate format");
   const statement: Statement = {
     format: s.format,
     claims: identified(s.claims),
-    definitions: identified(s.definitions),
     axioms: identified(s.axioms),
   };
   if (!Object.keys(statement.claims).length) throw new Error("no claims");
-  distinct(statement.claims, statement.definitions, statement.axioms);
+  distinct(statement.claims, statement.axioms);
   return structuredClone(statement);
 }
 export function parseCertificate(value: unknown): Certificate {
@@ -88,7 +87,6 @@ export function statement(c: Statement): Statement {
   return {
     format: c.format,
     claims: c.claims,
-    definitions: c.definitions,
     axioms: c.axioms,
   };
 }

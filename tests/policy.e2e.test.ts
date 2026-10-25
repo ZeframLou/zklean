@@ -18,7 +18,7 @@ test("standard axiom permissions reject a different proposition under the same n
   const spoof = (await runNative(
     binary,
     "check",
-    await input("axiom-spoof", ["Spoof.everything"], ["propext"]),
+    await input("axiom-spoof", ["Spoof.everything"]),
   )) as typeof real;
   expect(checkAxioms(spoof, { axioms: propext })).toBe("axiom-mismatch");
   const child = Bun.spawn(
@@ -41,8 +41,7 @@ test("standard axiom permissions reject a different proposition under the same n
 });
 
 test("custom axioms are permitted only by their reviewed identities", async () => {
-  const names = ["Trusted.evidence", "Trusted.stock_policy"];
-  const statement = await checked("axioms", ["Inventory.assumed_safe"], names);
+  const statement = await checked("axioms", ["Inventory.assumed_safe"]);
   expect(checkAxioms(statement, { axioms: standardAxioms })).toBe(
     "forbidden-axiom",
   );

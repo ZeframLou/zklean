@@ -251,6 +251,10 @@ impl<'e> Identities<'e> {
         }
     }
 
+    pub fn all(&mut self, names: &BTreeSet<String>) -> Result<BTreeMap<String, String>> {
+        names.iter().map(|n| Ok((n.clone(), self.of(n)?))).collect()
+    }
+
     /// Propositions hash only their statement, whatever their declaration
     /// kind: proofs are irrelevant, and a published `axiom` matches the theorem.
     pub fn of(&mut self, name: &str) -> Result<String> {

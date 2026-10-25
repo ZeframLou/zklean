@@ -4,8 +4,8 @@ A Lean proof establishes a mathematical statement under explicit assumptions,
 called axioms. ZKLean checks that proof with [Nanoda](https://github.com/ammkrn/nanoda_lib)
 inside [SP1](https://github.com/succinctlabs/sp1/tree/v5.2.4) and produces a
 Groth16 certificate that recipients can verify without the original proof terms.
-The certificate names each proposition, definition and used axiom by a content
-identity, so it stays a few hundred bytes however large the proofs are.
+The certificate names each proposition and used axiom by a content identity, so
+it stays a few hundred bytes however large the proofs are.
 
 ## Check and certify a module
 
@@ -16,28 +16,28 @@ that toolchain. These steps copy the inventory example project shipped with the 
 ```sh
 cp -R examples/inventory inventory
 zklean check --project inventory --module V1 \
-  --claims Inventory.reservation_safe \
-  --definitions Inventory.POST_reservations --axioms propext
+  --claims Inventory.reservation_safe --axioms propext
 zklean prove --project inventory --module V1 \
-  --claims Inventory.reservation_safe \
-  --definitions Inventory.POST_reservations --axioms propext \
+  --claims Inventory.reservation_safe --axioms propext \
   --source https://acme.example/reservation.ndjson --out reservation.json
 zklean verify --certificate reservation.json --axioms propext
 ```
 
 `check` runs Nanoda directly and prints the statement: the identities of the
-claims, of the listed definitions, and of every axiom the proofs use.
-`--definitions` names declarations the claims are about, such as an API
-operation, so recipients can match them too. `prove` also writes `reservation.ndjson`, the Lean export it
-proved from. Publish it at the `--source` URL: it holds every definition and
-statement recipients need. It also contains your proofs; to keep them private,
-publish instead the export of a specification module that states the claims as
-`axiom`s (`zklean export … --out reservation.ndjson`). Its identities are the same.
-`prove` additionally runs the checker inside SP1
-and generates cryptographic evidence; this can take hours and needs a measured
-memory budget. See [Benchmarks](BENCHMARKS.md) before choosing a proving workload;
-`prove --timeout MS` overrides the default one-hour deadline. `verify` uses the embedded WebAssembly verifier and the
-locally trusted checker key. The npm package is currently unpublished. After publication, recipients can
+claims and of every axiom the proofs use. `prove` additionally runs the checker
+inside SP1 and generates cryptographic evidence; this can take hours and needs a
+measured memory budget. See [Benchmarks](BENCHMARKS.md) before choosing a proving
+workload; `prove --timeout MS` overrides the default one-hour deadline.
+
+`prove` also writes `reservation.ndjson`, the Lean export it proved from.
+Publish it at the `--source` URL: it holds every definition and statement
+recipients need. It also contains your proofs. To keep them private, publish
+instead the export of a module that states the claims as `axiom`s
+(`zklean export --project … --module Spec --claims … --out reservation.ndjson`);
+its identities are the same.
+
+`verify` uses the embedded WebAssembly verifier and the locally trusted checker
+key. The npm package is currently unpublished. After publication, recipients can
 install the SDK when they do not need source checking or proof generation:
 
 ```sh
@@ -79,50 +79,23 @@ Nothing fetched is executed.
 
 An export holds kernel terms rather than readable Lean. To review the
 definitions and write your own proofs, use the provider's Lean source from any
-copy: if its identities match the certificate, it is the certified model. Record
-what your own code assumes:
+copy: if its identities match the certificate, it is the certified model.
+
+## Depend on a certified guarantee
+
+Write your own proofs against the provider's Lean module, then record which of
+its claims they assume:
 
 ```sh
 zklean requirements --project client --module Remote \
-  --claims Inventory.reservation_safe \
-  --definitions Inventory.POST_reservations --out requirements.json
+  --claims Inventory.reservation_safe --out requirements.json
 ```
 
-A certificate satisfies the snapshot when every required claim and definition
-appears in it with the same identity. Requirements generation does not prove the
-claims. Regenerate and review the snapshot whenever its Lean sources change.
-
-## Derive a different requirement
-
-A client needing only stock conservation can derive a weaker statement from the
-certified guarantee. Save this as `client/Bridge.lean`:
-
-```lean
-import Remote
-
-theorem Client.stock_conserved (available requested remaining : Nat) :
-    Inventory.POST_reservations available requested = some remaining →
-      remaining + requested = available := by
-  intro accepted
-  exact (Inventory.reservation_safe available requested remaining accepted).2.2
-```
-
-Here `Remote` is the provider's specification module. Save the remote
-certificate's `claims` object as `remote-claims.json`, and certify the derivation
-with the remote guarantee as a permitted axiom:
-
-```sh
-zklean prove --project client --module Bridge \
-  --claims Client.stock_conserved \
-  --axioms propext,Inventory.reservation_safe \
-  --axiom-policy remote-claims.json \
-  --source https://client.example/bridge.ndjson --out bridge.json
-```
-
-The bridge certificate lists `Inventory.reservation_safe` among its axioms with
-the remote claim's identity, and its source export contains that axiom's
-statement. A recipient verifies both certificates and accepts
-the bridge only with that remote claim permitted by identity.
+A certificate satisfies the snapshot when every required claim appears in it
+with the same identity. If you need a weaker property, derive it inside your own
+proof and still require the provider's claim. Requirements generation does not
+prove the claims. Regenerate and review the snapshot whenever its Lean sources
+change.
 
 ## Choose axioms
 

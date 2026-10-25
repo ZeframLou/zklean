@@ -43,7 +43,6 @@ for (let i = 0; i < paths.length; i++) {
   const input = {
     export: exported,
     claims: Object.keys(certificate.claims),
-    allowedAxioms: [],
   };
   const checked = await runNative(tools.binary, "check", input);
   if (canonical(checked) !== canonical(statement(certificate)))

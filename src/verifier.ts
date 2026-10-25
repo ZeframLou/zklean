@@ -19,19 +19,16 @@ export function createVerifier(options: VerifierOptions = {}) {
     value: unknown,
     policy: VerifyOptions,
   ): Promise<VerificationResult> {
-    let identity: { certificateId: string; statementId: string };
+    let identity: { statementId: string };
     let key: string;
     let check: () => Promise<boolean>;
     try {
       const certificate = parseCertificate(value);
-      identity = {
-        certificateId: certificateId(certificate),
-        statementId: statementId(certificate),
-      };
+      identity = { statementId: statementId(certificate) };
       const policyError = checkAxioms(certificate, policy);
       if (policyError)
         return { ...identity, status: "unknown", reason: policyError };
-      key = `${backend.identity}\0${identity.certificateId}`;
+      key = `${backend.identity}\0${certificateId(certificate)}`;
       check = () => backend.verify(certificate);
     } catch (error) {
       return {
