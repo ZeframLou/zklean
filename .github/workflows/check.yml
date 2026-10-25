@@ -26,6 +26,11 @@ jobs:
       - run: bash scripts/prepare-sp1.sh
       - run: rustup toolchain install 1.91.1 --profile minimal --target wasm32-unknown-unknown
       - run: bun run build:verifier
+      # CI's build is canonical; the committed binary must match it.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zklean-verifier-wasm
+          path: src/verifier.wasm
       - run: git diff --exit-code -- src/verifier.wasm
       - run: cargo fmt --check -p zklean-core -p zklean-native -p zklean-verifier
       - run: cargo clippy --locked -p zklean-core -p zklean-native -p zklean-verifier -- -D warnings
