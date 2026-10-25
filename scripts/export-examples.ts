@@ -39,6 +39,11 @@ const examples = [
     claims: ["Inventory.reservation_safe"],
   },
   {
+    module: "Chain",
+    file: "chain",
+    claims: ["Chain.top"],
+  },
+  {
     module: "PropDef",
     file: "prop-def",
     claims: ["Demo.assumed"],

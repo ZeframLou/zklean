@@ -59,7 +59,8 @@ for a reference inside the inductive group being hashed.
   identity. A definition whose *value* is a proposition, such as
   `def Ok : Prop := …`, is not a proof and keeps its value.
 - Otherwise a definition is `{def:{name, levelParams, type, value}}`, an opaque
-  `{opaque:{…}}` likewise, an axiom `{axiom:{name, levelParams, type}}` and a
+  `{opaque:{…}}` and a theorem whose type is not a proposition `{thm:{…}}`
+  likewise, an axiom `{axiom:{name, levelParams, type}}` and a
   quotient primitive `{quot:{name, levelParams, type}}`. Reducibility hints do
   not affect meaning and are omitted; Nanoda rejects unsafe and partial
   declarations.
@@ -72,8 +73,9 @@ for a reference inside the inductive group being hashed.
   `H("zklean/declaration/1\0", {member:{group:g, name}})`.
 
 `levelParams` are universe parameter names, so renaming one changes the identity.
-The kernel admits no cycles between declarations except within an inductive
-block, so every identity is well defined.
+Nanoda checks each declaration against only those before it, so an export lists
+declarations in dependency order. Identities are computed in that order, and the
+only cycles, within an inductive block, are broken by the block hash.
 
 ## Statement and certificate
 

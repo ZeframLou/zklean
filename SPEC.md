@@ -51,8 +51,8 @@ identities of the claims and those axioms.
 ```json
 {
   "format": "zklean/1",
-  "claims": { "Inventory.reservation_safe": "b682…698a" },
-  "axioms": { "propext": "dba3…d434" },
+  "claims": { "Inventory.reservation_safe": "65de…8b2f" },
+  "axioms": { "propext": "a6bb…4158" },
   "proof": "base64:…",
   "source": "https://acme.example/reservation.ndjson"
 }

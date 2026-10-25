@@ -38,11 +38,10 @@ struct Export {
     export: String,
 }
 
-/// Checking recurses over expressions and dependencies, so run it with far more
-/// stack than the main thread's.
+/// Run with the SP1 guest's 2 MiB stack, so whatever checks here can be proved.
 fn main() -> Result<()> {
     std::thread::Builder::new()
-        .stack_size(1 << 30)
+        .stack_size(2 << 20)
         .spawn(run)?
         .join()
         .map_err(|_| anyhow::anyhow!("zklean-native panicked"))?

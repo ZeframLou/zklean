@@ -21,7 +21,9 @@ fn hash(domain: &str, value: &Value) -> Result<String> {
 }
 
 /// Read a checked export. Declarations whose type is a proposition are
-/// decided by the checker first.
+/// decided by the checker first. Nanoda checks each declaration against only
+/// those before it, so the export is in dependency order and every identity is
+/// computed in one forward pass, without recursing through dependencies.
 pub fn read<'p, A>(
     file: &'p ExportFile<'p>,
     f: impl FnOnce(&mut Reader<'_, '_, 'p>) -> Result<A>,
@@ -52,12 +54,14 @@ pub fn read<'p, A>(
             groups: HashMap::new(),
             nodes: HashMap::new(),
             levels: HashMap::new(),
-            active: HashSet::new(),
         };
         for (name, d) in &file.declars {
             let rendered = reader.render(*name)?;
             reader.names.insert(rendered, *name);
             reader.declars.insert(*name, d);
+        }
+        for name in file.declars.keys() {
+            reader.identify(*name)?;
         }
         f(&mut reader)
     })
@@ -73,7 +77,6 @@ pub struct Reader<'r, 'c, 'p> {
     groups: HashMap<NamePtr<'c>, String>,
     nodes: HashMap<(ExprPtr<'c>, Option<NamePtr<'c>>), String>,
     levels: HashMap<LevelPtr<'c>, String>,
-    active: HashSet<NamePtr<'c>>,
 }
 
 impl<'r, 'c> Reader<'r, 'c, '_> {
@@ -182,11 +185,15 @@ impl<'r, 'c> Reader<'r, 'c, '_> {
         Ok(axioms)
     }
 
-    fn id(&mut self, name: NamePtr<'c>) -> Result<String> {
-        if let Some(id) = self.ids.get(&name) {
-            return Ok(id.clone());
-        }
-        ensure!(self.active.insert(name), "cyclic declaration identity");
+    /// The identity of a declaration already passed in export order.
+    fn id(&self, name: NamePtr<'c>) -> Result<String> {
+        self.ids
+            .get(&name)
+            .cloned()
+            .context("declaration used before it is declared")
+    }
+
+    fn identify(&mut self, name: NamePtr<'c>) -> Result<()> {
         let d = self.declars[&name];
         let id = if let Some(first) = self.group_of(name) {
             let group = self.group(first)?;
@@ -206,6 +213,7 @@ impl<'r, 'c> Reader<'r, 'c, '_> {
                 _ if self.props.contains(&name) => ("prop", None),
                 Declar::Definition { val, .. } => ("def", Some(*val)),
                 Declar::Opaque { val, .. } => ("opaque", Some(*val)),
+                Declar::Theorem { val, .. } => ("thm", Some(*val)),
                 Declar::Axiom { .. } => ("axiom", None),
                 Declar::Quot { .. } => ("quot", None),
                 _ => bail!("unexpected declaration kind"),
@@ -215,9 +223,8 @@ impl<'r, 'c> Reader<'r, 'c, '_> {
             }
             hash("zklean/declaration/1\0", &json!({ kind: fields }))?
         };
-        self.active.remove(&name);
-        self.ids.insert(name, id.clone());
-        Ok(id)
+        self.ids.insert(name, id);
+        Ok(())
     }
 
     /// The kernel's input for a mutual inductive block: its universe

@@ -242,3 +242,10 @@ test("inductive metadata in an export is checked, not trusted", async () => {
     runNative(binary, "check", { ...mutual, export: lines.join("\n") }),
   ).rejects.toThrow();
 });
+
+test("identities do not recurse through long dependency chains", async () => {
+  // zklean-native runs with the SP1 guest's 2 MiB stack, so passing here
+  // means the guest can prove it too.
+  const value = await checked("chain", ["Chain.top"]);
+  expect(Object.keys(value.claims)).toEqual(["Chain.top"]);
+});
