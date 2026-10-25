@@ -129,11 +129,9 @@ test("native and TypeScript use identical authenticated statement bytes", async 
 
 test("a mutual block is identified as one unit, and a nested type stands alone", async () => {
   const claims = ["Shapes.even_zero", "Shapes.leaf_eq"];
-  const [base, variant, swapped] = await Promise.all(
-    ["mutual", "mutual-variant", "mutual-swapped"].map((file) =>
-      checked(file, claims),
-    ),
-  );
+  const base = await checked("mutual", claims);
+  const variant = await checked("mutual-variant", claims);
+  const swapped = await checked("mutual-swapped", claims);
   // Renaming a constructor of Odd changes a claim that mentions only Even.
   expect(variant.claims["Shapes.even_zero"]).not.toBe(
     base.claims["Shapes.even_zero"],
