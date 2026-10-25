@@ -5,7 +5,7 @@
 Bun 1.4.4, stable Rust and Rust 1.96.0, the
 [SP1 6.10.0 toolchain](https://github.com/succinctlabs/sp1/tree/v6.10.0)
 (`cargo prove`), [Lean 4.36.0-rc1](https://github.com/leanprover/lean4/releases/tag/v4.36.0-rc1)
-with Lake, and, for proving, Go 1.24 and a C compiler.
+with Lake, and, for proving, Go 1.24, `protoc` and a C compiler.
 
 ```sh
 rustup toolchain install 1.96.0 --profile minimal --target wasm32-unknown-unknown
