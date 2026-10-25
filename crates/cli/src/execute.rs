@@ -18,8 +18,9 @@ pub fn run(input: &str) -> Result<Value> {
     let elf = std::fs::read(&request.elf_path).context("read guest ELF")?;
     let mut stdin = SP1Stdin::new();
     stdin.write(&request.input);
+    // The light client only executes, without the CPU prover's setup.
     let (public_values, report) = ProverClient::builder()
-        .cpu()
+        .light()
         .build()
         .execute(elf.into(), stdin)
         .run()
