@@ -1,6 +1,6 @@
 {
   "format": "zklean/verifier-profile/1",
   "sp1Version": "5.2.4",
-  "elfSha256": "9680867bc056bb84e6d1d9a14be1cef40698f68bc9e5e6a946b584d0ccfce91a",
-  "verifierKey": "0x001e48f9a06e2fb22a241c38f0d0a19a0abea03a15e1d7fb17a2e19104d6c9a6"
+  "elfSha256": "f715b55ad6b2a4114da58b52faef524d433889a681fea1d5439c301be9d6bec2",
+  "verifierKey": "0x00e433f51f7efdf9208f270d3519a4c792235a3544cd2d777953ebf1b147c6e7"
 }
