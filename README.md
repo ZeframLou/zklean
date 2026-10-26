@@ -108,14 +108,11 @@ const result = await createVerifier().verify(certificate, {
 A pass proves the listed claims; check they include the ones you rely on
 ([how](docs/USAGE.md#verify-a-certificate)).
 
-## How it works
+## Prove, pin, verify
 
-1. **Prove.** You prove your specs in Lean as usual. `zklean prove` re-checks
-   the whole proof with Nanoda, an independent Lean checker, inside
-   [SP1](https://github.com/succinctlabs/sp1), which produces a short proof that
-   a program ran correctly. The result is a certificate: each proved theorem's
-   name and fingerprint, the axioms it relies on, and a 356-byte proof that the
-   check passed.
+1. **Prove.** You prove your specs in Lean as usual, then run `zklean prove` to
+   produce the certificate: each proved theorem's name and fingerprint, the
+   axioms it relies on, and a 356-byte proof that the check passed.
 2. **Pin.** Each team that depends on you reviews the theorems it relies on
    once, in Lean, and records their fingerprints with `zklean requirements`. A
    fingerprint covers a theorem's statement and every definition it mentions,
@@ -124,6 +121,34 @@ A pass proves the listed claims; check they include the ones you rely on
    fingerprints, in under a second with no Lean. A change to anything the
    theorem depends on changes its fingerprint and fails the check. A change to
    the proofs or to unrelated code passes.
+
+## How it works
+
+```text
+author:  Lean module ─▶ lean4export ─▶ export ─▶ SP1 zkVM running the guest ─▶ certificate
+anyone:  certificate ─▶ TypeScript SDK (SP1 verifier, pinned key) ─▶ pass or fail
+```
+
+- **Export.** Lean compiles your module, and
+  [lean4export](https://github.com/leanprover/lean4export) writes every
+  declaration it depends on, proofs included, to one file.
+- **Guest.** A Rust program checks that export with
+  [Nanoda](https://github.com/ammkrn/nanoda_lib), a Lean type checker written
+  independently of Lean. It rejects any redefinition of the 31 built-in
+  constants Nanoda evaluates natively, computes each claim's fingerprint from
+  its statement and everything that statement mentions, and collects the axioms
+  the proofs use. Its only output is a 32-byte hash of the claims and axioms.
+- **Prover.** [SP1](https://github.com/succinctlabs/sp1), a zkVM, runs the guest
+  and proves it ran correctly: a STARK proof, recursively compressed and wrapped
+  into a 356-byte Groth16 proof over BN254. The export is the private input;
+  only the 32-byte hash is public.
+- **Certificate.** The claims and axioms with their fingerprints, the Groth16
+  proof, and the URL where the export is published.
+- **Verifier.** The TypeScript SDK recomputes the hash from the certificate's
+  claims and axioms and checks the proof with SP1's own verifier, compiled to
+  WebAssembly, against a **verifier key** pinned in the SDK. That key identifies
+  the exact guest program, so a proof from any other program fails. It runs in a
+  background worker and needs no native code, Lean or network.
 
 ## Trust model
 
