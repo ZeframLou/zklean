@@ -86,8 +86,8 @@ size of the export, and `--timeout MS` raises the one-hour default limit.
 proved from, `reservation.ndjson`. (`check`, `requirements` and `fetch` stop
 their native check after 10 minutes, which only very large exports reach.)
 
-Publish the export at the `--source` URL, so recipients can see what your claims
-mean. Serve it over https at exactly that address, without a redirect, since
+Publish the export at the `--source` URL, so recipients can confirm your claims
+against your Lean source. Serve it over https at exactly that address, without a redirect, since
 `fetch` refuses redirects: `raw.githubusercontent.com` links work, but GitHub
 release download links redirect. The export also contains your proofs. To keep them private, write a
 module that states each claim as an `axiom` instead of proving it, as
@@ -310,7 +310,8 @@ override them; an override must point to an existing file:
 | `ZKLEAN_PROFILE`   | `src/guest.json`                                                                                 |
 
 `ZKLEAN_PROFILE` sets the verifier key that `verify` and `fetch` trust: override
-it only with a profile you derived yourself, with `zklean pin --out FILE`, from
+it only with a **verifier profile** (the verifier key and the guest's SHA-256,
+as in `src/guest.json`) you derived yourself, with `zklean pin --out FILE`, from
 a guest you built (see [CONTRIBUTING.md](../CONTRIBUTING.md)).
 `SP1_GROTH16_CIRCUIT_PATH` moves SP1's proving files from
 `~/.sp1/circuits/groth16`.

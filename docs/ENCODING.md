@@ -146,6 +146,7 @@ select one.
 
 Groth16 soundness relies on SP1's **trusted setup**, a one-time ceremony that
 generated the circuit key; if every participant colluded, they could forge
-proofs. A new theorem needs no new setup. Version 1 establishes that the claims were proved and that the
-certificate is intact. It makes no promise that the proof reveals nothing about
-the Lean proofs beyond what upstream SP1 guarantees.
+proofs. A new theorem needs no new setup. Version 1 establishes that the claims
+were proved and that `{format, claims, axioms}` is unmodified; `source` is not
+authenticated. It makes no promise that the proof reveals nothing about the
+Lean proofs beyond what upstream SP1 guarantees.

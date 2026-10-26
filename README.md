@@ -37,7 +37,7 @@ the properties their code depends on.
 - A **certificate** lists the proved theorems, called **claims**, and the
   axioms they use, each by name and identity. It carries a cryptographic proof
   that an independent Lean checker accepted the proofs, and a link to the export
-  behind the identities, so readers can see what the claims mean.
+  behind the identities, so readers can confirm the identities against Lean source.
 - The cryptographic proof comes from **[SP1](https://github.com/succinctlabs/sp1)**,
   which runs a program and produces a short proof that the program ran and gave
   a particular result. ZKLean's program checks Lean proofs with
@@ -51,14 +51,15 @@ the properties their code depends on.
  ──────                                         ─────────
  Lean module ── zklean prove ──▶ certificate ──▶ 1. verify the cryptographic proof
                  (Nanoda inside SP1)             2. accept only permitted axioms
-                                                 3. optionally fetch the export
+                                                 3. check the claims are the ones
+                                                    relied on, by identity
+                                                 4. optionally fetch the export
                                                     and confirm its identities
 ```
 
 Proving happens once per version of the proofs. For the example below it takes
 about 5 to 15 minutes and up to 20 GB of memory on a 12-core machine; larger
-exports take longer. Verifying needs no Lean, native code
-or network access. The inventory example below has a 381 KB export but a
+exports take longer. Verifying needs no Lean, native code or network access. The inventory example below has a 381 KB export but a
 certificate under 1 KB; a certificate grows with its number of claims, not with
 the size of the proofs. A certificate never contains your proofs, but the
 export `prove` writes does, and the cryptographic proof is not promised to hide
@@ -66,13 +67,14 @@ them; see [keeping proofs private](docs/USAGE.md#certify-a-module).
 
 ## Trust model
 
-A verifier trusts that Nanoda checks Lean correctly, that SP1's proofs are
-sound, including its one-time trusted setup (a key-generation ceremony whose
-participants could forge proofs only if all of them colluded), and that the **verifier key** built into ZKLean's TypeScript library, a
-fingerprint of the exact checker program, is the right one. A certificate passes
-only if every axiom it uses is one you permitted, and then shows that each claim
-about the Lean model follows from those axioms. It says nothing about whether
-running software matches that model, or whether the claims say what you need.
+A verifier trusts the checker program, Nanoda plus ZKLean's identity code, to be
+correct, and the **verifier key** built into ZKLean's TypeScript library to
+identify that program. It also trusts SP1's proofs to be sound, which holds
+unless every participant in SP1's one-time trusted setup colluded. A
+certificate passes only if every axiom it uses is one you permitted, and then
+shows that each claim about the Lean model follows from those axioms; it says
+nothing about whether running software matches that model, or whether the
+claims say what you need.
 
 ## Install
 

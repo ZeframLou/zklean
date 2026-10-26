@@ -68,6 +68,11 @@ the claim names, `{export, claims}` (the export as one string). It MUST:
 
 ### 3.3. Certificate format
 
+Lean's **standard axioms** are `propext`, `Quot.sound` and `Classical.choice`,
+with the identities they have in Lean 4.35.0, listed in `src/axioms.json`. An
+axiom is standard only if both its name and its identity match; a different
+axiom named `propext` is non-standard and must be in the source.
+
 ```json
 {
   "format": "zklean/1",
@@ -89,11 +94,6 @@ the claim names, `{export, claims}` (the export as one string). It MUST:
   contains every claim and every non-standard axiom, with everything they
   depend on. Anyone fetching the source MUST NOT follow redirects from it, so
   the URL is the file's final address.
-
-Lean's **standard axioms** are `propext`, `Quot.sound` and `Classical.choice`,
-with the identities they have in Lean 4.35.0, listed in `src/axioms.json`. An
-axiom is standard only if both its name and its identity match; a different
-axiom named `propext` is non-standard and must be in the source.
 
 A certificate is **well formed** when it is a JSON object with exactly these
 five fields; `format` is `"zklean/1"`; `claims` has at least one entry and no
