@@ -71,11 +71,10 @@ A verifier trusts the checker program, Nanoda plus ZKLean's identity code, to be
 correct, and the **verifier key** built into ZKLean's TypeScript library to
 identify that program. It also trusts SP1's proof system and its
 implementation, whose one-time trusted setup is secure if any one participant
-was honest. A
-certificate passes only if every axiom it uses is one you permitted, and then
-shows that each claim about the Lean model follows from those axioms; it says
-nothing about whether running software matches that model, or whether the
-claims say what you need.
+was honest. A certificate passes only if every axiom it uses is one you
+permitted, and then shows that each claim about the Lean model follows from
+those axioms; it says nothing about whether running software matches that
+model, or whether the claims say what you need.
 
 ## Install
 
