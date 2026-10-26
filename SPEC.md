@@ -84,20 +84,26 @@ the claim names, `{export, claims}` (the export as one string). It MUST:
 - `proof`: the Groth16 proof of `{format, claims, axioms}`, encoded as
   [ENCODING.md](docs/ENCODING.md) specifies.
 - `source`: the `https` URL, without credentials, of one lean4export file that
-  contains every claim and every axiom other than Lean's standard ones, with
-  everything they depend on. Anyone fetching the source MUST NOT follow
-  redirects from it, so the URL is the file's final address.
+  contains every claim and every non-standard axiom, with everything they
+  depend on. Anyone fetching the source MUST NOT follow redirects from it, so
+  the URL is the file's final address.
+
+Lean's **standard axioms** are `propext`, `Quot.sound` and `Classical.choice`,
+with the identities they have in Lean 4.35.0, listed in `src/axioms.json`. An
+axiom is standard only if both its name and its identity match; a different
+axiom named `propext` is non-standard and must be in the source.
 
 A certificate is **well formed** when it is a JSON object with exactly these
-five fields, every name is non-empty, every identity is 64 lowercase
-hexadecimal characters, and the proof decodes to exactly 356 bytes. Verifiers
-MUST reject any other certificate.
+five fields, every rule above holds, every name is non-empty, every identity is
+64 lowercase hexadecimal characters, the proof is canonical base64 that decodes
+to exactly 356 bytes, and the source parses as an `https` URL without a user
+name or password. Verifiers MUST reject any other certificate.
 
 The source is not part of the proved statement. It is an untrusted pointer: a
 verifier checks the certificate, then checks the file with Nanoda and accepts it
 only if it reproduces the identity of every claim and non-standard axiom. A
-source matched against an unverified certificate means nothing, since a forger can choose identities that
-match any file. A wrong source can make that check fail, but cannot make a
+source matched against an unverified certificate means nothing, since a forger
+can choose identities that match any file. A wrong source can make that check fail, but cannot make a
 different statement match. Because `source` is outside the proof, the author can
 move the file and change the URL without re-proving.
 

@@ -16,7 +16,9 @@ Verifying certificates from TypeScript needs only the SDK,
 `bun add zklean@0.1.0`. Everything else uses the command-line tool, which runs
 from a release checkout. The full tool needs [Bun](https://bun.sh/) 1.4.4 or
 newer, stable [Rust](https://rustup.rs/), and
-[Lean](https://lean-lang.org/install/) 4.35.0 with its build tool Lake:
+[Lean](https://lean-lang.org/install/) 4.35.0 with its build tool Lake. Your
+Lean project, and any project it depends on, must use the same version: its
+`lean-toolchain` file must select `leanprover/lean4:v4.35.0`.
 
 ```sh
 git clone --branch v0.1.0 https://github.com/ZeframLou/zklean.git
@@ -79,7 +81,9 @@ zklean prove --project examples/lean --module V1 \
 
 `prove` runs the same check inside SP1. For this example that takes about 5 to
 15 minutes and up to 20 GB of memory on a 12-core machine; time grows with the
-size of the export, and `--timeout MS` raises the one-hour default limit. It
+size of the export, and `--timeout MS` raises the one-hour default limit.
+`check`, `requirements` and `fetch` stop their native check after 10 minutes,
+which only very large exports reach. It
 writes the certificate, `reservation.json`, and beside it the export it proved
 from, `reservation.ndjson`.
 
@@ -146,7 +150,8 @@ zklean fetch --certificate reservation.json --axioms propext --out reservation.n
 `fetch` verifies the certificate, downloads the export from its `source` URL,
 checks it with Nanoda, and saves it only if it reproduces the identity of every
 claim and every non-standard axiom. Otherwise it reports the mismatched
-identities or the missing declaration and exits with status 1. `--from FILE` checks a local copy instead. Nothing fetched is
+identities or the missing declaration and exits with status 1. `--from FILE` checks a local copy instead. A download must finish within 10
+minutes and be at most 1 GiB. Nothing fetched is
 executed.
 
 An export holds Lean's compiled form of the declarations rather than readable

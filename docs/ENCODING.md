@@ -11,8 +11,9 @@ read the export through one parser. Verification is offline and needs no
 proving files, Lean process or native executable.
 
 Lean terms are built from a few kinds of node, such as function application
-and `fun` abstraction, and every term has a **universe level** (a `Sort`),
-itself a small expression over universe parameters. The tables below hash both.
+and `fun` abstraction. Every type lives in a universe, written `Sort l`, where
+the **universe level** `l` is a small expression over universe parameters. The
+table below hashes both terms and levels.
 
 ## Canonical JSON
 
@@ -21,6 +22,7 @@ only integers from 0 to 2^53 − 1 as numbers. Strings escape only `"`, `\` and
 characters below U+0020: `\b \f \n \r \t`, and otherwise `\u00xx` in
 lowercase hex. No Unicode normalization is applied, and unpaired surrogates are
 rejected. `H(tag, v)` is lowercase hex `SHA256(UTF8(tag) || canonicalJSON(v))`.
+In a tag, `\0` is a single 0x00 byte.
 
 ## Identities
 

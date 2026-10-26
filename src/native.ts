@@ -21,7 +21,11 @@ export async function runNative(
     stdout: "pipe",
     stderr: "pipe",
   });
-  const timer = setTimeout(() => child.kill(), timeout);
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    child.kill();
+  }, timeout);
   try {
     child.stdin.write(JSON.stringify(input));
     child.stdin.end();
@@ -47,6 +51,10 @@ export async function runNative(
       new Response(child.stdout).text(),
       readStderr(),
     ]);
+    if (timedOut)
+      throw new Error(
+        `zklean-native ${command} timed out after ${timeout / 1000} s`,
+      );
     if (code !== 0)
       throw new Error(
         `zklean-native ${command} failed (${code}): ${stderr.slice(-4000)}`,
