@@ -18,6 +18,33 @@ A verifier trusts the checker identified by its pinned key, SP1's cryptography,
 and the axioms it permits by identity. Acceptance establishes that the certified
 statements follow from those axioms; you decide whether they say what you need.
 
+## Install
+
+Verifying certificates needs only the TypeScript SDK, on
+[Bun](https://bun.sh/) 1.4.4 or newer:
+
+```sh
+bun add zklean@0.1.0
+```
+
+Checking and proving Lean modules uses the command-line tool from a release
+checkout, with the tools listed in [CONTRIBUTING.md](CONTRIBUTING.md):
+
+```sh
+git clone --branch v0.1.0 https://github.com/ZeframLou/zklean.git
+cd zklean
+bun install --frozen-lockfile
+bash scripts/setup-exporter.sh
+cargo build --release --locked -p zklean-native
+```
+
+Proving also needs the release's guest program:
+
+```sh
+gh release download v0.1.0 --repo ZeframLou/zklean --pattern zklean-guest
+export ZKLEAN_GUEST_ELF="$PWD/zklean-guest"
+```
+
 ## Certify an inventory reservation
 
 [`examples/lean/Inventory.lean`](examples/lean/Inventory.lean) models a

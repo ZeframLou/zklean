@@ -1,0 +1,32 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tag matches package version
+        run: test "${GITHUB_REF_NAME}" = "v$(jq -r .version package.json)"
+      - uses: dtolnay/rust-toolchain@stable
+      - run: rustup toolchain install 1.96.0 --profile minimal
+      - name: Install pinned SP1 toolchain
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/succinctlabs/sp1/v6.10.0/sp1up/sp1up -o /tmp/sp1up
+          bash /tmp/sp1up --version v6.10.0
+          echo "$HOME/.sp1/bin" >> "$GITHUB_PATH"
+      - run: bash scripts/build-guest.sh
+      # The released guest must be the one src/guest.json pins.
+      - name: Guest matches the pinned profile
+        run: |
+          cp crates/guest/target/elf-compilation/riscv64im-succinct-zkvm-elf/release/zklean-guest zklean-guest
+          test "$(sha256sum zklean-guest | cut -d' ' -f1)" = "$(jq -r .elfSha256 src/guest.json)"
+      - run: gh release create "$GITHUB_REF_NAME" zklean-guest --title "$GITHUB_REF_NAME" --notes "Guest program for proving: set ZKLEAN_GUEST_ELF to zklean-guest."
+        env:
+          GH_TOKEN: ${{ github.token }}

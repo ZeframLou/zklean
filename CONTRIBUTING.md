@@ -35,17 +35,39 @@ As with the guest, CI's Linux build of the verifier is canonical: after changing
 
 `crates/guest` runs `zklean_core::check` inside SP1. Its verifier key depends on
 the exact ELF, and Cargo hashes package paths into the build, so
-`scripts/build-guest.sh` builds from a fixed path, on Linux. The canonical ELF is the one
-CI's guest job uploads as the `zklean-guest-elf` artifact; `zklean pin` derives
-`src/guest.json` from it. Any change to `crates/core` or `vendor/nanoda` changes
-the key and invalidates `tests/fixtures/identity.certificate.json`.
+`scripts/build-guest.sh` builds from a fixed path, on Linux. CI's guest job
+builds the canonical ELF and uploads it as the `zklean-guest-elf` artifact;
+`zklean pin` derives `src/guest.json` from it, and CI requires the two to agree.
+Any change to `crates/core` or `vendor/nanoda` changes the key and invalidates
+`tests/fixtures/identity.certificate.json`.
 
-To re-prove that certificate, build the prover in its own directory, since the
-tests rebuild `target/release` without features:
-`GOFLAGS=-buildvcs=false cargo build --release --locked -p zklean-native --features prover,execute --target-dir target/prover`.
-Then run `zklean prove` on `tests/fixtures/identity.ndjson` with
-`ZKLEAN_NATIVE=target/prover/release/zklean-native` and `ZKLEAN_GUEST_ELF` set
-to the CI ELF; the same two variables run `tests/guest.e2e.test.ts`. The first proof downloads SP1's Groth16
-circuit files.
+To prove, build the prover in its own directory, since the tests rebuild
+`target/release` without features:
+
+```sh
+GOFLAGS=-buildvcs=false cargo build --release --locked -p zklean-native \
+  --features prover,execute --target-dir target/prover
+export ZKLEAN_NATIVE="$PWD/target/prover/release/zklean-native"
+export ZKLEAN_GUEST_ELF=/path/to/zklean-guest   # the CI artifact
+```
+
+The same two variables run `tests/guest.e2e.test.ts`.
+
+## Releases
+
+1. Set `version` in `package.json`, pin `src/guest.json` from CI's guest
+   artifact, and re-prove the identity certificate against the tag's source:
+
+   ```sh
+   bun src/cli.ts prove --export tests/fixtures/identity.ndjson \
+     --claims Demo.identity --out tests/fixtures/identity.certificate.json \
+     --source https://raw.githubusercontent.com/ZeframLou/zklean/vX.Y.Z/tests/fixtures/identity.ndjson
+   rm tests/fixtures/identity.certificate.ndjson
+   ```
+
+2. Commit, wait for CI to pass, then tag: `git tag vX.Y.Z && git push origin vX.Y.Z`.
+   The release workflow rebuilds the guest, requires it to match `src/guest.json`
+   and attaches it to the GitHub release.
+3. Publish the SDK: `npm publish`.
 
 Nanoda is vendored with visibility-only changes; see `vendor/nanoda/UPSTREAM.md`.

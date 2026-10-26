@@ -4,8 +4,9 @@ A Lean proof establishes a statement under explicit assumptions, called axioms.
 ZKLean checks the proof with [Nanoda](https://github.com/ammkrn/nanoda_lib) inside
 [SP1](https://github.com/succinctlabs/sp1/tree/v6.10.0) and produces a certificate:
 the identities of the proved claims and the axioms they use, a 356-byte Groth16
-proof, and the URL of the Lean export behind them. Run the CLI from a source
-checkout as `bun src/cli.ts`; [CONTRIBUTING.md](../CONTRIBUTING.md) lists the tools.
+proof, and the URL of the Lean export behind them. This guide writes the CLI as
+`zklean`: run it as `bun src/cli.ts` from a v0.1.0 checkout, set up as in the
+[README](../README.md#install).
 
 ## Check and certify a module
 
@@ -34,7 +35,8 @@ its identities are the same.
 zklean verify --certificate reservation.json --axioms propext
 ```
 
-From TypeScript, with [Bun](https://bun.sh/) 1.4.4 or newer:
+From TypeScript, with [Bun](https://bun.sh/) 1.4.4 or newer and
+`bun add zklean@0.1.0`:
 
 ```ts
 import { createVerifier, standardAxioms } from "zklean";
@@ -95,8 +97,10 @@ consumers pass the same map as `axioms`; `standardAxioms` holds the pinned ones.
 
 ## Tools
 
-The CLI finds `zklean-native`, the guest ELF, lean4export, Lake and the verifier
-profile in the source tree. `ZKLEAN_NATIVE`, `ZKLEAN_GUEST_ELF`,
-`ZKLEAN_EXPORTER`, `ZKLEAN_LAKE` and `ZKLEAN_PROFILE` override them; an override
-must exist. Proving downloads SP1's Groth16 circuit files on first use;
-`SP1_GROTH16_CIRCUIT_PATH` relocates them.
+The CLI finds `zklean-native`, lean4export, Lake and the verifier profile in the
+checkout. Proving needs `zklean-native` built with
+`--features prover,execute` and the guest program attached to the GitHub
+release, given as `ZKLEAN_GUEST_ELF`. `ZKLEAN_NATIVE`, `ZKLEAN_EXPORTER`,
+`ZKLEAN_LAKE` and `ZKLEAN_PROFILE` override the other tools; an override must
+exist. The first proof downloads SP1's 6.2 GB Groth16 circuit files to
+`~/.sp1/circuits` (`SP1_GROTH16_CIRCUIT_PATH` relocates them).
