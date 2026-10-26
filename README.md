@@ -15,9 +15,8 @@ With ZKLean, you publish a certificate with each release, and their CI checks it
 in a quarter of a second. If a release changes anything the proof depends on,
 their CI goes red before they ship against it.
 
-The proof covers your Lean model of the service, not the deployed code, so keep
-the model close to the code. The certificate tells them what you proved;
-whether your server behaves like the model is still up to you.
+The certificate covers your Lean model of the service, and you keep that model
+faithful to the code.
 
 ## What you get
 
@@ -86,8 +85,8 @@ const result = await createVerifier().verify(certificate, {
 });
 ```
 
-Passing means the listed claims hold. Make sure they are the claims you need;
-the [usage guide](docs/USAGE.md#verify-a-certificate) shows how.
+Passing means the listed claims hold. Compare them with the claims you depend
+on, as the [usage guide](docs/USAGE.md#verify-a-certificate) shows.
 
 ## Install
 

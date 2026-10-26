@@ -83,8 +83,8 @@ zklean prove --project examples/lean --module V1 \
 size of the export, and `--timeout MS` raises the one-hour default limit.
 `prove` writes the certificate, `reservation.json`, and beside it the
 **export** it proved from, `reservation.ndjson`: the file of Lean definitions
-the identities are computed from. (`check`, `requirements` and `fetch` stop
-their native check after 10 minutes, which only very large exports reach.)
+the identities are computed from. `check`, `requirements` and `fetch` stop
+their native check after 10 minutes.
 
 Publish the export at the `--source` URL, so recipients can confirm your claims
 against your Lean source. Serve it over https at exactly that address, without
@@ -142,8 +142,8 @@ prints an error instead.
 
 Anything but `"status": "verified"` means the certificate establishes nothing:
 `status` is then `"unknown"` and `reason` is `invalid-certificate`,
-`forbidden-axiom`, `axiom-mismatch` or `verifier-unavailable`, sometimes with a
-`detail`.
+`forbidden-axiom`, `axiom-mismatch` or `verifier-unavailable`, with an
+optional `detail`.
 
 Verification needs no native code, Lean or network access, and runs in a
 background worker so it does not block your program. It checks the
