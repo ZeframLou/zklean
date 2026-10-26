@@ -107,6 +107,8 @@ test("satisfaction is by claim name and identity, never by axiom", () => {
       requirements,
     ),
   ).toBe(false);
+  // An empty requirement would be satisfied by everything.
+  expect(satisfies(certificate, { ...requirements, claims: {} })).toBe(false);
 });
 
 const fixture = (name: string) =>

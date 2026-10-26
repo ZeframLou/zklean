@@ -80,7 +80,8 @@ zklean prove --project examples/lean --module V1 \
 
 `prove` runs the same check inside SP1. For this example it takes 5 to 15
 minutes and up to 20 GB of memory on 12 cores. Larger exports take longer;
-`--timeout MS` raises the one-hour limit. `prove` writes the certificate,
+`--timeout MS` changes the one-hour limit, and for `check`, `requirements` and
+`fetch` the 10-minute limit on their native check. `prove` writes the certificate,
 `reservation.json`, and beside it the **export** it proved from,
 `reservation.ndjson`: the file of Lean definitions the identities are computed
 from.
@@ -112,7 +113,7 @@ const result = await createVerifier().verify(certificate, {
 });
 if (
   result.status !== "verified" ||
-  certificate.claims["Inventory.reservation_safe"] !== expected
+  result.claims["Inventory.reservation_safe"] !== expected
 )
   throw new Error("the certificate does not prove the expected claim");
 ```
@@ -224,7 +225,7 @@ const result = await createVerifier().verify(certificate, {
 });
 if (
   result.status !== "verified" ||
-  !satisfies(certificate, await loadRequirements("requirements.json"))
+  !satisfies(result, await loadRequirements("requirements.json"))
 )
   throw new Error("the certificate no longer proves a required claim");
 ```

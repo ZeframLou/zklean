@@ -59,7 +59,6 @@ test("concurrent checks of one certificate share a single backend run", async ()
   let calls = 0;
   const verifier = createVerifier({
     backend: {
-      identity: "test",
       async verify() {
         calls++;
         await Bun.sleep(10);
@@ -74,4 +73,36 @@ test("concurrent checks of one certificate share a single backend run", async ()
   );
   expect(results.every((result) => result.status === "verified")).toBe(true);
   expect(calls).toBe(1);
+  // The result carries exactly what was verified, whatever the caller does
+  // to its own object meanwhile.
+  const copy = structuredClone(certificate);
+  const pending = verifier.verify(copy, { axioms: {} });
+  (copy.claims as Record<string, string>)["Demo.identity"] = "f".repeat(64);
+  expect(await pending).toMatchObject({
+    status: "verified",
+    claims: certificate.claims,
+    axioms: {},
+  });
+  expect(await verifier.verify(certificate, { axioms: {} })).not.toHaveProperty(
+    "detail",
+  );
+});
+
+test("a rejected policy names the axioms it does not permit", async () => {
+  const statement = await checked("axioms", ["Inventory.assumed_safe"]);
+  const result = await createVerifier({
+    backend: { verify: async () => true },
+  }).verify(
+    {
+      ...statement,
+      proof: `base64:${Buffer.alloc(356).toString("base64")}`,
+      source: "https://example.com/axioms.ndjson",
+    },
+    { axioms: {} },
+  );
+  expect(result).toMatchObject({
+    status: "unknown",
+    reason: "forbidden-axiom",
+    detail: "not permitted: Trusted.evidence, Trusted.stock_policy",
+  });
 });

@@ -27,41 +27,42 @@ for (const [fixture, claims] of accepted)
     `SP1 and native checking commit the same statement for ${fixture}`,
     async () => {
       const request = await input(fixture, claims);
+      // execute requires the guest's public value to equal the native
+      // commitment, so success means the two checkers agree.
       const result = (await runNative(binary, "execute", {
         elfPath,
         input: request,
-      })) as { cycles: number; statement: unknown };
+      })) as { cycles: number };
       expect(result.cycles).toBeGreaterThan(0);
-      expect(result.statement).toEqual(
-        await runNative(binary, "check", request),
-      );
     },
     300_000,
   );
 
 test.skipIf(!elfPath)(
-  "the real SP1 guest rejects invalid proofs, ambiguous exports, kernel spoofs and unproved claims",
+  "the real SP1 guest rejects what native checking rejects, for the same reason",
   async () => {
     const invalid = await input("identity", ["Demo.identity"]);
     invalid.export = invalid.export.replace('"value":6', '"value":0');
-    await expect(
-      runNative(binary, "execute", { elfPath, input: invalid }),
-    ).rejects.toThrow("guest execution failed");
     const ambiguous = await input("identity", ["Demo.identity"]);
     ambiguous.export = ambiguous.export.replace(
       '"body":3',
       '"body":3,"body":1',
     );
-    await expect(
-      runNative(binary, "execute", { elfPath, input: ambiguous }),
-    ).rejects.toThrow("guest execution failed");
-    for (const spoof of [
-      await input("kernel-spoof", ["Attack.claim"]),
-      await input("v1-spec"),
-    ])
+    const cases: [typeof invalid, string][] = [
+      [invalid, "self.def_eq(u, v)"],
+      [ambiguous, "duplicate field `body`"],
+      [
+        await input("kernel-spoof", ["Attack.claim"]),
+        "Nat.gcd differs from Lean's definition",
+      ],
+      [await input("v1-spec"), "claim must be a theorem of a proposition"],
+    ];
+    for (const [request, reason] of cases) {
+      await expect(runNative(binary, "check", request)).rejects.toThrow(reason);
       await expect(
-        runNative(binary, "execute", { elfPath, input: spoof }),
+        runNative(binary, "execute", { elfPath, input: request }),
       ).rejects.toThrow("guest execution failed");
+    }
   },
   300_000,
 );

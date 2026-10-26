@@ -1,5 +1,5 @@
 import { certificateId, parseCertificate, statementId } from "./encoding.ts";
-import { checkAxioms } from "./policy.ts";
+import { checkAxioms, rejectedAxioms } from "./policy.ts";
 import { groth16Backend } from "./groth16.ts";
 import type { VerificationResult, VerifierOptions, Policy } from "./types.ts";
 
@@ -15,17 +15,11 @@ export function createVerifier(options: VerifierOptions = {}) {
     value: unknown,
     policy: Policy,
   ): Promise<VerificationResult> {
-    let identity: Pick<VerificationResult, "statementId">;
-    let key: string;
-    let check: () => Promise<boolean>;
+    // Parsing copies the certificate, so the caller cannot change what is
+    // verified, and the result reports exactly what was.
+    let certificate;
     try {
-      const certificate = parseCertificate(value);
-      identity = { statementId: statementId(certificate) };
-      const policyError = checkAxioms(certificate, policy);
-      if (policyError)
-        return { ...identity, status: "unknown", reason: policyError };
-      key = `${backend.identity}\0${certificateId(certificate)}`;
-      check = () => backend.verify(certificate);
+      certificate = parseCertificate(value);
     } catch (error) {
       return {
         status: "unknown",
@@ -33,21 +27,43 @@ export function createVerifier(options: VerifierOptions = {}) {
         detail: String(error),
       };
     }
+    const id = statementId(certificate);
+    const policyError = checkAxioms(certificate, policy);
+    if (policyError)
+      return {
+        statementId: id,
+        status: "unknown",
+        reason: policyError,
+        detail: `not permitted: ${rejectedAxioms(certificate, policy)
+          .map(([name]) => name)
+          .join(", ")}`,
+      };
+    const key = certificateId(certificate);
     let task = checks.get(key);
     if (!task) {
-      task = check();
+      task = backend.verify(certificate);
       checks.set(key, task);
       if (checks.size > 1024) checks.delete(checks.keys().next().value!);
     }
     try {
       if (await task)
-        return { ...identity, status: "verified", reason: "valid" };
+        return {
+          statementId: id,
+          status: "verified",
+          reason: "valid",
+          claims: certificate.claims,
+          axioms: certificate.axioms,
+        };
       checks.delete(key);
-      return { ...identity, status: "unknown", reason: "invalid-certificate" };
+      return {
+        statementId: id,
+        status: "unknown",
+        reason: "invalid-certificate",
+      };
     } catch (error) {
       checks.delete(key);
       return {
-        ...identity,
+        statementId: id,
         status: "unknown",
         reason: "verifier-unavailable",
         detail: String(error),

@@ -26,24 +26,25 @@ const exported = (names: string[]) =>
     tools,
   });
 
+// Both steps run the binary built here, from the current pins.
+const native = resolve("target/release/zklean-native");
+const build = () => {
+  const child = Bun.spawnSync(
+    ["cargo", "build", "--release", "--locked", "-p", "zklean-native"],
+    { stdout: "inherit", stderr: "inherit" },
+  );
+  if (child.exitCode !== 0) throw new Error("native build failed");
+};
+
+build();
 await write(
   "crates/core/src/kernel.json",
-  await runNative(tools.binary, "kernel", {
-    export: await exported(kernel),
-  }),
+  await runNative(native, "kernel", { export: await exported(kernel) }),
 );
 // The pins are compiled in, and every later check enforces them.
-const build = Bun.spawnSync(
-  ["cargo", "build", "--release", "--locked", "-p", "zklean-native"],
-  { stdout: "inherit", stderr: "inherit" },
-);
-if (build.exitCode !== 0) throw new Error("native build failed");
-const { axioms } = (await runNative(
-  resolve("target/release/zklean-native"),
-  "check",
-  {
-    export: await exported(claims),
-    claims,
-  },
-)) as { axioms: Record<string, string> };
+build();
+const { axioms } = (await runNative(native, "check", {
+  export: await exported(claims),
+  claims,
+})) as { axioms: Record<string, string> };
 await write("src/axioms.json", axioms);

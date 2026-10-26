@@ -23,8 +23,6 @@ export interface Requirements {
 
 /** This is trusted application configuration, never certificate-provided code. */
 export interface ProofBackend {
-  /** Stable identity of the trusted verifier profile; isolates cached results. */
-  readonly identity: string;
   verify(certificate: Certificate): Promise<boolean>;
 }
 export type Status = "verified" | "unknown";
@@ -34,13 +32,22 @@ export type Reason =
   | "forbidden-axiom"
   | "axiom-mismatch"
   | "verifier-unavailable";
-export interface VerificationResult {
-  status: Status;
-  reason: Reason;
-  /** Identity of the authenticated statement. */
-  statementId?: string;
-  detail?: string;
-}
+/** A verified result carries exactly the claims and axioms that were proved. */
+export type VerificationResult =
+  | {
+      status: "verified";
+      reason: "valid";
+      /** Identity of the authenticated statement. */
+      statementId: string;
+      claims: Identified;
+      axioms: Identified;
+    }
+  | {
+      status: "unknown";
+      reason: Exclude<Reason, "valid">;
+      statementId?: string;
+      detail?: string;
+    };
 export interface Policy {
   /** Permitted axioms by name and identity; see `standardAxioms`. */
   axioms: Identified;

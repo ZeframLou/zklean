@@ -7,7 +7,14 @@ const MAX_EXPORT_BYTES = 1 << 30;
 interface Mismatch {
   name: string;
   expected: string;
-  actual: string;
+  actual: string | null;
+}
+
+/** Exports are UTF-8; anything else is rejected rather than repaired. */
+export function decodeExport(bytes: Uint8Array): string {
+  return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(
+    bytes,
+  );
 }
 
 /** Download a certificate's source export, bounded in size and time. Redirects
@@ -34,9 +41,7 @@ export async function download(
     }
     chunks.push(read.value);
   }
-  return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(
-    Buffer.concat(chunks),
-  );
+  return decodeExport(Buffer.concat(chunks));
 }
 
 /** Check a source export with Nanoda and recompute the identities of every
@@ -46,6 +51,7 @@ export async function matchSource(
   certificate: Certificate,
   exported: string,
   binary: string,
+  timeout?: number,
 ): Promise<Mismatch[]> {
   const expected = {
     ...certificate.claims,
@@ -55,11 +61,17 @@ export async function matchSource(
       ),
     ),
   };
-  const actual = (await runNative(binary, "identify", {
-    export: exported,
-    names: Object.keys(expected),
-  })) as Record<string, string>;
+  const actual = (await runNative(
+    binary,
+    "identify",
+    { export: exported, names: Object.keys(expected) },
+    timeout,
+  )) as Record<string, string>;
   return Object.entries(expected)
     .filter(([name, id]) => actual[name] !== id)
-    .map(([name, id]) => ({ name, expected: id, actual: actual[name]! }));
+    .map(([name, id]) => ({
+      name,
+      expected: id,
+      actual: actual[name] ?? null,
+    }));
 }

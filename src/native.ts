@@ -23,6 +23,8 @@ export async function runNative(
   });
   let timedOut = false;
   const timer = setTimeout(() => {
+    // A child that already exited is draining its output, not hung.
+    if (child.exitCode !== null) return;
     timedOut = true;
     child.kill();
   }, timeout);
@@ -64,6 +66,13 @@ export async function runNative(
     clearTimeout(timer);
   }
 }
+/** A timeout in milliseconds that setTimeout honours exactly. */
+export function parseTimeout(value: string): number {
+  const timeout = Number(value);
+  if (!Number.isSafeInteger(timeout) || timeout < 1 || timeout > 0x7fffffff)
+    throw new Error("timeout must be an integer from 1 to 2147483647 ms");
+  return timeout;
+}
 /** Prove a checked statement with the pinned guest. Proving needs the guest
  * ELF named by the profile's digest; verification never does. */
 export async function prove(
@@ -75,8 +84,6 @@ export async function prove(
   if (!tools.elf) throw new Error("guest ELF not found; set ZKLEAN_GUEST_ELF");
   const { verifierKey, elfSha256 } = await profile(tools);
   const timeout = options.timeout ?? 3_600_000;
-  if (!Number.isSafeInteger(timeout) || timeout < 1 || timeout > 0x7fffffff)
-    throw new Error("timeout must be an integer from 1 to 2147483647 ms");
   const proved = (await runNative(
     tools.binary,
     "prove",

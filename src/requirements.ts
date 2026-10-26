@@ -25,9 +25,14 @@ export function satisfies(
   certificate: Pick<Certificate, "claims">,
   requirements: Requirements,
 ): boolean {
-  return Object.entries(requirements.claims).every(
-    ([name, id]) =>
-      Object.hasOwn(certificate.claims, name) &&
-      certificate.claims[name] === id,
+  // An empty requirement would be satisfied by every certificate.
+  const required = Object.entries(requirements.claims);
+  return (
+    required.length > 0 &&
+    required.every(
+      ([name, id]) =>
+        Object.hasOwn(certificate.claims, name) &&
+        certificate.claims[name] === id,
+    )
   );
 }

@@ -2,11 +2,11 @@
 import { parseArgs } from "node:util";
 import { resolve } from "node:path";
 import { version } from "../package.json";
-import { prove, runNative } from "./native.ts";
+import { parseTimeout, prove, runNative } from "./native.ts";
 import { groth16Backend } from "./groth16.ts";
 import { createVerifier } from "./verifier.ts";
 import { exportModule, findTools, profile } from "./tooling.ts";
-import { checkAxioms, standardAxioms } from "./policy.ts";
+import { rejectedAxioms, standardAxioms } from "./policy.ts";
 import type { Identified, Statement, Policy } from "./types.ts";
 import {
   SP1_VERSION,
@@ -14,13 +14,13 @@ import {
   parseCertificate,
   parseSource,
 } from "./encoding.ts";
-import { download, matchSource } from "./fetch.ts";
+import { decodeExport, download, matchSource } from "./fetch.ts";
 
 const help = `ZKLean — check and certify Lean propositions
 
   zklean check        --project DIR --module NAME --claims A,B [--axioms A,B]
   zklean prove        --project DIR --module NAME --claims A,B [--axioms A,B]
-                      --source URL --out CERT.json [--timeout MS]
+                      --source URL --out CERT.json
   zklean verify       --certificate CERT.json [--axioms A,B]
   zklean fetch        --certificate CERT.json [--axioms A,B] [--from FILE] --out SOURCE.ndjson
   zklean requirements --project DIR --module NAME --claims A,B --out FILE.json
@@ -34,6 +34,7 @@ identities in --axiom-policy FILE, a JSON object mapping names to identities.
 prove writes CERT.json and CERT.ndjson, the export it proved from; publish the
 export at the --source URL. fetch verifies the certificate, then checks that the
 source (or --from FILE) reproduces every identity before saving it.
+--timeout MS limits each native step: 10 minutes by default, one hour for prove.
 ZKLEAN_NATIVE, ZKLEAN_GUEST_ELF, ZKLEAN_EXPORTER, ZKLEAN_LAKE and ZKLEAN_PROFILE
 override the bundled tools.
 `;
@@ -76,7 +77,13 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
     if (!value) throw new Error(`--${name} is required`);
     return value;
   };
+  const timeout =
+    optional("timeout") === undefined
+      ? undefined
+      : parseTimeout(required("timeout"));
   const tools = await findTools();
+  const readExport = async (path: string) =>
+    decodeExport(await Bun.file(path).bytes());
 
   const custom = optional("axiom-policy")
     ? identified(await Bun.file(required("axiom-policy")).json())
@@ -104,7 +111,7 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
   };
   const exported = (claims: string[]): Promise<string> =>
     optional("export")
-      ? Bun.file(required("export")).text()
+      ? readExport(required("export"))
       : exportModule({
           project: resolve(required("project")),
           module: required("module"),
@@ -142,26 +149,28 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
       const claims = list(required("claims"));
       const input = { export: await exported(claims), claims };
       if (command === "requirements")
-        return output(await runNative(tools.binary, "requirements", input));
+        return output(
+          await runNative(tools.binary, "requirements", input, timeout),
+        );
       const statement = (await runNative(
         tools.binary,
         "check",
         input,
+        timeout,
       )) as Statement;
-      if (checkAxioms(statement, policy)) {
+      const rejected = rejectedAxioms(statement, policy);
+      if (rejected.length)
         // Name each rejected axiom with its identity, so it can be reviewed
         // and permitted, or the proof changed.
-        const rejected = Object.entries(statement.axioms)
-          .filter(([name, id]) => policy.axioms[name] !== id)
-          .map(([name, id]) =>
-            Object.hasOwn(policy.axioms, name)
-              ? `  ${name} ${id} (differs from the permitted identity)`
-              : `  ${name} ${id}`,
-          );
         throw new Error(
-          `the proofs use axioms that are not permitted:\n${rejected.join("\n")}`,
+          `the proofs use axioms that are not permitted:\n${rejected
+            .map(([name, id]) =>
+              Object.hasOwn(policy.axioms, name)
+                ? `  ${name} ${id} (differs from the permitted identity)`
+                : `  ${name} ${id}`,
+            )
+            .join("\n")}`,
         );
-      }
       if (command === "check") return output(statement);
       const source = required("source");
       const out = required("out");
@@ -170,24 +179,15 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
       console.error(
         "Generating a Groth16 proof; this takes minutes to hours, growing with the export…",
       );
-      const timeout = optional("timeout");
-      const certificate = await prove(input, source, {
-        tools,
-        timeout: timeout === undefined ? undefined : Number(timeout),
-      });
+      const certificate = await prove(input, source, { tools, timeout });
       await Bun.write(out, `${JSON.stringify(certificate, null, 2)}\n`);
       await Bun.write(out.replace(/\.json$/, "") + ".ndjson", input.export);
       return;
     }
     case "verify": {
-      const { certificate, result } = await verify(required("certificate"));
-      if (result.status !== "verified") {
-        process.exitCode = 1;
-        return output(result);
-      }
-      // Verified says only that these claims were proved; show which.
-      const { claims, axioms } = certificate;
-      return output({ ...result, claims, axioms });
+      const { result } = await verify(required("certificate"));
+      if (result.status !== "verified") process.exitCode = 1;
+      return output(result);
     }
     case "fetch": {
       // A forged certificate can name identities that match any export, so a
@@ -200,9 +200,14 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
       if (result.status !== "verified") return fail(result);
       const from = optional("from");
       const source = from
-        ? await Bun.file(from).text()
+        ? await readExport(from)
         : await download(certificate.source);
-      const mismatches = await matchSource(certificate, source, tools.binary);
+      const mismatches = await matchSource(
+        certificate,
+        source,
+        tools.binary,
+        timeout,
+      );
       if (mismatches.length) return fail({ mismatches });
       await Bun.write(required("out"), source);
       return;
