@@ -1,7 +1,10 @@
 name: Check
 on:
+  # Documentation changes cannot affect the build, tests or pinned artifacts.
   push:
+    paths-ignore: ['**.md', 'docs/**', 'LICENSE']
   pull_request:
+    paths-ignore: ['**.md', 'docs/**', 'LICENSE']
   workflow_dispatch:
 
 concurrency:
