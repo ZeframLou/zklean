@@ -13,9 +13,11 @@ top of you would love to rely on that. Today they either take your word for it
 or rebuild your Lean project, and wait out its full proof check, on every
 release. Most take your word for it.
 
-With ZKLean, you publish a certificate with each release, and their CI checks it
-in a quarter of a second. If a release changes anything the proof depends on,
-their CI goes red before they ship against it.
+With ZKLean, you publish a certificate with each release. The checkout team
+reviews your theorem once, in Lean, and pins its fingerprint. From then on their
+CI checks each release's certificate in a quarter of a second, with no Lean
+installed. If a release changes anything the proof depends on, the fingerprint
+changes and their CI goes red before they ship against it.
 
 ## What you get
 
