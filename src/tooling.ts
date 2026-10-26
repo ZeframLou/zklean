@@ -109,7 +109,7 @@ export async function exportModule(options: {
   ]);
 }
 
-const LEAN_TOOLCHAIN = "leanprover/lean4:v4.36.0-rc1";
+const LEAN_TOOLCHAIN = "leanprover/lean4:v4.35.0";
 
 async function runLake(
   project: string,
@@ -119,7 +119,7 @@ async function runLake(
   const toolchain = Bun.file(join(project, "lean-toolchain"));
   if (await toolchain.exists()) {
     const requested = (await toolchain.text()).trim();
-    if (![LEAN_TOOLCHAIN, "v4.36.0-rc1"].includes(requested))
+    if (![LEAN_TOOLCHAIN, "v4.35.0"].includes(requested))
       throw new Error(
         `ZKLean requires ${LEAN_TOOLCHAIN}; this project selects ${requested}`,
       );

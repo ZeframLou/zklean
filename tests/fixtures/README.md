@@ -1,7 +1,7 @@
 # Test artifacts
 
 The `.ndjson` files are lean4export output for `examples/lean` with Lean
-v4.36.0-rc1 and exporter commit df81913eee5519d5a88ae5b0fd701b5298cc29ab.
+v4.35.0 and exporter commit 5a9a355dc6c5fd82b69058d433e2ae2e8dfbf8fe.
 Regenerate them with `bun scripts/export-examples.ts`.
 
 - `v1.ndjson`: the inventory example, with `Init`.
