@@ -24,9 +24,10 @@ the block hash.
 
 **Names** of declarations, referenced constants and universe parameters render
 as dotted strings, with numeric components in decimal. A string component that
-is empty, contains `.`, or is all digits is ambiguous: a declaration with such a
-name, or that refers to one, has no identity, so no claim or reported axiom can
-depend on it.
+is empty, contains `.`, or is all digits is written in Lean's quotes, as
+`«rate.limit»`, so distinct names never render alike. A component containing
+`«` or `»` cannot be rendered: a declaration with such a name, or that refers
+to one, has no identity, so no claim or reported axiom can depend on it.
 
 **Built-in constants.** Nanoda evaluates literals, `Nat` arithmetic, `Quot` and
 `eagerReduce` natively, recognizing 31 constants by name. An export may contain

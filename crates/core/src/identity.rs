@@ -29,8 +29,9 @@ fn digest(node: &str) -> String {
     format!("{:x}", digest.finalize())
 }
 
-/// A name with an ambiguous component cannot be rendered, so neither its
-/// declaration nor anything that refers to it has an identity.
+/// A name with a component containing `«` or `»` cannot be rendered
+/// unambiguously, so neither its declaration nor anything that refers to it has
+/// an identity.
 #[derive(Debug)]
 struct Ambiguous(String);
 
@@ -615,9 +616,9 @@ impl<'r, 'c> Reader<'r, 'c, '_> {
         Ok(Value::Array(names))
     }
 
-    /// Dotted Lean name. Components that would make the rendering ambiguous
-    /// (empty, containing a dot, or all digits like a numeric component) are
-    /// rejected.
+    /// Dotted Lean name, quoting components as Lean does so that distinct
+    /// names never render alike. A component containing `«` or `»` cannot be
+    /// rendered.
     fn render(&mut self, name: NamePtr<'c>) -> Result<String> {
         if let Some(r) = self.rendered.get(&name) {
             return Ok(r.clone());
@@ -626,9 +627,18 @@ impl<'r, 'c> Reader<'r, 'c, '_> {
             Name::Anon => return Ok(String::new()),
             Name::Str(pre, s, _) => {
                 let s = self.ctx.read_string(s).to_string();
-                if s.is_empty() || s.contains('.') || s.chars().all(|c| c.is_ascii_digit()) {
+                if s.contains('«') || s.contains('»') {
                     return Err(Ambiguous(s).into());
                 }
+                // Lean's own quoting keeps the rendering unambiguous: a
+                // component that is empty, contains a dot, or is all digits
+                // like a numeric component is written `«…»`.
+                let s = if s.is_empty() || s.contains('.') || s.chars().all(|c| c.is_ascii_digit())
+                {
+                    format!("«{s}»")
+                } else {
+                    s
+                };
                 (self.render(pre)?, s)
             }
             Name::Num(pre, n, _) => (self.render(pre)?, n.to_string()),

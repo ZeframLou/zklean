@@ -9,6 +9,7 @@ Regenerate them with `bun scripts/export-examples.ts`.
 - `identity.ndjson`: a one-line theorem, the source of the test certificate.
 - `percent.ndjson`: the README's progress-bar example, the source of its
   certificate.
+- `quoted.ndjson`: a name component containing a dot, written `«rate.limit»`.
 - `composition.ndjson`: several polymorphic claims with universe parameters.
 - `axioms.ndjson`, `axiom-spoof.ndjson`: custom axioms, and a fake `propext`.
 - `prop-def.ndjson`: a Prop-valued definition, whose body must be in its identity.

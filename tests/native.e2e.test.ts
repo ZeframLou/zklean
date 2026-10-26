@@ -313,3 +313,13 @@ test("a claim is never replaced by a library statement", async () => {
     claims: { "Nat.sub_add_cancel": expect.stringMatching(hex) },
   });
 });
+
+test("a name component containing a dot is quoted as Lean quotes it", async () => {
+  const value = await checked("quoted", ["«rate.limit».pos"]);
+  expect(Object.keys(value.claims)).toEqual(["«rate.limit».pos"]);
+  expect(value.claims["«rate.limit».pos"]).toMatch(hex);
+  // The two-component name `rate.limit.pos` is a different name.
+  await expect(
+    runNative(binary, "check", await input("quoted", ["rate.limit.pos"])),
+  ).rejects.toThrow("unresolved declaration rate.limit.pos");
+});

@@ -19,6 +19,11 @@ const examples = [
     claims: ["Inventory.reservation_safe"],
   },
   {
+    module: "Quoted",
+    file: "quoted",
+    claims: ["«rate.limit».pos"],
+  },
+  {
     module: "Percent",
     file: "percent",
     claims: ["Progress.percent_le_100"],

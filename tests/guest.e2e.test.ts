@@ -13,6 +13,7 @@ const binary = elfPath ? (await findTools()).binary : "";
 // equal the native commitment, so the two checkers agree on each statement.
 const accepted: [string, string[]][] = [
   ["identity", ["Demo.identity"]],
+  ["quoted", ["«rate.limit».pos"]],
   ["v1", ["Inventory.reservation_safe"]],
   ["composition", ["Pipeline.compose", "Pipeline.weaken"]],
   ["axioms", ["Inventory.assumed_safe"]],

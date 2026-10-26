@@ -107,10 +107,16 @@ pub fn run(input: &str) -> Result<Value> {
             continue;
         };
         let (pre, part) = if let Some(s) = line.get("str") {
-            (
-                s["pre"].as_u64(),
-                s["str"].as_str().unwrap_or_default().to_string(),
-            )
+            // Quoted exactly as the checker renders names.
+            let part = s["str"].as_str().unwrap_or_default();
+            let quoted =
+                part.is_empty() || part.contains('.') || part.chars().all(|c| c.is_ascii_digit());
+            let part = if quoted && !part.contains(['«', '»']) {
+                format!("«{part}»")
+            } else {
+                part.to_string()
+            };
+            (s["pre"].as_u64(), part)
         } else {
             (line["num"]["pre"].as_u64(), line["num"]["i"].to_string())
         };
