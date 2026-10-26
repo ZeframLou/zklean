@@ -24,8 +24,9 @@ checker written independently of Lean, and outputs the **statement digest** of
 `{format, claims, axioms}`. The resulting Groth16 proof is valid only for the
 guest identified by a **verifier key**.
 
-Verification relies on the guest being correct and on SP1's proofs, including
-its one-time trusted setup, being sound. It establishes properties of a Lean
+Verification relies on the guest being correct, on SP1's proofs, including its
+one-time trusted setup, being sound, and on Lean's kernel having checked the
+pinned library (Section 2). It establishes properties of a Lean
 model, not of deployed code, and only the certificate's own claims. A verifier:
 
 - MUST pin a trusted verifier key, and MUST NOT accept one from a certificate;
@@ -35,15 +36,25 @@ model, not of deployed code, and only the certificate's own claims. A verifier:
 
 ## 2. Generation
 
-The guest reads one input, `{export, claims}`: the export as a string and the
-claim names. It MUST:
+The guest reads one input, `{export, claims, library}`: the export as a
+string, the claim names, and membership proofs for **library theorems**:
+theorems of Lean's standard library that the export states as axioms instead of
+proving. The guest embeds the root of a pinned table of every Lean 4.35.0
+library theorem, with the axioms its proof uses. It MUST:
 
 - check the entire export with Nanoda;
 - reject an export that redefines any of the 31 constants Nanoda evaluates
   natively by name, such as `Nat.gcd`;
 - require every claim to be a theorem whose type is a proposition;
-- collect every axiom the claims' proofs use; and
-- output the statement digest of the claims and those axioms.
+- collect every axiom the claims' proofs use;
+- for each membership proof, verify it against the pinned root, require its
+  theorem to be one of those axioms with the pinned identity, and replace it
+  with the axioms the library proof uses; and
+- output the statement digest of the claims and the remaining axioms.
+
+A prover SHOULD state every library theorem the claims use, and drop every
+declaration the claims do not reach, so the guest checks only what the claims
+need.
 
 ## 3. Certificate
 

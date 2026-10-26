@@ -7,7 +7,7 @@
 - Omit development history, unsolicited project-status commentary, version announcements, and implementation inventories unless the task requires them.
 - Explain dependencies and internal mechanisms only when the reader needs them to make a decision or perform an action.
 - State relevant requirements and limitations directly. Keep instructions accurate; do not hide prerequisites or claim that an unavailable workflow works.
-- Put detailed protocol, architecture, and contributor material in dedicated documentation. Keep the README focused on purpose and a runnable example.
+- Keep the README to purpose, installation, a runnable example, the practical workflow, a short "How it works" section on the architecture, and the trust model. Put detailed protocol and contributor material in dedicated documentation.
 - Write for developers new to formal verification and cryptographic proofs. Explain those concepts separately before using them as shared vocabulary.
 - Describe ZKLean's trust boundary between certificate producers and verifiers: the trusted checker identity, permitted axioms, and what acceptance establishes. Keep HTTPV's server trust model in its own repository. Keep the README's security section to one paragraph of at most three sentences.
 - Keep ZKLean's proving and local verification independent of HTTPV. HTTPV consumes certificates through a configured verifier and does not invoke a prover or the ZKLean CLI.

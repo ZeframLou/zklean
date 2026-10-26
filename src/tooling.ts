@@ -6,6 +6,8 @@ export interface Tools {
   elf?: string | undefined;
   exporter?: string | undefined;
   lake?: string | undefined;
+  /** The pinned table of Lean's library theorems, for proving. */
+  library?: string | undefined;
   profile: string;
 }
 
@@ -29,7 +31,7 @@ async function locate(
 
 export async function findTools(): Promise<Tools> {
   const elan = process.env.ELAN_HOME ?? join(process.env.HOME ?? "", ".elan");
-  const [binary, elf, exporter, lake, profile] = await Promise.all([
+  const [binary, elf, exporter, lake, library, profile] = await Promise.all([
     locate("ZKLEAN_NATIVE", [
       join(source, "target", "release", "zklean-native"),
     ]),
@@ -46,6 +48,7 @@ export async function findTools(): Promise<Tools> {
       join(elan, "bin", "lake"),
       ...(Bun.which("lake") ? [Bun.which("lake")!] : []),
     ]),
+    locate("ZKLEAN_LIBRARY", [join(source, "library", "lean-4.35.0.ndjson")]),
     locate("ZKLEAN_PROFILE", [join(source, "src", "guest.json")]),
   ]);
   if (!profile)
@@ -60,6 +63,7 @@ export async function findTools(): Promise<Tools> {
     elf,
     exporter,
     lake,
+    library,
     profile,
   };
 }

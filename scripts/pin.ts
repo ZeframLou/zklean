@@ -1,6 +1,6 @@
-/** Regenerate the pinned identities of Lean's own definitions at the pinned
- * toolchain: the constants the checker computes with by name, then the
- * standard axioms. */
+/** Regenerate everything pinned from Lean's own library at the pinned
+ * toolchain: the constants the checker computes with by name, the table of
+ * library theorems with its root, and the standard axioms. */
 import { resolve } from "node:path";
 import { runNative } from "../src/native.ts";
 import { exportModule, findTools } from "../src/tooling.ts";
@@ -41,6 +41,27 @@ await write(
   "crates/core/src/kernel.json",
   await runNative(native, "kernel", { export: await exported(kernel) }),
 );
+// The library table: every theorem in Lean's standard library, with the axioms
+// its proof uses, and the Merkle root the checker pins.
+const library = (await runNative(
+  native,
+  "library",
+  {
+    export: await exportModule({
+      project: resolve("examples/lean"),
+      module: "Library",
+      claims: [],
+      tools,
+    }),
+  },
+  3_600_000,
+)) as { size: number; root: string; table: string };
+await Bun.write("library/lean-4.35.0.ndjson", library.table);
+await write("crates/core/src/library.json", {
+  lean: "4.35.0",
+  root: library.root,
+  size: library.size,
+});
 // The pins are compiled in, and every later check enforces them.
 build();
 const { axioms } = (await runNative(native, "check", {

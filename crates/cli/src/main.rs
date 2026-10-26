@@ -4,6 +4,7 @@ use zklean_core::ProveInput;
 
 #[cfg(feature = "execute")]
 mod execute;
+mod prepare;
 #[cfg(feature = "prover")]
 mod sp1;
 
@@ -76,6 +77,29 @@ fn main() -> Result<()> {
         }
         #[cfg(feature = "prover")]
         "prove" | "identity" => sp1::run(&command, &input)?,
+        "prepare" => {
+            let input = input.clone();
+            guest_stack(move || prepare::run(&input))?
+        }
+        // The pinned library: every theorem of a full export of Lean's library.
+        "library" => {
+            let request: Export = serde_json::from_str(&input)?;
+            let entries = guest_stack(move || zklean_core::library_table(&request.export))?;
+            let leaves = entries
+                .iter()
+                .map(zklean_core::library::leaf)
+                .collect::<Result<Vec<_>>>()?;
+            let root = zklean_core::library::root(&leaves)
+                .iter()
+                .map(|b| format!("{b:02x}"))
+                .collect::<String>();
+            let mut table = String::new();
+            for entry in &entries {
+                table.push_str(&serde_json::to_string(entry)?);
+                table.push('\n');
+            }
+            serde_json::json!({"size": entries.len(), "root": root, "table": table})
+        }
         "kernel" => {
             let request: Export = serde_json::from_str(&input)?;
             serde_json::to_value(guest_stack(move || {

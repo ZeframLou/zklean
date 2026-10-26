@@ -2,7 +2,7 @@
 import { parseArgs } from "node:util";
 import { resolve } from "node:path";
 import { version } from "../package.json";
-import { parseTimeout, prove, runNative } from "./native.ts";
+import { parseTimeout, prepare, prove, runNative } from "./native.ts";
 import { groth16Backend } from "./groth16.ts";
 import { createVerifier } from "./verifier.ts";
 import { exportModule, findTools, profile } from "./tooling.ts";
@@ -147,11 +147,12 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
     case "requirements":
     case "prove": {
       const claims = list(required("claims"));
-      const input = { export: await exported(claims), claims };
+      const raw = { export: await exported(claims), claims };
       if (command === "requirements")
         return output(
-          await runNative(tools.binary, "requirements", input, timeout),
+          await runNative(tools.binary, "requirements", raw, timeout),
         );
+      const input = await prepare(tools, raw, timeout);
       const statement = (await runNative(
         tools.binary,
         "check",

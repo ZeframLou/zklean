@@ -243,3 +243,73 @@ test("identities recurse through neither dependency chains nor deep terms", asyn
   const deep = await checked("deep", ["Deep.f_ok"]);
   expect(Object.keys(deep.claims)).toEqual(["Deep.f_ok"]);
 });
+
+const table = () =>
+  Bun.file(resolve(import.meta.dir, "../library/lean-4.35.0.ndjson")).text();
+type Prepared = { export: string; library: { entry: { id: string } }[] };
+
+test("library theorems become pinned statements without changing the statement", async () => {
+  for (const [module, claims] of [
+    ["percent", ["Progress.percent_le_100"]],
+    ["v1", ["Inventory.reservation_safe"]],
+  ] as const) {
+    const request = await input(module, [...claims]);
+    const prepared = (await runNative(binary, "prepare", {
+      ...request,
+      library: await table(),
+    })) as Prepared;
+    expect(prepared.export.length).toBeLessThan(request.export.length);
+    expect(prepared.library.length).toBeGreaterThan(0);
+    expect(
+      await runNative(binary, "check", { ...request, ...prepared }),
+    ).toEqual(await runNative(binary, "check", request));
+  }
+});
+
+test("only genuine, used library theorems are accepted", async () => {
+  const request = await input("percent", ["Progress.percent_le_100"]);
+  const prepared = (await runNative(binary, "prepare", {
+    ...request,
+    library: await table(),
+  })) as Prepared;
+  const check = (value: object) =>
+    runNative(binary, "check", { ...request, ...prepared, ...value });
+  // A tampered entry is not in the pinned table.
+  const tampered = structuredClone(prepared.library);
+  tampered[0]!.entry.id = "0".repeat(64);
+  await expect(check({ library: tampered })).rejects.toThrow("library");
+  // A membership must account for an axiom the claims actually use.
+  const twice = [...prepared.library, prepared.library[0]];
+  await expect(check({ library: twice })).rejects.toThrow(
+    "not an axiom the claims use",
+  );
+  // A stated "library theorem" must state exactly Lean's theorem.
+  const lines = prepared.export.split("\n");
+  const stated = lines
+    .map((line, i) => [line, i] as const)
+    .filter(([line]) => line.startsWith('{"axiom"'));
+  // The later one takes the earlier one's statement, which is already defined.
+  const [a, b] = [JSON.parse(stated[0]![0]), JSON.parse(stated[1]![0])];
+  b.axiom.type = a.axiom.type;
+  lines[stated[1]![1]] = JSON.stringify(b);
+  // The proof no longer checks, or the statement's identity differs.
+  await expect(check({ export: lines.join("\n") })).rejects.toThrow();
+  // Without memberships, library theorems are reported as plain axioms.
+  const unresolved = (await check({ library: [] })) as {
+    axioms: Record<string, string>;
+  };
+  expect(Object.keys(unresolved.axioms).length).toBeGreaterThan(1);
+});
+
+test("a claim is never replaced by a library statement", async () => {
+  const request = await input("v1", ["Nat.sub_add_cancel"]);
+  const prepared = (await runNative(binary, "prepare", {
+    ...request,
+    library: await table(),
+  })) as Prepared;
+  expect(
+    await runNative(binary, "check", { ...request, ...prepared }),
+  ).toMatchObject({
+    claims: { "Nat.sub_add_cancel": expect.stringMatching(hex) },
+  });
+});

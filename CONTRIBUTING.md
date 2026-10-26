@@ -33,9 +33,11 @@ bun run check
 ZKLEAN_LAKE="$(command -v lake)" bun run check   # with Lake installed: also the Lean export tests
 ```
 
-CI also re-exports the Lean fixtures and re-derives the pinned identities of
-Lean's own definitions (`bun scripts/pin.ts`), requiring both unchanged, and
-rebuilds the WebAssembly verifier and the guest (see below).
+CI also re-exports the Lean fixtures and re-derives everything pinned from
+Lean's own library (`bun scripts/pin.ts`): the built-in constants, the standard
+axioms, and the library table with its root. It requires both unchanged, and
+rebuilds the WebAssembly verifier and the guest (see below). A new Lean version
+means re-running `pin.ts`, which changes the root and so the guest key.
 
 ## The guest and its key
 
@@ -45,9 +47,8 @@ the exact ELF, and Cargo hashes package paths into the build, so
 builds the canonical ELF and uploads it as the `zklean-guest-elf` artifact;
 `zklean pin` derives `src/guest.json` from it, and CI requires the two to agree.
 Any change to `crates/core`, `vendor/nanoda`, `crates/guest` or its `Cargo.lock`
-changes the key and invalidates
-`tests/fixtures/identity.certificate.json`. To build it yourself on Linux, run
-`bash scripts/build-guest.sh`.
+changes the key and invalidates the certificates in `tests/fixtures`. To build
+the guest yourself on Linux, run `bash scripts/build-guest.sh`.
 
 The WebAssembly verifier is reproducible in the same way:
 `bun run build:verifier` uses Rust 1.96.0 and strips local paths from the
@@ -75,8 +76,8 @@ fixture.
    the guest changed, the job then fails its profile check until you pin.
    Download and unzip the artifact (for example with `gh run download`). With
    `ZKLEAN_NATIVE` set to the prover build and `ZKLEAN_GUEST_ELF` to the
-   unzipped guest, as above, pin `src/guest.json` and re-prove the identity
-   certificate, naming the URL the tag will serve as its source:
+   unzipped guest, as above, pin `src/guest.json` and re-prove both
+   certificates, naming the URL the tag will serve as each source:
 
    ```sh
    bun src/cli.ts pin --out src/guest.json
@@ -84,6 +85,11 @@ fixture.
      --claims Demo.identity --out tests/fixtures/identity.certificate.json \
      --source https://raw.githubusercontent.com/ZeframLou/zklean/vX.Y.Z/tests/fixtures/identity.ndjson
    rm tests/fixtures/identity.certificate.ndjson
+   bun src/cli.ts prove --export tests/fixtures/percent.ndjson \
+     --claims Progress.percent_le_100 --axioms propext \
+     --out tests/fixtures/percent.certificate.json \
+     --source https://raw.githubusercontent.com/ZeframLou/zklean/vX.Y.Z/tests/fixtures/percent.ndjson
+   rm tests/fixtures/percent.certificate.ndjson
    ```
 
 2. Commit, wait for CI to pass, then tag: `git tag vX.Y.Z && git push origin vX.Y.Z`.

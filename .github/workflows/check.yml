@@ -61,7 +61,7 @@ jobs:
       - run: bun scripts/export-examples.ts
       - run: git diff --exit-code -- tests/fixtures/*.ndjson
       - run: bun scripts/pin.ts
-      - run: git diff --exit-code -- src/axioms.json crates/core/src/kernel.json
+      - run: git diff --exit-code -- src/axioms.json crates/core/src/kernel.json crates/core/src/library.json library
       - run: ZKLEAN_LAKE="$(command -v lake)" bun test tests/tooling.e2e.test.ts
 
   guest:

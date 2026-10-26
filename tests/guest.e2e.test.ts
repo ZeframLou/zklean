@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import { expect, test } from "bun:test";
 import { input } from "./helpers.ts";
 import { runNative } from "../src/native.ts";
@@ -37,6 +38,25 @@ for (const [fixture, claims] of accepted)
     },
     300_000,
   );
+
+test.skipIf(!elfPath)(
+  "SP1 accepts Lean library theorems by their pinned membership",
+  async () => {
+    const request = await input("percent", ["Progress.percent_le_100"]);
+    const prepared = (await runNative(binary, "prepare", {
+      ...request,
+      library: await Bun.file(
+        resolve(import.meta.dir, "../library/lean-4.35.0.ndjson"),
+      ).text(),
+    })) as object;
+    const result = (await runNative(binary, "execute", {
+      elfPath,
+      input: { ...request, ...prepared },
+    })) as { statement: unknown };
+    expect(result.statement).toEqual(await runNative(binary, "check", request));
+  },
+  300_000,
+);
 
 test.skipIf(!elfPath)(
   "the real SP1 guest rejects what native checking rejects, for the same reason",

@@ -29,6 +29,19 @@ fn digest(node: &str) -> String {
     format!("{:x}", digest.finalize())
 }
 
+/// A name with an ambiguous component cannot be rendered, so neither its
+/// declaration nor anything that refers to it has an identity.
+#[derive(Debug)]
+struct Ambiguous(String);
+
+impl std::fmt::Display for Ambiguous {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ambiguous name component: {:?}", self.0)
+    }
+}
+
+impl std::error::Error for Ambiguous {}
+
 /// A JSON string, escaped as canonical JSON escapes it.
 fn quote(s: &str) -> String {
     serde_json::to_string(s).expect("strings serialize")
@@ -64,18 +77,32 @@ pub fn read<'p, A>(
             props: &props,
             names: FxHashMap::default(),
             rendered: FxHashMap::default(),
+            order: Vec::new(),
             ids: FxHashMap::default(),
+            unidentified: FxHashSet::default(),
             groups: FxHashMap::default(),
             nodes: FxHashMap::default(),
             levels: FxHashMap::default(),
         };
         for (name, d) in &file.declars {
-            let rendered = reader.render(*name)?;
-            reader.names.insert(rendered, *name);
+            reader.order.push(*name);
             reader.declars.insert(*name, d);
+            match reader.render(*name) {
+                Ok(rendered) => {
+                    reader.names.insert(rendered, *name);
+                }
+                Err(e) if e.is::<Ambiguous>() => {}
+                Err(e) => return Err(e),
+            }
         }
         for name in file.declars.keys() {
-            reader.identify(*name)?;
+            match reader.identify(*name) {
+                Ok(()) => {}
+                Err(e) if e.is::<Ambiguous>() => {
+                    reader.unidentified.insert(*name);
+                }
+                Err(e) => return Err(e),
+            }
         }
         f(&mut reader)
     })
@@ -87,7 +114,11 @@ pub struct Reader<'r, 'c, 'p> {
     props: &'r FxHashSet<NamePtr<'c>>,
     names: FxHashMap<String, NamePtr<'c>>,
     rendered: FxHashMap<NamePtr<'c>, String>,
+    /// Declarations in export order.
+    order: Vec<NamePtr<'c>>,
     ids: FxHashMap<NamePtr<'c>, String>,
+    /// Declarations that depend on an ambiguous name.
+    unidentified: FxHashSet<NamePtr<'c>>,
     groups: FxHashMap<NamePtr<'c>, String>,
     nodes: FxHashMap<(ExprPtr<'c>, Option<NamePtr<'c>>), String>,
     levels: FxHashMap<LevelPtr<'c>, String>,
@@ -127,6 +158,117 @@ impl<'r, 'c> Reader<'r, 'c, '_> {
             .iter()
             .map(|n| Ok((n.clone(), self.id(self.lookup(n)?.0)?)))
             .collect()
+    }
+
+    /// Every identified theorem of a proposition, with its identity and the
+    /// axioms it depends on, exactly as `axioms` reports them. One pass over
+    /// the export in order reuses each declaration's result; it repeats only
+    /// for references inside inductive blocks, which may point forward.
+    pub fn theorems(&mut self) -> Result<Vec<(String, String, BTreeSet<String>)>> {
+        let order = self.order.clone();
+        let mut direct: FxHashMap<NamePtr<'c>, Vec<NamePtr<'c>>> = FxHashMap::default();
+        for &name in &order {
+            let refs = self.references(name)?;
+            direct.insert(name, refs);
+        }
+        let mut sets: FxHashMap<NamePtr<'c>, FxHashSet<NamePtr<'c>>> = FxHashMap::default();
+        loop {
+            let mut changed = false;
+            for &name in &order {
+                let mut set = sets.get(&name).cloned().unwrap_or_default();
+                let before = set.len();
+                if matches!(self.declars[&name], Declar::Axiom { .. }) {
+                    set.insert(name);
+                }
+                for r in &direct[&name] {
+                    if let Some(s) = sets.get(r) {
+                        set.extend(s.iter().copied());
+                    }
+                }
+                if set.len() != before || !sets.contains_key(&name) {
+                    changed |= set.len() != before;
+                    sets.insert(name, set);
+                }
+            }
+            if !changed {
+                break;
+            }
+        }
+        let mut out = Vec::new();
+        for &name in &order {
+            let theorem =
+                matches!(self.declars[&name], Declar::Theorem { .. }) && self.props.contains(&name);
+            let Some(id) = self.ids.get(&name).cloned() else {
+                continue;
+            };
+            if theorem {
+                let axioms = sets[&name]
+                    .iter()
+                    .map(|a| self.render(*a))
+                    .collect::<Result<_>>()?;
+                out.push((self.render(name)?, id, axioms));
+            }
+        }
+        Ok(out)
+    }
+
+    /// The declarations one declaration refers to directly, as `axioms`
+    /// follows them.
+    fn references(&mut self, name: NamePtr<'c>) -> Result<Vec<NamePtr<'c>>> {
+        let d = self.declars[&name];
+        let mut out = Vec::new();
+        let mut roots = vec![d.info().ty];
+        match d {
+            Declar::Axiom { .. } | Declar::Quot { .. } => {}
+            Declar::Theorem { val, .. }
+            | Declar::Definition { val, .. }
+            | Declar::Opaque { val, .. } => roots.push(*val),
+            Declar::Inductive(i) => {
+                out.extend(i.all_ind_names.iter().chain(i.all_ctor_names.iter()))
+            }
+            Declar::Constructor(c) => out.push(c.inductive_name),
+            Declar::Recursor(r) => {
+                out.extend(r.all_inductives.iter());
+                roots.extend(r.rec_rules.iter().map(|rule| rule.val));
+            }
+        }
+        let mut seen = FxHashSet::default();
+        while let Some(e) = roots.pop() {
+            if !seen.insert(e) {
+                continue;
+            }
+            match self.ctx.read_expr(e) {
+                Expr::Const { name, .. } => out.push(name),
+                Expr::Proj {
+                    ty_name, structure, ..
+                } => {
+                    out.push(ty_name);
+                    roots.push(structure);
+                }
+                Expr::NatLit { .. } => out.push(self.lookup("Nat")?.0),
+                Expr::StringLit { .. } => {
+                    for n in ["String", "String.ofList", "Char.ofNat", "List"] {
+                        out.push(self.lookup(n)?.0);
+                    }
+                }
+                Expr::App { fun, arg, .. } => roots.extend([fun, arg]),
+                Expr::Pi {
+                    binder_type, body, ..
+                }
+                | Expr::Lambda {
+                    binder_type, body, ..
+                } => roots.extend([binder_type, body]),
+                Expr::Let {
+                    binder_type,
+                    val,
+                    body,
+                    ..
+                } => roots.extend([binder_type, val, body]),
+                Expr::Var { .. } | Expr::Sort { .. } => {}
+                Expr::Local { .. } => bail!("free variable in export"),
+            }
+        }
+        Ok(out)
     }
 
     /// Every axiom the declarations depend on, through types, values and proofs.
@@ -202,10 +344,13 @@ impl<'r, 'c> Reader<'r, 'c, '_> {
 
     /// The identity of a declaration already passed in export order.
     fn id(&self, name: NamePtr<'c>) -> Result<String> {
-        self.ids
-            .get(&name)
-            .cloned()
-            .context("declaration used before it is declared")
+        if let Some(id) = self.ids.get(&name) {
+            return Ok(id.clone());
+        }
+        if self.unidentified.contains(&name) {
+            return Err(Ambiguous(format!("{name:?}")).into());
+        }
+        bail!("declaration used before it is declared")
     }
 
     fn identify(&mut self, name: NamePtr<'c>) -> Result<()> {
@@ -481,10 +626,9 @@ impl<'r, 'c> Reader<'r, 'c, '_> {
             Name::Anon => return Ok(String::new()),
             Name::Str(pre, s, _) => {
                 let s = self.ctx.read_string(s).to_string();
-                ensure!(
-                    !s.is_empty() && !s.contains('.') && !s.chars().all(|c| c.is_ascii_digit()),
-                    "ambiguous name component"
-                );
+                if s.is_empty() || s.contains('.') || s.chars().all(|c| c.is_ascii_digit()) {
+                    return Err(Ambiguous(s).into());
+                }
                 (self.render(pre)?, s)
             }
             Name::Num(pre, n, _) => (self.render(pre)?, n.to_string()),

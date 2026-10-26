@@ -6,6 +6,27 @@ export interface ProveInput {
   /** NDJSON emitted by the pinned lean4export. */
   export: string;
   claims: string[];
+  /** Library theorems the export states without proof, with their
+   * membership in the pinned library. */
+  library?: unknown[];
+}
+
+/** Keep only what the claims need, with Lean's library theorems as statements
+ * accepted by the pinned library. Identities are unchanged. */
+export async function prepare(
+  tools: Tools,
+  input: ProveInput,
+  timeout?: number,
+): Promise<ProveInput> {
+  if (!tools.library)
+    throw new Error("library table not found; set ZKLEAN_LIBRARY");
+  const prepared = (await runNative(
+    tools.binary,
+    "prepare",
+    { ...input, library: await Bun.file(tools.library).text() },
+    timeout,
+  )) as { export: string; library: unknown[] };
+  return { ...input, ...prepared };
 }
 /** Process boundary keeps Nanoda's panic-based rejection out of the Bun host.
  * No shell is used. Configuration is supplied by the application, never input. */

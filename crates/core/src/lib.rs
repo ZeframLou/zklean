@@ -1,5 +1,6 @@
 //! Shared checked computation. The SP1 guest and native diagnostics run this code.
 mod identity;
+pub mod library;
 
 use anyhow::{ensure, Result};
 use identity::Reader;
@@ -16,6 +17,10 @@ use std::{
 pub struct ProveInput {
     pub export: String,
     pub claims: Vec<String>,
+    /// Lean library theorems the export states as axioms, with their
+    /// membership in the pinned library.
+    #[serde(default)]
+    pub library: Vec<library::Membership>,
 }
 
 /// Lean names mapped to declaration identities.
@@ -47,11 +52,41 @@ pub fn check(input: &ProveInput) -> Result<Statement> {
                 "claim must be a theorem of a proposition: {name}"
             );
         }
-        let axioms = env.axioms(&claims)?;
+        let mut axioms = env.axioms(&claims)?;
+        // A library theorem stated as an axiom is accepted by its membership
+        // in the pinned library, and the axioms its proof uses take its place.
+        let mut inherited = Identified::new();
+        for membership in &input.library {
+            let entry = library::verify(membership)?;
+            ensure!(
+                axioms.remove(&entry.name),
+                "{} is not an axiom the claims use",
+                entry.name
+            );
+            let stated = env.identities(&BTreeSet::from([entry.name.clone()]))?;
+            ensure!(
+                stated[&entry.name] == entry.id,
+                "{} differs from Lean's library",
+                entry.name
+            );
+            inherited.extend(entry.axioms.clone());
+        }
+        let mut reported = env.identities(&axioms)?;
+        for (name, id) in inherited {
+            ensure!(
+                reported.get(&name).is_none_or(|known| *known == id),
+                "{name} has two identities"
+            );
+            reported.insert(name, id);
+        }
+        ensure!(
+            reported.keys().all(|name| !claims.contains(name)),
+            "a claim is also an axiom"
+        );
         Ok(Statement {
             format: "zklean/1".into(),
             claims: env.identities(&claims)?,
-            axioms: env.identities(&axioms)?,
+            axioms: reported,
         })
     })
 }
@@ -78,6 +113,23 @@ pub fn requirements(input: &ProveInput) -> Result<Requirements> {
 pub fn identify(export: &str, names: &[String]) -> Result<Identified> {
     let names = names.iter().cloned().collect();
     checked(export, |env| env.identities(&names))
+}
+
+/// Every theorem in a full export of Lean's library, in name order: the source
+/// of the pinned library table.
+pub fn library_table(export: &str) -> Result<Vec<library::Entry>> {
+    checked(export, |env| {
+        let mut entries = Vec::new();
+        for (name, id, axioms) in env.theorems()? {
+            entries.push(library::Entry {
+                name,
+                id,
+                axioms: env.identities(&axioms)?,
+            });
+        }
+        entries.sort_by(|a, b| a.name.as_bytes().cmp(b.name.as_bytes()));
+        Ok(entries)
+    })
 }
 
 /// The checker computes with these constants by name, trusting that they are

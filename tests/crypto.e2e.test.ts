@@ -3,9 +3,11 @@ import { resolve } from "node:path";
 import {
   createVerifier,
   groth16Backend,
+  parseCertificate,
   standardAxioms,
   type Certificate,
 } from "zklean";
+import { matchSource } from "../src/fetch.ts";
 import { binary, buildNative, input } from "./helpers.ts";
 import { runNative } from "../src/native.ts";
 
@@ -74,3 +76,22 @@ test("verification runs off the event loop and concurrent checks share it", asyn
   expect(results.every((result) => result.status === "verified")).toBe(true);
   expect(timerFired).toBe(true);
 }, 60_000);
+
+test("the README's example certificate verifies and matches its export", async () => {
+  const file = (name: string) => Bun.file(resolve(import.meta.dir, name));
+  const certificate = parseCertificate(
+    await file("fixtures/percent.certificate.json").json(),
+  );
+  expect(
+    await createVerifier().verify(certificate, {
+      axioms: { propext: standardAxioms.propext },
+    }),
+  ).toMatchObject(valid);
+  expect(
+    await matchSource(
+      certificate,
+      await file("fixtures/percent.ndjson").text(),
+      binary,
+    ),
+  ).toEqual([]);
+});

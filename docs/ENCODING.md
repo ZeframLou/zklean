@@ -23,8 +23,10 @@ declaration, or the export is rejected; within a block, cycles are broken by
 the block hash.
 
 **Names** of declarations, referenced constants and universe parameters render
-as dotted strings, with numeric components in decimal. An export is rejected if
-any string component of such a name is empty, contains `.`, or is all digits.
+as dotted strings, with numeric components in decimal. A string component that
+is empty, contains `.`, or is all digits is ambiguous: a declaration with such a
+name, or that refers to one, has no identity, so no claim or reported axiom can
+depend on it.
 
 **Built-in constants.** Nanoda evaluates literals, `Nat` arithmetic, `Quot` and
 `eagerReduce` natively, recognizing 31 constants by name. An export may contain
@@ -78,6 +80,24 @@ declaration order.
 Besides what Nanoda rejects, an export is rejected if members of a block list
 the block differently, a theorem's type is not a proposition, a term contains a
 free variable, or a name refers to a declaration the export does not contain.
+
+## Library table
+
+The pinned library table has one entry for every theorem of a proposition in
+Lean 4.35.0's standard library (the declarations `import Init` brings in, minus
+any that depend on an ambiguous name): `{name, id, axioms}`, where `id` is the
+theorem's identity and `axioms` maps each axiom its proof uses to its identity.
+Entries are sorted by the UTF-8 bytes of their names.
+
+A leaf is `SHA256(UTF8("zklean/library/1\0") || canonicalJSON(entry))`, and a
+node over children `l` and `r` is
+`SHA256(UTF8("zklean/library-node/1\0") || l || r)`. The tree and its inclusion proofs are RFC 9162's Merkle tree (Section 2.1)
+with these hashes. The guest pins the Lean version, the number of entries and
+the root, in `crates/core/src/library.json`; the full table is
+`library/lean-4.35.0.ndjson`, one entry per line.
+
+A membership proof is `{entry, index, path}`, with `path` the RFC 9162 audit
+path as lowercase hex, from the leaf upward.
 
 ## Statement and proof
 

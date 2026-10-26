@@ -84,7 +84,9 @@ minutes and up to 20 GB of memory on 12 cores. Larger exports take longer;
 `fetch` the 10-minute limit on their native check. `prove` writes the certificate,
 `reservation.json`, and beside it the **export** it proved from,
 `reservation.ndjson`: the file of Lean definitions the identities are computed
-from.
+from. `check` and `prove` keep only what the claims need, and state theorems
+from Lean's standard library without their proofs; the guest accepts those by
+the pinned library table, so proving re-checks only your own proofs.
 
 Publish the export at the `--source` URL, so recipients can confirm your claims
 against your Lean source. Serve it over https at exactly that address. `fetch`
@@ -288,6 +290,7 @@ override them; an override must point to an existing file:
 | `ZKLEAN_GUEST_ELF` | `crates/guest/target/elf-compilation/riscv64im-succinct-zkvm-elf/release/zklean-guest`, if built |
 | `ZKLEAN_EXPORTER`  | `.tooling/lean4export/.lake/build/bin/lean4export`                                               |
 | `ZKLEAN_LAKE`      | `$ELAN_HOME/bin/lake` (by default `~/.elan/bin/lake`), then `lake` on `PATH`                     |
+| `ZKLEAN_LIBRARY`   | `library/lean-4.35.0.ndjson`, the pinned table of Lean's library theorems                        |
 | `ZKLEAN_PROFILE`   | `src/guest.json`                                                                                 |
 
 `ZKLEAN_PROFILE` sets the verifier key that `verify` and `fetch` trust: override

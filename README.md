@@ -48,50 +48,49 @@ To verify certificates, on [Bun](https://bun.sh/) 1.4.4 or newer:
 bun add zklean@0.1.0
 ```
 
-To make certificates, you also need Lean, Rust and a 6 GB prover download; the
-[usage guide](docs/USAGE.md#set-up) walks through it.
+To make certificates, you also need Lean, Rust, a 6 GB prover download and
+about 20 GB of memory; the [usage guide](docs/USAGE.md#set-up) walks through it.
 
 ## Try it
 
-Verify the real certificate in this repository, from a clone:
+This repository has a real certificate for the example below. Verify it from a
+clone:
 
 ```sh
 git clone https://github.com/ZeframLou/zklean.git && cd zklean
 bun install
-bun src/cli.ts verify --certificate tests/fixtures/identity.certificate.json
+bun src/cli.ts verify --certificate tests/fixtures/percent.certificate.json --axioms propext
 ```
 
-It prints `"status": "verified"` and the claim it proves.
+It prints `"status": "verified"` and the claim it proves,
+`Progress.percent_le_100`.
 
 ## Example
 
-[`examples/lean/Inventory.lean`](examples/lean/Inventory.lean) models the
-reservation endpoint, and [`V1.lean`](examples/lean/V1.lean) proves that a
-successful reservation is positive, fits in stock, and conserves units:
+A progress bar never shows more than 100%.
+[`examples/lean/Percent.lean`](examples/lean/Percent.lean) defines how progress
+becomes a percentage, rounding down and showing 0% for an empty task, and proves
+the result never goes above 100% when the work done doesn't exceed the total:
 
 ```lean
-def POST_reservations (available requested : Nat) : Option Nat :=
-  if 0 < requested ∧ requested ≤ available then
-    some (available - requested)
-  else
-    none
+def percent (done total : Nat) : Nat :=
+  if total = 0 then 0 else done * 100 / total
 
-theorem reservation_safe (available requested remaining : Nat) :
-    POST_reservations available requested = some remaining →
-      0 < requested ∧ requested ≤ available ∧ remaining + requested = available
+theorem percent_le_100 (done total : Nat) (h : done ≤ total) :
+    percent done total ≤ 100
 ```
 
 Generate the certificate with the `zklean` CLI
-([setup](docs/USAGE.md#set-up)). `--axioms propext` accepts the
-one standard Lean assumption this proof relies on.
+([setup](docs/USAGE.md#set-up)). `--axioms propext` accepts the one standard
+Lean assumption this proof relies on.
 
 ```sh
-zklean prove --project examples/lean --module V1 \
-  --claims Inventory.reservation_safe --axioms propext \
-  --source https://example.com/reservation.ndjson --out reservation.json
+zklean prove --project examples/lean --module Percent \
+  --claims Progress.percent_le_100 --axioms propext \
+  --source https://example.com/percent.ndjson --out percent.json
 ```
 
-This takes about 5 to 15 minutes. It writes the certificate and a file of the
+This takes about 5 to 20 minutes. It writes the certificate and a file of the
 Lean definitions behind it, which you publish at the `--source` URL.
 
 Anyone can then check it:
@@ -99,7 +98,7 @@ Anyone can then check it:
 ```ts
 import { createVerifier, standardAxioms } from "zklean";
 
-const certificate = await Bun.file("reservation.json").json();
+const certificate = await Bun.file("percent.json").json();
 const result = await createVerifier().verify(certificate, {
   axioms: { propext: standardAxioms.propext },
 });
@@ -131,13 +130,18 @@ anyone:  certificate ─▶ TypeScript SDK (SP1 verifier, pinned key) ─▶ pas
 
 - **Export.** Lean compiles your module, and
   [lean4export](https://github.com/leanprover/lean4export) writes every
-  declaration it depends on, proofs included, to one file.
+  declaration it depends on, proofs included, to one file. ZKLean keeps only
+  what your claims need, with theorems from Lean's standard library as
+  statements without their proofs.
 - **Guest.** A Rust program checks that export with
   [Nanoda](https://github.com/ammkrn/nanoda_lib), a Lean type checker written
   independently of Lean. It rejects any redefinition of the 31 built-in
   constants Nanoda evaluates natively, computes each claim's fingerprint from
   its statement and everything that statement mentions, and collects the axioms
-  the proofs use. Its only output is a 32-byte hash of the claims and axioms.
+  the proofs use. It accepts each standard-library statement by its membership
+  in a pinned table of Lean 4.35.0's 41,920 library theorems, and reports the
+  axioms their proofs use instead. Its only output is a 32-byte hash of the
+  claims and axioms.
 - **Prover.** [SP1](https://github.com/succinctlabs/sp1), a zkVM, runs the guest
   and proves it ran correctly: a STARK proof, recursively compressed and wrapped
   into a 356-byte Groth16 proof over BN254. The export is the private input;
@@ -152,10 +156,11 @@ anyone:  certificate ─▶ TypeScript SDK (SP1 verifier, pinned key) ─▶ pas
 
 ## Trust model
 
-You trust three things: the checker
+You trust four things: the checker
 ([Nanoda](https://github.com/ammkrn/nanoda_lib) plus ZKLean's fingerprinting
-code) is correct, the [SP1](https://github.com/succinctlabs/sp1) proof system
-is sound, and the library's verifier key matches that checker. A passing
+code) is correct, Lean's own kernel checked its standard library, the
+[SP1](https://github.com/succinctlabs/sp1) proof system is sound, and the
+library's verifier key matches that checker. A passing
 certificate means its claims follow from the axioms you allowed. It does not
 mean your running code matches the Lean model, or that the claims say what you
 need.
