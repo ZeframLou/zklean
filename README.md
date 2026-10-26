@@ -75,3 +75,8 @@ accepted.
 See the [usage guide](docs/USAGE.md), the [certificate specification](SPEC.md),
 the [encoding](docs/ENCODING.md) and [contributing](CONTRIBUTING.md).
 [HTTPV](https://github.com/ZeframLou/httpv) builds on ZKLean to certify HTTP APIs.
+
+## License
+
+[MIT NON-AI License](LICENSE). The vendored Nanoda checker keeps its own
+[Apache 2.0 license](vendor/nanoda/LICENSE).

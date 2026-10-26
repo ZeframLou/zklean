@@ -2,6 +2,7 @@
   "name": "zklean",
   "version": "0.1.0",
   "description": "Succinct proofs of Lean specifications",
+  "license": "SEE LICENSE IN LICENSE",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ZeframLou/zklean.git"
@@ -29,6 +30,7 @@
   },
   "files": [
     "src",
+    "LICENSE",
     "README.md",
     "SPEC.md",
     "docs"
