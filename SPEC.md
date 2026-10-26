@@ -24,8 +24,9 @@ checker written independently of Lean, and outputs the **statement digest** of
 `{format, claims, axioms}`. The resulting Groth16 proof is valid only for the
 guest identified by a **verifier key**.
 
-Verification establishes properties of a Lean model, not of deployed code, and
-only the certificate's own claims. A verifier:
+Verification relies on the guest being correct and on SP1's proofs, including
+its one-time trusted setup, being sound. It establishes properties of a Lean
+model, not of deployed code, and only the certificate's own claims. A verifier:
 
 - MUST pin a trusted verifier key, and MUST NOT accept one from a certificate;
 - MUST permit each axiom by name and identity; and
@@ -64,9 +65,11 @@ claim names. It MUST:
 | `proof`  | the encoded proof of the statement digest                              |
 | `source` | `https` URL, without credentials, of an export behind the identities   |
 
-A certificate is **well formed** when it has exactly these fields with these
-contents, every name is non-empty, every identity is 64 lowercase hexadecimal
-characters, and the proof is canonical base64 of exactly 356 bytes. Verifiers
+A certificate is **well formed** when it is a JSON object with exactly these
+fields, `format` is `"zklean/1"`, `claims` has at least one entry and no name in
+common with `axioms`, every name is non-empty, every identity is 64 lowercase
+hexadecimal characters, the proof is canonical base64 of exactly 356 bytes, and
+the source parses as an `https` URL without a user name or password. Verifiers
 MUST reject any other certificate.
 
 Lean's **standard axioms** are `propext`, `Quot.sound` and `Classical.choice`
@@ -80,8 +83,8 @@ Verification succeeds only when the certificate is well formed, every entry of
 `axioms` is in the policy with the same identity, and the proof verifies
 against the pinned verifier key and the statement digest.
 
-A certificate stays valid for as long as verifiers pin the same verifier key;
-a new checker has a new key and needs new certificates.
+Certificates MAY be generated offline. They stay valid for as long as verifiers
+pin the same verifier key.
 
 ## 5. Source
 
@@ -89,8 +92,7 @@ The source is not part of the proved statement. A verifier that uses it first
 verifies the certificate, then checks the export with Nanoda and accepts it
 only if it reproduces the identity of every claim and every non-standard axiom;
 the export MUST contain all of them and everything they depend on. Anyone
-fetching the source MUST NOT follow redirects. A wrong source can only fail
-this check, and the author can move the file without re-proving.
+fetching the source MUST NOT follow redirects.
 
 ## 6. Requirements
 
@@ -103,11 +105,11 @@ A requirement records the claims a verifier's own proofs assume:
 }
 ```
 
-It is well formed when it has exactly these two fields, `format` is
+It is well formed when it is a JSON object with exactly these two fields, `format` is
 `"zklean/requirements/1"`, `claims` has at least one entry, every name is
 non-empty, and every identity is 64 lowercase hexadecimal characters; verifiers
-MUST reject any other. Each claim MUST be a proposition, proved or stated as an
-axiom. A certificate satisfies a requirement when every required claim appears
+MUST reject any other. A generator MUST include only propositions, proved or
+stated as axioms. A certificate satisfies a requirement when every required claim appears
 in its `claims` with the same identity; an entry of `axioms` never does.
 
 ## 7. References

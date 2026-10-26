@@ -18,9 +18,9 @@ in a tag is a single 0x00 byte.
 ## Identities
 
 Identities are computed from the declarations Nanoda has checked, in export
-order. Nanoda checks each declaration against only those before it, so every
-reference is to an earlier declaration; the only cycles, inside an inductive
-block, are broken by the block hash.
+order. Every reference outside an inductive block is to an earlier
+declaration, or the export is rejected; within a block, cycles are broken by
+the block hash.
 
 **Names** of declarations, referenced constants and universe parameters render
 as dotted strings, with numeric components in decimal. An export is rejected if
@@ -49,14 +49,16 @@ hashed the same way.
 | `proj`           | `{proj:{name, id, idx, struct:h}}`                                             |
 | literal          | `{natVal:{value:"digits", type:id(Nat)}}`, `{strVal:{value, type:id(String)}}` |
 
-`id` is the referenced constant's identity, or `null` inside the inductive block
-being hashed. Binder names, binder annotations and `letE` nondependency hints
+`id` is the referenced constant's identity, or `null` when that constant is a
+member of the inductive block being hashed. Binder names, binder annotations and `letE` nondependency hints
 are dropped.
 
 **Declarations** are hashed as `H("zklean/declaration/1\0", d)`. `type` and
-`value` are term hashes; `levelParams` are the universe parameter names.
+`value` are term hashes; `levelParams` are the universe parameter names, in
+declaration order.
 
-- A theorem, axiom, definition or opaque whose type is a proposition is
+- A theorem, axiom, definition or opaque whose type is a proposition, as Nanoda
+  decides, is
   `{prop:{name, levelParams, type}}`. Its value is omitted, so an `axiom`
   stating a theorem's proposition has the theorem's identity. A definition whose
   _value_ is a proposition, such as `def Ok : Prop := …`, keeps its value.
@@ -67,8 +69,7 @@ are dropped.
   single type such as `Nat` is a block of one. The block is
   `g = H("zklean/declaration/1\0", {inductive:{levelParams, numParams, types}})`,
   where `types` lists `{name, type, ctors:[{name, type}]}` in block order, with
-  constructors in declaration order. Order matters because it fixes the order
-  of the recursors' motives. Each type, constructor and recursor, including
+  constructors in declaration order; order is part of the identity. Each type, constructor and recursor, including
   constructors of propositions, has identity
   `H("zklean/declaration/1\0", {member:{group:g, name}})`; recursors are derived
   from the block and not hashed.
@@ -86,17 +87,12 @@ The guest's public value is 32 bytes:
 `proof` is `base64:` followed by padded, canonical RFC 4648 base64 of exactly
 356 bytes, as returned by `SP1ProofWithPublicValues.bytes()`: a four-byte
 selector naming SP1's circuit key, then the exit code, verifier-key root and
-proof nonce (32 bytes each), then the 256-byte uncompressed Groth16 proof.
+proof nonce (32 bytes each), then the 256-byte uncompressed Groth16 proof. A
+proof whose selector does not name the circuit key is rejected.
 
 ## Keys
 
 Verification uses the unmodified `sp1-verifier` 6.10.0 crate, compiled to
 WebAssembly, which fixes SP1's **circuit key**. The **verifier key** is SP1's
 `vk.bytes32()` encoding of the guest, stored in `src/guest.json` with the
-SHA-256 of the guest ELF; `zklean pin` derives both from a built guest. An
-application may trust a different key with
-`createVerifier({ backend: groth16Backend(key) })`; certificate data cannot
-choose one.
-
-Groth16 soundness relies on SP1's one-time trusted setup, which is secure if any
-one participant was honest. A new theorem needs no new setup.
+SHA-256 of the guest ELF; `zklean pin` derives both from a built guest.
