@@ -1,9 +1,7 @@
-/** Public API: verification, requirements, and native checking and proving. */
+/** Public API: verification and requirements. Checking and proving use the
+ * CLI from a checkout. */
 export { createVerifier } from "./verifier.ts";
-export { prove, runNative } from "./native.ts";
 export { parseCertificate, parseStatement, statementId } from "./encoding.ts";
-export type { ProveInput } from "./native.ts";
-export { findTools, type Tools } from "./tooling.ts";
 export type {
   Certificate,
   Statement,

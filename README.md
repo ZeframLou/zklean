@@ -38,10 +38,12 @@ bash scripts/setup-exporter.sh
 cargo build --release --locked -p zklean-native
 ```
 
-Proving also needs the release's guest program:
+Proving also needs Go 1.24, `protoc`, the prover build and the release's guest
+program:
 
 ```sh
-gh release download v0.1.0 --repo ZeframLou/zklean --pattern zklean-guest
+GOFLAGS=-buildvcs=false cargo build --release --locked -p zklean-native --features prover,execute
+curl -fLO https://github.com/ZeframLou/zklean/releases/download/v0.1.0/zklean-guest
 export ZKLEAN_GUEST_ELF="$PWD/zklean-guest"
 ```
 

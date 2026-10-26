@@ -9,5 +9,4 @@ serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
 nanoda_lib = { path = "../../vendor/nanoda" }
-# Fixed-seed hashing: RandomState would draw from the zkVM's insecure RNG.
-rustc-hash = "2.1.3"
+rustc-hash.workspace = true

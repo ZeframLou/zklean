@@ -7,7 +7,7 @@ import { groth16Backend } from "./groth16.ts";
 import { createVerifier } from "./verifier.ts";
 import { exportModule, findTools, profile } from "./tooling.ts";
 import { checkAxioms, standardAxioms } from "./policy.ts";
-import type { Statement, Policy } from "./types.ts";
+import type { Identified, Statement, Policy } from "./types.ts";
 import {
   SP1_VERSION,
   identified,
@@ -87,7 +87,7 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
         const id = Object.hasOwn(custom, name)
           ? custom[name]
           : Object.hasOwn(standardAxioms, name)
-            ? standardAxioms[name]
+            ? (standardAxioms as Identified)[name]
             : undefined;
         if (!id) throw new Error(`no identity for axiom ${name}`);
         return [name, id];

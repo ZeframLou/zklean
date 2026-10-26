@@ -1,6 +1,6 @@
 import { runNative } from "./native.ts";
 import { standardAxioms } from "./policy.ts";
-import type { Certificate } from "./types.ts";
+import type { Certificate, Identified } from "./types.ts";
 
 const MAX_EXPORT_BYTES = 1 << 30;
 
@@ -51,7 +51,7 @@ export async function matchSource(
     ...certificate.claims,
     ...Object.fromEntries(
       Object.entries(certificate.axioms).filter(
-        ([name, id]) => standardAxioms[name] !== id,
+        ([name, id]) => (standardAxioms as Identified)[name] !== id,
       ),
     ),
   };

@@ -68,6 +68,6 @@ The same two variables run `tests/guest.e2e.test.ts`.
 2. Commit, wait for CI to pass, then tag: `git tag vX.Y.Z && git push origin vX.Y.Z`.
    The release workflow rebuilds the guest, requires it to match `src/guest.json`
    and attaches it to the GitHub release.
-3. Publish the SDK: `npm publish`.
+3. Publish the SDK from a clean checkout of the tag: `npm publish`.
 
 Nanoda is vendored with visibility-only changes; see `vendor/nanoda/UPSTREAM.md`.

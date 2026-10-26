@@ -2,7 +2,7 @@
  * toolchain: the constants the checker computes with by name, then the
  * standard axioms. */
 import { resolve } from "node:path";
-import { runNative } from "../src/index.ts";
+import { runNative } from "../src/native.ts";
 import { exportModule, findTools } from "../src/tooling.ts";
 
 // A native test requires these names to equal the core's KERNEL list, so a

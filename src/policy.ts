@@ -2,7 +2,7 @@ import builtins from "./axioms.json";
 import type { Certificate, Identified, Reason, Policy } from "./types.ts";
 
 /** Identities of Lean's standard axioms at the pinned toolchain. */
-export const standardAxioms: Identified = builtins;
+export const standardAxioms = builtins satisfies Identified;
 
 /** Permission binds a name to its identity, never to its spelling alone. */
 export function checkAxioms(
