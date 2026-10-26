@@ -25,8 +25,9 @@ depends on, directly or indirectly. Each reference to another constant carries
 that constant's identity, so equal identities mean equal names, statements and
 definitions throughout.
 
-**Names** are rendered as dotted strings. An export containing any ambiguous
-component (empty, containing `.`, or all digits) is rejected.
+**Names** are rendered as dotted strings; numeric components render in decimal.
+An export is rejected if any string component is ambiguous: empty, containing
+`.`, or all digits.
 
 **Built-in constants.** For speed, the checker evaluates natural-number and
 string literals, `Nat` arithmetic, quotients (`Quot`) and the `eagerReduce`
@@ -54,8 +55,7 @@ child replaced by its hash, as in a Merkle tree:
 
 Binder names, binder annotations and `letE` nondependency hints are dropped:
 they do not affect meaning. `id` is the referenced constant's identity, or `null`
-for a reference to a member of the mutual inductive block being hashed (see
-below). `us` lists the hashes of the constant's universe-level arguments.
+for a reference to a member of the inductive block being hashed (see below). `us` lists the hashes of the constant's universe-level arguments.
 
 **Declarations** are hashed as `H("zklean/declaration/1\0", d)`. Each form
 includes `levelParams`, the declaration's universe parameter names, so renaming
@@ -72,8 +72,10 @@ one changes the identity.
   quotient primitive `{quot:{name, levelParams, type}}`. Reducibility hints do
   not affect meaning and are omitted; Nanoda rejects unsafe and partial
   declarations.
-- A mutual inductive block, a group of inductive types defined together, is
-  hashed once, as the description Lean's checker receives for it:
+- Every inductive type belongs to a **block**: a group of inductive types
+  defined together, or a single inductive type, such as `Nat`, as a block of
+  one. A block is hashed once, as the description Lean's checker receives for
+  it:
   `g = H("zklean/declaration/1\0", {inductive:{levelParams, numParams, types}})`,
   where `types` lists each type's `{name, type, ctors:[{name, type}]}` in block
   order. Order is part of the identity, because it fixes the order of the

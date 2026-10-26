@@ -8,17 +8,20 @@ This guide is for two kinds of user:
   claim, or build their own proofs on top of them.
 
 The [README](../README.md#concepts) defines the terms used here: claims, axioms,
-identities, certificates and exports. An **export** is a file of a Lean
-module's definitions and theorems, written by the lean4export tool; ZKLean
-checks it and computes identities from it.
+identities, certificates and exports.
 
 ## Set up
 
-Recipients who only verify certificates need just the TypeScript SDK
-(`bun add zklean@0.1.0`) and can skip to
-[Verify a certificate](#verify-a-certificate). Reading what a certificate
-claims (`zklean fetch`) needs the command-line tool and its native build, but
-not Lean.
+Verifying certificates from TypeScript needs only the SDK,
+`bun add zklean@0.1.0`. Everything else uses the command-line tool, and each
+command needs a little more of the setup below:
+
+| Command                           | Needs                                           |
+| --------------------------------- | ----------------------------------------------- |
+| `verify`                          | the checkout and `bun install`                  |
+| `fetch`                           | also the native build (`cargo build`)           |
+| `check`, `export`, `requirements` | also Lean and lean4export (`setup-exporter.sh`) |
+| `prove`                           | also the prover build and the guest             |
 
 The command-line tool, which checks and proves Lean modules, runs from a
 release checkout. It needs [Bun](https://bun.sh/) 1.4.4 or newer, stable
@@ -97,6 +100,20 @@ cryptographic proof reveals nothing about them.
 
 ## Verify a certificate
 
+From TypeScript:
+
+```ts
+import { createVerifier, standardAxioms } from "zklean";
+
+const result = await createVerifier().verify(
+  await Bun.file("reservation.json").json(),
+  { axioms: { propext: standardAxioms.propext } },
+);
+if (result.status !== "verified") throw new Error(result.reason);
+```
+
+From the command line:
+
 ```sh
 zklean verify --certificate reservation.json --axioms propext
 ```
@@ -109,18 +126,6 @@ It prints the result and exits with status 1 unless the certificate verifies:
   "status": "verified",
   "reason": "valid"
 }
-```
-
-From TypeScript:
-
-```ts
-import { createVerifier, standardAxioms } from "zklean";
-
-const result = await createVerifier().verify(
-  await Bun.file("reservation.json").json(),
-  { axioms: { propext: standardAxioms.propext } },
-);
-if (result.status !== "verified") throw new Error(result.reason);
 ```
 
 Verification needs no native code, Lean or network access, and runs in a
@@ -140,8 +145,8 @@ zklean fetch --certificate reservation.json --axioms propext --out reservation.n
 
 `fetch` verifies the certificate, downloads the export from its `source` URL,
 checks it with Nanoda, and saves it only if it reproduces the identity of every
-claim and every non-standard axiom; otherwise it lists the mismatches and exits
-with status 1. `--from FILE` checks a local copy instead. Nothing fetched is
+claim and every non-standard axiom. Otherwise it reports the mismatched
+identities or the missing declaration and exits with status 1. `--from FILE` checks a local copy instead. Nothing fetched is
 executed.
 
 An export holds Lean's compiled form of the declarations rather than readable
@@ -165,8 +170,18 @@ standard library, hundreds of megabytes.
 
 Your own proofs can assume another project's claims. **Requirements** record
 which claims you rely on, by name and identity, so you can later confirm that a
-certificate still proves them. Write your proofs against the author's Lean
-module, then generate your requirements:
+certificate still proves them. First make your Lean project depend on the
+author's, in your `lakefile.toml`:
+
+```toml
+[[require]]
+name = "author"
+git = "https://example.com/author.git"
+rev = "v1"
+```
+
+Then write your proofs against the author's module, and generate your
+requirements:
 
 ```sh
 # client and Remote stand for your own project and the module importing the author's code.
@@ -185,23 +200,37 @@ if (!satisfies(certificate, await loadRequirements("requirements.json")))
   throw new Error("the certificate no longer proves a required claim");
 ```
 
-To rely on a weaker
-property, prove it from the author's claim in your own module, and require the
-author's claim rather than your derived one. Regenerate the requirements
+To rely on a weaker property, prove it from the author's claim in your own
+module, and require the author's claim rather than your derived one: a
+certificate lists only the author's claims, so a requirement on your own
+theorem could never be satisfied. Regenerate the requirements
 whenever the Lean code they come from changes.
 
 ## Choose axioms
 
-A certificate is only as good as the axioms it assumes, so verification accepts
-only axioms you name. Lean's standard axioms, `propext`, `Quot.sound` and
-`Classical.choice`, resolve to identities pinned to Lean 4.35.0. Any other axiom
-needs its identity in an `--axiom-policy` file, a JSON object mapping axiom
-names to identities that you review independently of the certificate's author,
-and its name in `--axioms`:
+A certificate is only as good as the axioms it assumes: an axiom can state
+something false, and then every claim that uses it is meaningless. So
+verification accepts only axioms you name. Lean's standard axioms, `propext`,
+`Quot.sound` and `Classical.choice`, resolve to identities pinned to Lean
+4.35.0. Any other axiom needs its name in `--axioms` and its identity in an
+`--axiom-policy` file, a JSON object mapping axiom names to identities.
+
+Review an axiom in your own copy of the Lean code that declares it, never only
+in the author's export. Running `zklean check` there without permitting it
+prints its identity:
+
+```text
+the proofs use axioms that are not permitted:
+  Trusted.evidence dc1a548e…45b9
+  Trusted.stock_policy 2e6eaa4d…7ce1
+```
+
+[`examples/lean/Axioms.lean`](../examples/lean/Axioms.lean) declares these two.
+Then permit them:
 
 ```sh
-zklean verify --certificate reservation.json \
-  --axioms propext,Trusted.evidence --axiom-policy policy.json
+zklean verify --certificate assumed.json \
+  --axioms Trusted.evidence,Trusted.stock_policy --axiom-policy policy.json
 ```
 
 In the SDK, pass the same map as `axioms`; `standardAxioms` holds the standard

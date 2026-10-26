@@ -14,7 +14,8 @@ Lean definition, theorem or axiom) and everything it depends on. It carries a
 a specific checker program accepted the proofs. That program is identified by
 its **verifier key**, which each verifier fixes in advance ("pins") rather than
 taking from a certificate. The certificate also gives the URL of one Lean
-**export**, a file of declarations written by lean4export, that holds the
+**export**, a file of declarations written by
+[lean4export](https://github.com/leanprover/lean4export), that holds the
 definitions behind every identity. Verifiers check the proof without the Lean
 proofs or a Lean installation. A certificate is under 1 KB for a few
 claims; it grows with the number of claims, not with the size of the proofs.
@@ -78,8 +79,8 @@ The **guest**, the program SP1 runs and proves, MUST:
   [ENCODING.md](docs/ENCODING.md) specifies.
 - `source`: the `https` URL, without credentials, of one lean4export file that
   contains every claim and every axiom other than Lean's standard ones, with
-  everything they depend on. Verifiers MUST NOT follow redirects from it, so the
-  URL is the file's final address.
+  everything they depend on. Anyone fetching the source MUST NOT follow
+  redirects from it, so the URL is the file's final address.
 
 A certificate is **well formed** when it is a JSON object with exactly these
 five fields, every name is non-empty, every identity is 64 lowercase
@@ -104,12 +105,16 @@ the proof encoding.
 
 ### 3.4. Verification
 
-Verification succeeds only when the certificate is well formed, every `axioms`
-entry equals an entry of the verifier's **axiom policy**, the axioms it permits
-by name and identity, and the
-Groth16 proof verifies against the pinned verifier key and the **statement
-digest**, the hash of `{format, claims, axioms}` defined in
-[ENCODING.md](docs/ENCODING.md).
+A verifier's **axiom policy** is the set of axioms it permits, by name and
+identity. Verification succeeds only when:
+
+1. the certificate is well formed;
+2. every `axioms` entry equals an entry of the axiom policy by name and
+   identity; and
+3. the Groth16 proof verifies against the pinned verifier key and the
+   **statement digest**, the hash of `{format, claims, axioms}` defined in
+   [ENCODING.md](docs/ENCODING.md).
+
 A verifier MUST NOT accept a verifier key from the certificate.
 
 Certificates MAY be generated offline, and stay valid for as long as verifiers

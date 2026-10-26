@@ -35,7 +35,7 @@ the properties their code depends on.
   what ZKLean checks and computes identities from.
 - A **certificate** lists the proved theorems, called **claims**, and the
   axioms they use, each by name and identity. It carries a cryptographic proof
-  that an independent Lean checker accepted the proofs, and links to the export
+  that an independent Lean checker accepted the proofs, and a link to the export
   behind the identities, so readers can see what the claims mean.
 - The cryptographic proof comes from **[SP1](https://github.com/succinctlabs/sp1)**,
   which runs a program and produces a short proof that the program ran and gave
@@ -58,7 +58,9 @@ Proving takes about 5 to 15 minutes and up to 20 GB of memory on a 12-core
 machine, once per version of the proofs. Verifying needs no Lean, native code
 or network access. The inventory example below has a 381 KB export but a
 certificate under 1 KB; a certificate grows with its number of claims, not with
-the size of the proofs.
+the size of the proofs. A certificate never contains your proofs, but the
+export `prove` writes does, and the cryptographic proof is not promised to hide
+them; see [keeping proofs private](docs/USAGE.md#certify-a-module).
 
 ## Trust model
 

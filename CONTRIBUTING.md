@@ -17,6 +17,7 @@ certificates, see the [usage guide](docs/USAGE.md).
 ```sh
 rustup toolchain install 1.96.0 --profile minimal --target wasm32-unknown-unknown
 curl -fsSL https://raw.githubusercontent.com/succinctlabs/sp1/v6.10.0/sp1up/sp1up | bash -s -- --version v6.10.0
+export PATH="$HOME/.sp1/bin:$PATH"
 bun install --frozen-lockfile
 bash scripts/setup-exporter.sh    # pinned lean4export
 cargo build --release --locked -p zklean-native

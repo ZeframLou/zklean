@@ -149,22 +149,17 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
         input,
       )) as Statement;
       if (checkAxioms(statement, policy)) {
-        // Name the axioms, so the fix is clear.
-        const used = Object.keys(statement.axioms);
-        const missing = used.filter((n) => !Object.hasOwn(policy.axioms, n));
-        const changed = used.filter(
-          (n) =>
-            !missing.includes(n) && policy.axioms[n] !== statement.axioms[n],
-        );
+        // Name each rejected axiom with its identity, so it can be reviewed
+        // and permitted, or the proof changed.
+        const rejected = Object.entries(statement.axioms)
+          .filter(([name, id]) => policy.axioms[name] !== id)
+          .map(([name, id]) =>
+            Object.hasOwn(policy.axioms, name)
+              ? `  ${name} ${id} (differs from the permitted identity)`
+              : `  ${name} ${id}`,
+          );
         throw new Error(
-          [
-            missing.length &&
-              `the proofs use axioms not in --axioms: ${missing.join(", ")}`,
-            changed.length &&
-              `these axioms differ from the permitted identity: ${changed.join(", ")}`,
-          ]
-            .filter(Boolean)
-            .join("; "),
+          `the proofs use axioms that are not permitted:\n${rejected.join("\n")}`,
         );
       }
       if (command === "check") return output(statement);
