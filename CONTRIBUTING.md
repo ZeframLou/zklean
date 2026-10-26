@@ -76,15 +76,11 @@ fixture.
    the guest changed, the job then fails its profile check until you pin.
    Download and unzip the artifact (for example with `gh run download`). With
    `ZKLEAN_NATIVE` set to the prover build and `ZKLEAN_GUEST_ELF` to the
-   unzipped guest, as above, pin `src/guest.json` and re-prove both
-   certificates, naming the URL the tag will serve as each source:
+   unzipped guest, as above, pin `src/guest.json` and re-prove the
+   certificate, naming the URL the tag will serve as its source:
 
    ```sh
    bun src/cli.ts pin --out src/guest.json
-   bun src/cli.ts prove --export tests/fixtures/identity.ndjson \
-     --claims Demo.identity --out tests/fixtures/identity.certificate.json \
-     --source https://raw.githubusercontent.com/ZeframLou/zklean/vX.Y.Z/tests/fixtures/identity.ndjson
-   rm tests/fixtures/identity.certificate.ndjson
    bun src/cli.ts prove --export tests/fixtures/percent.ndjson \
      --claims Progress.percent_le_100 --axioms propext \
      --out tests/fixtures/percent.certificate.json \

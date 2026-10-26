@@ -1,0 +1,11 @@
+{
+  "format": "zklean/1",
+  "claims": {
+    "Progress.percent_le_100": "c6102b5b63fecf2c7863bd14e8244d87e5f43f469c81fcd325c020b5ad5ad612"
+  },
+  "axioms": {
+    "propext": "a6bbf25b802e02baf26a09a613b9d9d24da3a580a1ce2ecc94f70ad264af4158"
+  },
+  "proof": "base64:Q4iiHAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAC+FDumYl01swA5QzQgUsJjAW/reRm0oVzJA0FfyU1IAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB6KjBWPHNiN17xcJP/o/1VGZ6gFWqTmiz1NbSlxt4NMKFfJeknq8XbCMr/K6Pk9KJSKZ1yfdGsZw7c7/ttYrRQc2RORusdJZfn9INHt3W18BbKtEopbHoZuER9YA2htmCqnc7Oj8jWVNms0Rsv/EwiGzBDGTbYW4NemL/ZB2PE4LGgBTh0GWFv5BWZc+bHTXnzejHKIv6cGEI/gFCR+3KMidDtfrNyaCnEMmN+sKAEf6ScuccWqmCKhnsh2mJoWyR57/dIj8gHfly8N3cZkkYSxj6oKE6lweSN/khdjw7TnIImA9qKwSZUHOoH+WyKocj1ZeGG6Jcg89+z7fhj1sO4=",
+  "source": "https://raw.githubusercontent.com/ZeframLou/zklean/v0.1.0/tests/fixtures/percent.ndjson"
+}

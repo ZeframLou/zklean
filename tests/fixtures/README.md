@@ -6,7 +6,7 @@ Regenerate them with `bun scripts/export-examples.ts`.
 
 - `v1.ndjson`: the inventory example, with the parts of Lean's `Init` library
   it depends on.
-- `identity.ndjson`: a one-line theorem, the source of the test certificate.
+- `identity.ndjson`: a one-line theorem.
 - `percent.ndjson`: the README's progress-bar example, the source of its
   certificate.
 - `quoted.ndjson`: a name component containing a dot, written `«rate.limit»`.
@@ -21,7 +21,7 @@ Regenerate them with `bun scripts/export-examples.ts`.
 - `chain.ndjson`, `deep.ndjson`: a 2,000-deep chain of definitions and a
   5,000-deep `let` chain.
 
-`identity.certificate.json` and `percent.certificate.json` are real SP1 6.10.0
-Groth16 certificates for `identity.ndjson` and `percent.ndjson`. Both must be
-re-proved whenever the guest in `src/guest.json` changes. Their `source` names
-the file at the v0.1.0 tag.
+`percent.certificate.json` is a real SP1 6.10.0 Groth16 certificate for the
+prepared form of `percent.ndjson`. It must be re-proved whenever the guest in
+`src/guest.json` changes. Its `source` names the export it was proved from, at
+the v0.1.0 tag.

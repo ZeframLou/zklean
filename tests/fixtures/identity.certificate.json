@@ -1,9 +1,0 @@
-{
-  "format": "zklean/1",
-  "claims": {
-    "Demo.identity": "b1daf96ccf270647ee70f044fefae31c916d7556380b5b75916376fc7bafc732"
-  },
-  "axioms": {},
-  "proof": "base64:Q4iiHAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAC+FDumYl01swA5QzQgUsJjAW/reRm0oVzJA0FfyU1IAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABjK0XMh00E1QR/3ZVS2BtXXkMexH1bSc1LA+VWX4GmjDcYGAGqm/md7BauzLTKtcASJRyG1iedux4UlhQSmDgAE/K1+wsfNFjc6bfK2snKnNJykpBJetQg93iJyRctj7R7MzUB8wx1oDKd0f8oxRVsVpxNelv2HEKsBdSRzUW++LLCw3iXcEOKMbaAZcQCePPRp4bo1zyDm3cUXn+YyY0wrnv+C4+C/3nI6WlLJQ0X3SmAxGGo5prglDSqIojGbvBvmKD2JMnNkDSIIN0Hi1jXF0BtcTNyfnGaKNF5EwduhCAphLc+FNlMZGAQeEYxL3wcPUKnFXmKIfq7Z+V29594=",
-  "source": "https://raw.githubusercontent.com/ZeframLou/zklean/v0.1.0/tests/fixtures/identity.ndjson"
-}
