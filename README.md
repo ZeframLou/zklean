@@ -1,23 +1,34 @@
 # ZKLean
 
-ZKLean turns a proof about your code, written in
+**Formal verification for interconnected software**
+
+ZKLean turns a formal proof about your code, written in
 [Lean](https://lean-lang.org/) (a language for machine-checked proofs), into a
 1 KB certificate. Anyone can check it in under a second, without installing
 Lean.
 
+ZKLean makes formal verification practical for software with third-party
+dependencies, be it packages or API endpoints.
+
 ## Why
 
-Say you run an inventory service, and you have proved in Lean that a
-reservation never takes more stock than you have. The team building checkout on
-top of you would love to rely on that. Today they either take your word for it
-or rebuild your Lean project, and wait out its full proof check, on every
-release. Most take your word for it.
+Say you run the inventory service for an online shop, and you have proved in
+Lean that a reservation never takes more stock than you have. The team building
+checkout on top of you would love to rely on that, and they'd want to make sure
+you didn't add a bug or a backorder feature in a new release.
 
-With ZKLean, you publish a certificate with each release. The checkout team
-reviews your theorem once, in Lean, and pins its fingerprint. From then on their
-CI checks each release's certificate in a quarter of a second, with no Lean
-installed. If a release changes anything the proof depends on, the fingerprint
-changes and their CI goes red before they ship against it.
+Today they either take your word for it or rebuild your Lean project and wait
+out its full proof check, on every release. This is extremely expensive: Lean
+proofs could easily be thousands of lines long, and for production software they
+could be 10k-100k+ lines.
+
+With ZKLean, you publish a certificate with each release, which includes a
+succinct zero-knowledge proof (356 bytes) that can be checked in under a second.
+The ZK proof shows that _some_ valid proof exists for your Lean specs, without
+needing the actual proofs.
+
+This way, other people can depend on your software and build their own formal
+specs that depend on your specs.
 
 ## What you get
 
@@ -28,6 +39,17 @@ changes and their CI goes red before they ship against it.
   definitions, so renaming can't hide a change.
 - **Explicit assumptions.** A certificate lists every axiom (unproved
   assumption) its proofs rely on, and you choose which ones you accept.
+
+## Install
+
+To verify certificates, on [Bun](https://bun.sh/) 1.4.4 or newer:
+
+```sh
+bun add zklean@0.1.0
+```
+
+To make certificates, you also need Lean, Rust and a 6 GB prover download; the
+[usage guide](docs/USAGE.md#set-up) walks through it.
 
 ## Try it
 
@@ -86,16 +108,22 @@ const result = await createVerifier().verify(certificate, {
 A pass proves the listed claims; check they include the ones you rely on
 ([how](docs/USAGE.md#verify-a-certificate)).
 
-## Install
+## How it works
 
-To verify certificates, on [Bun](https://bun.sh/) 1.4.4 or newer:
-
-```sh
-bun add zklean@0.1.0
-```
-
-To make certificates, you also need Lean, Rust and a 6 GB prover download; the
-[usage guide](docs/USAGE.md#set-up) walks through it.
+1. **Prove.** You prove your specs in Lean as usual. `zklean prove` re-checks
+   the whole proof with Nanoda, an independent Lean checker, inside
+   [SP1](https://github.com/succinctlabs/sp1), which produces a short proof that
+   a program ran correctly. The result is a certificate: each proved theorem's
+   name and fingerprint, the axioms it relies on, and a 356-byte proof that the
+   check passed.
+2. **Pin.** Each team that depends on you reviews the theorems it relies on
+   once, in Lean, and records their fingerprints with `zklean requirements`. A
+   fingerprint covers a theorem's statement and every definition it mentions,
+   not its proof.
+3. **Verify.** On every release, they verify your new certificate and compare
+   fingerprints, in under a second with no Lean. A change to anything the
+   theorem depends on changes its fingerprint and fails the check. A change to
+   the proofs or to unrelated code passes.
 
 ## Trust model
 
