@@ -127,7 +127,7 @@ zklean verify --certificate reservation.json --axioms propext
 It prints the result and exits with status 1 unless the certificate verifies.
 For a verified certificate it also prints the claims and axioms that were
 proved. `statementId` is the hash of those claims and axioms, defined in
-[ENCODING.md](ENCODING.md#statement-and-certificate). A malformed certificate
+[ENCODING.md](ENCODING.md#statement-and-proof). A malformed certificate
 prints an error instead.
 
 ```json
