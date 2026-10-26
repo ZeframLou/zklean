@@ -24,8 +24,6 @@ their CI goes red before they ship against it.
   network.
 - **Precise claims.** Each claim is fingerprinted with its exact statement and
   definitions, so renaming can't hide a change.
-- **An independent checker.** A second checker, written independently of Lean,
-  re-checks every proof, so a single bug in Lean can't pass a false claim.
 - **Explicit assumptions.** A certificate lists every axiom (unproved
   assumption) its proofs rely on, and you choose which ones you accept.
 
