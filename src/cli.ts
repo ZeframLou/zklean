@@ -180,9 +180,14 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
       return;
     }
     case "verify": {
-      const { result } = await verify(required("certificate"));
-      if (result.status !== "verified") process.exitCode = 1;
-      return output(result);
+      const { certificate, result } = await verify(required("certificate"));
+      if (result.status !== "verified") {
+        process.exitCode = 1;
+        return output(result);
+      }
+      // Verified says only that these claims were proved; show which.
+      const { claims, axioms } = certificate;
+      return output({ ...result, claims, axioms });
     }
     case "fetch": {
       // A forged certificate can name identities that match any export, so a

@@ -66,8 +66,9 @@ them; see [keeping proofs private](docs/USAGE.md#certify-a-module).
 
 ## Trust model
 
-A verifier trusts that Nanoda checks Lean correctly, that SP1's proofs,
-including its one-time trusted setup, are sound, and that the **verifier key** built into ZKLean's TypeScript library, a
+A verifier trusts that Nanoda checks Lean correctly, that SP1's proofs are
+sound, including its one-time trusted setup (a key-generation ceremony whose
+participants could forge proofs only if all of them colluded), and that the **verifier key** built into ZKLean's TypeScript library, a
 fingerprint of the exact checker program, is the right one. A certificate passes
 only if every axiom it uses is one you permitted, and then shows that each claim
 about the Lean model follows from those axioms. It says nothing about whether
@@ -140,7 +141,9 @@ zklean verify --certificate reservation.json --axioms propext
 ```
 
 `--axioms propext` accepts the one standard axiom this proof uses. A
-certificate that uses any other axiom fails verification.
+certificate that uses any other axiom fails verification. A verified
+certificate proves only its own claims, which `verify` prints: check that they
+are the claims, with the identities, that you rely on.
 
 The [usage guide](docs/USAGE.md) covers verifying from TypeScript, publishing
 exports, keeping proofs private, depending on another project's claims, and

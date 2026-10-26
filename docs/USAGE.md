@@ -87,7 +87,9 @@ proved from, `reservation.ndjson`. (`check`, `requirements` and `fetch` stop
 their native check after 10 minutes, which only very large exports reach.)
 
 Publish the export at the `--source` URL, so recipients can see what your claims
-mean. The export also contains your proofs. To keep them private, write a
+mean. Serve it over https at exactly that address, without a redirect, since
+`fetch` refuses redirects: `raw.githubusercontent.com` links work, but GitHub
+release download links redirect. The export also contains your proofs. To keep them private, write a
 module that states each claim as an `axiom` instead of proving it, as
 [`examples/lean/V1Spec.lean`](../examples/lean/V1Spec.lean) does, and publish
 its export instead. A claim stated as an axiom has the same identity as the
@@ -128,17 +130,26 @@ zklean verify --certificate reservation.json --axioms propext
 ```
 
 It prints the result and exits with status 1 unless the certificate verifies.
-`statementId` is the hash of the certificate's claims and axioms that the proof
-covers, defined in [ENCODING.md](ENCODING.md#statement-and-certificate). A
-malformed certificate prints an error instead.
+For a verified certificate it also prints the claims and axioms that were
+proved. `statementId` is the hash of those claims and axioms, defined in
+[ENCODING.md](ENCODING.md#statement-and-certificate). A malformed certificate
+prints an error instead.
 
 ```json
 {
   "statementId": "…",
   "status": "verified",
-  "reason": "valid"
+  "reason": "valid",
+  "claims": { "Inventory.reservation_safe": "65dea06f…8b2f" },
+  "axioms": { "propext": "a6bbf25b…4158" }
 }
 ```
+
+`verified` means only that the certificate's own claims were proved. A
+certificate for some other theorem under the same name verifies too, so also
+check that it proves the claims you rely on, with the identities you expect:
+compare them with what `check` printed for the author's code, or use
+[requirements](#depend-on-a-certified-claim).
 
 Anything but `"status": "verified"` means the certificate establishes nothing:
 `status` is then `"unknown"` and `reason` is `invalid-certificate`,

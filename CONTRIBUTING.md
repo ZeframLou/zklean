@@ -70,10 +70,13 @@ fixture.
 
 ## Releases
 
-1. Set `version` in `package.json`. With `ZKLEAN_NATIVE` set to the prover
-   build and `ZKLEAN_GUEST_ELF` to CI's guest artifact, as above, pin
-   `src/guest.json` and re-prove the identity certificate, naming the URL the
-   tag will serve as its source:
+1. Set `version` in `package.json` and push the release's code. CI's guest job
+   uploads the `zklean-guest-elf` artifact, a zip holding `zklean-guest`; if
+   the guest changed, the job then fails its profile check until you pin.
+   Download and unzip the artifact (for example with `gh run download`). With
+   `ZKLEAN_NATIVE` set to the prover build and `ZKLEAN_GUEST_ELF` to the
+   unzipped guest, as above, pin `src/guest.json` and re-prove the identity
+   certificate, naming the URL the tag will serve as its source:
 
    ```sh
    bun src/cli.ts pin --out src/guest.json
