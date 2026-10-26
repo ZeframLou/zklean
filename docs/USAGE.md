@@ -53,7 +53,7 @@ Not every command needs all of this:
 | `fetch`                 | also the native build, `zklean-native`                  |
 | `check`, `requirements` | also Lean and lean4export, unless given `--export FILE` |
 | `export`                | also Lean and lean4export                               |
-| `prove`                 | also the prover build and the guest                     |
+| `prove`, `pin`          | also the prover build and the guest                     |
 
 ## Certify a module
 
@@ -251,8 +251,8 @@ prints its identity:
 
 ```text
 the proofs use axioms that are not permitted:
-  Trusted.evidence dc1a548e…45b9
-  Trusted.stock_policy 2e6eaa4d…7ce1
+  Trusted.evidence dc1a548e17ef5ea0d6890b8bf5fc859a6cfc5caf002e01613f08548802b245b9
+  Trusted.stock_policy 2e6eaa4de17f3b133069663f1ef9b9d534492cb37ba9b1462f5cbe5e1f647ce1
 ```
 
 [`examples/lean/Axioms.lean`](../examples/lean/Axioms.lean) declares these two,
@@ -292,6 +292,7 @@ override them; an override must point to an existing file:
 | `ZKLEAN_PROFILE`   | `src/guest.json`                                                                                 |
 
 `ZKLEAN_PROFILE` sets the verifier key that `verify` and `fetch` trust: override
-it only with a profile you built yourself with `zklean pin`.
+it only with a profile you derived yourself, with `zklean pin --out FILE`, from
+a guest you built (see [CONTRIBUTING.md](../CONTRIBUTING.md)).
 `SP1_GROTH16_CIRCUIT_PATH` moves SP1's proving files from
 `~/.sp1/circuits/groth16`.

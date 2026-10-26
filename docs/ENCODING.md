@@ -139,7 +139,8 @@ WebAssembly. Two keys are involved:
   derives both from a built guest.
 
 Applications can choose a different trusted verifier key with
-`groth16Backend(key)`; certificate data cannot select one.
+`createVerifier({ backend: groth16Backend(key) })`; certificate data cannot
+select one.
 
 ## Security assumptions
 
