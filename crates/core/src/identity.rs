@@ -9,9 +9,10 @@ use nanoda_lib::{
     name::Name,
     util::{ExportFile, ExprPtr, LevelPtr, LevelsPtr, NamePtr, TcCtx},
 };
+use rustc_hash::{FxHashMap, FxHashSet};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet};
 
 fn hash(domain: &str, value: &Value) -> Result<String> {
     let mut digest = Sha256::new();
@@ -41,7 +42,7 @@ pub fn read<'p, A>(
     file: &'p ExportFile<'p>,
     f: impl FnOnce(&mut Reader<'_, '_, 'p>) -> Result<A>,
 ) -> Result<A> {
-    let mut props = HashSet::new();
+    let mut props = FxHashSet::default();
     for (name, d) in &file.declars {
         if matches!(
             d,
@@ -59,14 +60,14 @@ pub fn read<'p, A>(
     file.with_ctx(|ctx| {
         let mut reader = Reader {
             ctx,
-            declars: HashMap::new(),
+            declars: FxHashMap::default(),
             props: &props,
-            names: HashMap::new(),
-            rendered: HashMap::new(),
-            ids: HashMap::new(),
-            groups: HashMap::new(),
-            nodes: HashMap::new(),
-            levels: HashMap::new(),
+            names: FxHashMap::default(),
+            rendered: FxHashMap::default(),
+            ids: FxHashMap::default(),
+            groups: FxHashMap::default(),
+            nodes: FxHashMap::default(),
+            levels: FxHashMap::default(),
         };
         for (name, d) in &file.declars {
             let rendered = reader.render(*name)?;
@@ -82,14 +83,14 @@ pub fn read<'p, A>(
 
 pub struct Reader<'r, 'c, 'p> {
     ctx: &'r mut TcCtx<'c, 'p>,
-    declars: HashMap<NamePtr<'c>, &'r Declar<'c>>,
-    props: &'r HashSet<NamePtr<'c>>,
-    names: HashMap<String, NamePtr<'c>>,
-    rendered: HashMap<NamePtr<'c>, String>,
-    ids: HashMap<NamePtr<'c>, String>,
-    groups: HashMap<NamePtr<'c>, String>,
-    nodes: HashMap<(ExprPtr<'c>, Option<NamePtr<'c>>), String>,
-    levels: HashMap<LevelPtr<'c>, String>,
+    declars: FxHashMap<NamePtr<'c>, &'r Declar<'c>>,
+    props: &'r FxHashSet<NamePtr<'c>>,
+    names: FxHashMap<String, NamePtr<'c>>,
+    rendered: FxHashMap<NamePtr<'c>, String>,
+    ids: FxHashMap<NamePtr<'c>, String>,
+    groups: FxHashMap<NamePtr<'c>, String>,
+    nodes: FxHashMap<(ExprPtr<'c>, Option<NamePtr<'c>>), String>,
+    levels: FxHashMap<LevelPtr<'c>, String>,
 }
 
 impl<'r, 'c> Reader<'r, 'c, '_> {
@@ -134,7 +135,8 @@ impl<'r, 'c> Reader<'r, 'c, '_> {
             .iter()
             .map(|n| Ok(self.lookup(n)?.0))
             .collect::<Result<Vec<_>>>()?;
-        let (mut seen, mut exprs, mut axioms) = (HashSet::new(), HashSet::new(), BTreeSet::new());
+        let (mut seen, mut exprs, mut axioms) =
+            (FxHashSet::default(), FxHashSet::default(), BTreeSet::new());
         while let Some(name) = pending.pop() {
             if !seen.insert(name) {
                 continue;
