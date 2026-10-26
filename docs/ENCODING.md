@@ -61,7 +61,9 @@ its root node.
 | `proj`           | `{proj:{name, id, idx, struct:h}}`                                             |
 | literal          | `{natVal:{value:"digits", type:id(Nat)}}`, `{strVal:{value, type:id(String)}}` |
 
-Binder names, binder annotations and `letE` nondependency hints are dropped:
+`bvar i` refers to the variable bound by the i-th enclosing binder, counting
+from the innermost (a de Bruijn index). Binder names, binder annotations and
+`letE` nondependency hints are dropped:
 they do not affect meaning. `id` is the referenced constant's identity, or `null`
 for a reference to a member of the inductive block being hashed (see below).
 `us` lists the hashes of the constant's universe-level arguments.
@@ -88,7 +90,9 @@ declaration's universe parameter names, so renaming one changes the identity.
   `g = H("zklean/declaration/1\0", {inductive:{levelParams, numParams, types}})`,
   where `types` lists each type's `{name, type, ctors:[{name, type}]}`, types in
   block order and constructors in declaration order. Order is part of the
-  identity, because it fixes the order of the recursors' motives; declaring a
+  identity, because it fixes the order of the motives (result types, one per
+  type in the block) of the block's recursors, the elimination principles Lean
+  derives for it; declaring a
   mutual block in another order changes it. Recursors are derived from this
   input and checked by Nanoda, so they are not hashed. Each type, constructor
   and recursor of the block, including constructors of propositions, has

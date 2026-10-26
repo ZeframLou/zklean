@@ -99,8 +99,9 @@ zklean export --project examples/lean --module V1Spec \
 ```
 
 The export must still contain every non-standard axiom your proofs use, since
-the certificate lists them. If there are any, import the modules that declare
-them in your specification module and add them to `--claims`, for example
+the certificate lists them. If there are any, declare them in a module that
+contains no proofs, import it in both your proof and your specification
+modules, and add the axioms to `--claims`, for example
 `--claims Inventory.reservation_safe,Trusted.evidence`.
 
 The certificate never contains your proofs, but ZKLean does not promise that its
@@ -141,7 +142,7 @@ malformed certificate prints an error instead.
 
 Verification needs no native code, Lean or network access, and runs in a
 background worker so it does not block your program. It checks the
-cryptographic proof against the verifier key built into the SDK, never a key
+cryptographic proof against the verifier key built into ZKLean, never a key
 supplied by the certificate, so a certificate cannot choose which checker it
 claims to come from.
 
@@ -285,5 +286,7 @@ override them; an override must point to an existing file:
 | `ZKLEAN_LAKE`      | `$ELAN_HOME/bin/lake` (by default `~/.elan/bin/lake`), then `lake` on `PATH`                     |
 | `ZKLEAN_PROFILE`   | `src/guest.json`                                                                                 |
 
+`ZKLEAN_PROFILE` sets the verifier key that `verify` and `fetch` trust: override
+it only with a profile you built yourself with `zklean pin`.
 `SP1_GROTH16_CIRCUIT_PATH` moves SP1's proving files from
 `~/.sp1/circuits/groth16`.

@@ -29,7 +29,8 @@ cargo build --release --locked -p zklean-native
 cargo fmt --check -p zklean-core -p zklean-native -p zklean-verifier
 cargo clippy --locked -p zklean-core -p zklean-native -p zklean-verifier -- -D warnings
 bun run format:check
-ZKLEAN_LAKE="$(command -v lake)" bun run check   # with Lake, also runs the Lean export tests
+bun run check
+ZKLEAN_LAKE="$(command -v lake)" bun run check   # with Lake installed: also the Lean export tests
 ```
 
 CI also re-exports the Lean fixtures and re-derives the pinned identities of
