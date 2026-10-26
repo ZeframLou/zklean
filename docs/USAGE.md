@@ -13,20 +13,10 @@ identities, certificates and exports.
 ## Set up
 
 Verifying certificates from TypeScript needs only the SDK,
-`bun add zklean@0.1.0`. Everything else uses the command-line tool, and each
-command needs a little more of the setup below:
-
-| Command                           | Needs                                           |
-| --------------------------------- | ----------------------------------------------- |
-| `verify`                          | the checkout and `bun install`                  |
-| `fetch`                           | also the native build (`cargo build`)           |
-| `check`, `export`, `requirements` | also Lean and lean4export (`setup-exporter.sh`) |
-| `prove`                           | also the prover build and the guest             |
-
-The command-line tool, which checks and proves Lean modules, runs from a
-release checkout. It needs [Bun](https://bun.sh/) 1.4.4 or newer, stable
-[Rust](https://rustup.rs/), and [Lean](https://lean-lang.org/install/) 4.35.0
-with its build tool Lake:
+`bun add zklean@0.1.0`. Everything else uses the command-line tool, which runs
+from a release checkout. The full tool needs [Bun](https://bun.sh/) 1.4.4 or
+newer, stable [Rust](https://rustup.rs/), and
+[Lean](https://lean-lang.org/install/) 4.35.0 with its build tool Lake:
 
 ```sh
 git clone --branch v0.1.0 https://github.com/ZeframLou/zklean.git
@@ -52,6 +42,16 @@ export ZKLEAN_GUEST_ELF="$PWD/zklean-guest"
 
 The first proof downloads SP1's proving files, a 6.2 GB download that takes
 7.8 GB on disk, to `~/.sp1/circuits/groth16`.
+
+Not every command needs all of this:
+
+| Command                 | Needs                                                   |
+| ----------------------- | ------------------------------------------------------- |
+| `verify`                | the checkout and `bun install`                          |
+| `fetch`                 | also the native build, `zklean-native`                  |
+| `check`, `requirements` | also Lean and lean4export, unless given `--export FILE` |
+| `export`                | also Lean and lean4export                               |
+| `prove`                 | also the prover build and the guest                     |
 
 ## Certify a module
 
@@ -190,13 +190,25 @@ zklean requirements --project client --module Remote \
 ```
 
 A certificate satisfies your requirements when every required claim appears
-among its claims with the same identity. The check is in the SDK only: verify
-the certificate first, then
+among its claims with the same identity. The check is in the SDK only, and
+applies to a certificate you have verified:
 
 ```ts
-import { loadRequirements, satisfies } from "zklean";
+import {
+  createVerifier,
+  loadRequirements,
+  satisfies,
+  standardAxioms,
+} from "zklean";
 
-if (!satisfies(certificate, await loadRequirements("requirements.json")))
+const certificate = await Bun.file("reservation.json").json();
+const result = await createVerifier().verify(certificate, {
+  axioms: { propext: standardAxioms.propext },
+});
+if (
+  result.status !== "verified" ||
+  !satisfies(certificate, await loadRequirements("requirements.json"))
+)
   throw new Error("the certificate no longer proves a required claim");
 ```
 
@@ -225,8 +237,19 @@ the proofs use axioms that are not permitted:
   Trusted.stock_policy 2e6eaa4d…7ce1
 ```
 
-[`examples/lean/Axioms.lean`](../examples/lean/Axioms.lean) declares these two.
-Then permit them:
+[`examples/lean/Axioms.lean`](../examples/lean/Axioms.lean) declares these two,
+and its theorem `Inventory.assumed_safe` uses them. After reviewing them, write
+`policy.json`:
+
+```json
+{
+  "Trusted.evidence": "dc1a548e17ef5ea0d6890b8bf5fc859a6cfc5caf002e01613f08548802b245b9",
+  "Trusted.stock_policy": "2e6eaa4de17f3b133069663f1ef9b9d534492cb37ba9b1462f5cbe5e1f647ce1"
+}
+```
+
+Then permit them, for example when verifying `assumed.json`, a certificate of
+`Inventory.assumed_safe`:
 
 ```sh
 zklean verify --certificate assumed.json \

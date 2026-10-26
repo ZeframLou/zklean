@@ -43,7 +43,8 @@ the exact ELF, and Cargo hashes package paths into the build, so
 `scripts/build-guest.sh` builds from a fixed path, on Linux. CI's guest job
 builds the canonical ELF and uploads it as the `zklean-guest-elf` artifact;
 `zklean pin` derives `src/guest.json` from it, and CI requires the two to agree.
-Any change to `crates/core` or `vendor/nanoda` changes the key and invalidates
+Any change to `crates/core`, `vendor/nanoda`, `crates/guest` or its `Cargo.lock`
+changes the key and invalidates
 `tests/fixtures/identity.certificate.json`. To build it yourself on Linux, run
 `bash scripts/build-guest.sh`.
 

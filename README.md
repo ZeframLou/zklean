@@ -22,6 +22,7 @@ the properties their code depends on.
 - **[Lean](https://lean-lang.org/)** is a programming language and proof
   assistant. You model software as Lean definitions, state properties of the
   model as **theorems**, and prove them. Lean checks every step mechanically.
+  Lean code is organised in **modules**, one per source file.
 - **Axioms** are statements a proof assumes without proving. Lean's standard
   library relies on three: `propext`, `Quot.sound` and `Classical.choice`. A
   proof can also add its own. Whoever relies on a proof decides which axioms
@@ -65,7 +66,7 @@ them; see [keeping proofs private](docs/USAGE.md#certify-a-module).
 ## Trust model
 
 A verifier trusts that Nanoda checks Lean correctly, that SP1's proofs are
-sound, and that the **verifier key** built into ZKLean's TypeScript SDK, a
+sound, and that the **verifier key** built into ZKLean's TypeScript library, a
 fingerprint of the exact checker program, is the right one. A certificate passes
 only if every axiom it uses is one you permitted, and then shows that each claim
 about the Lean model follows from those axioms. It says nothing about whether
@@ -73,7 +74,7 @@ running software matches that model, or whether the claims say what you need.
 
 ## Install
 
-The TypeScript SDK verifies certificates. It runs on [Bun](https://bun.sh/)
+The TypeScript library (SDK) verifies certificates. It runs on [Bun](https://bun.sh/)
 1.4.4 or newer:
 
 ```sh

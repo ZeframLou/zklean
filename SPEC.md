@@ -9,16 +9,19 @@ defines what a certificate states, its format, and how it is verified. The
 ZKLean certifies that Lean **propositions**, the statements Lean theorems
 prove, have been proved. A certificate names each certified proposition, and
 each axiom its proof uses, by an **identity**: a hash of the **declaration** (a
-Lean definition, theorem or axiom) and everything it depends on. It carries a
-356-byte **Groth16 proof**, a succinct cryptographic proof produced by SP1, that
-a specific checker program accepted the proofs. That program is identified by
+Lean definition, theorem or axiom) and everything it depends on; the certified
+propositions are its **claims**. It carries a **Groth16 proof**, a succinct
+cryptographic proof, inside a 356-byte proof encoding. The proof is produced by
+[SP1](https://github.com/succinctlabs/sp1), a system that runs a program and
+proves what it output, and shows that a specific checker program accepted the
+proofs. That program is identified by
 its **verifier key**, which each verifier fixes in advance ("pins") rather than
 taking from a certificate. The certificate also gives the URL of one Lean
 **export**, a file of declarations written by
 [lean4export](https://github.com/leanprover/lean4export), that holds the
 definitions behind every identity. Verifiers check the proof without the Lean
-proofs or a Lean installation. A certificate is under 1 KB for a few
-claims; it grows with the number of claims, not with the size of the proofs.
+proofs or a Lean installation. A certificate is under 1 KB for a few claims; it
+grows with the number of claims, not with the size of the proofs.
 
 ZKLean is usable independently of HTTP. The separate
 [HTTPV protocol](https://github.com/ZeframLou/httpv) serves certificates for
@@ -30,8 +33,8 @@ The terms MUST, MUST NOT, SHOULD, and MAY follow RFC 2119 and RFC 8174.
 
 Verification depends on the soundness of the trusted checker and the
 cryptographic proving system. Verifiers MUST pin a trusted verifier key and
-permit each axiom by name and identity. Equal identities denote the same statement about
-the same definitions. Certificates establish properties of a mathematical model;
+permit each axiom by name and identity. Equal identities denote the same
+statement about the same definitions. Certificates establish properties of a mathematical model;
 they do not attest to deployed code.
 
 ## 3. Certificates
@@ -44,12 +47,15 @@ Lean module ── lean4export ──> export ── Nanoda in SP1 ──> ident
 
 - **lean4export** writes the declarations Lean has checked, one JSON object per
   line (NDJSON).
-- **Nanoda** independently checks those declarations.
-- **SP1** proves that the checker accepted them and computed the committed identities.
+- **Nanoda**, a Lean type checker written independently of Lean, checks those
+  declarations again.
+- **SP1** proves that the checker accepted them and computed the identities it
+  **committed**, that is, output as the proof's public value.
 
 ### 3.2. Certificate generation
 
-The **guest**, the program SP1 runs and proves, MUST:
+The **guest**, the program SP1 runs and proves, reads one input, the export and
+the claim names, `{export, claims}` (the export as one string). It MUST:
 
 - check the entire export with Nanoda;
 - reject an export that redefines any of the 31 constants Nanoda evaluates
