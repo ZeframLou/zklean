@@ -4,7 +4,7 @@
 
 This specification is for people implementing a ZKLean verifier or prover. It
 defines what a certificate states, its format, and how it is verified. The
-[README](README.md#concepts) introduces the concepts.
+[README](README.md) introduces the concepts.
 
 ZKLean certifies that Lean **propositions**, the statements Lean theorems
 prove, have been proved. A certificate names each certified proposition, and

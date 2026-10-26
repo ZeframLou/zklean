@@ -7,8 +7,9 @@ This guide is for two kinds of user:
 - **Recipients** receive certificates and want to verify them, read what they
   claim, or build their own proofs on top of them.
 
-The [README](../README.md#concepts) defines the terms used here: claims, axioms,
-identities, certificates and exports.
+The [README](../README.md#what-you-get) introduces the main terms: certificates,
+claims, identities and axioms. An **export** is the file of Lean definitions a
+certificate is computed from, written by the lean4export tool.
 
 ## Set up
 
@@ -87,27 +88,9 @@ proved from, `reservation.ndjson`. (`check`, `requirements` and `fetch` stop
 their native check after 10 minutes, which only very large exports reach.)
 
 Publish the export at the `--source` URL, so recipients can confirm your claims
-against your Lean source. Serve it over https at exactly that address, without a redirect, since
-`fetch` refuses redirects: `raw.githubusercontent.com` links work, but GitHub
-release download links redirect. The export also contains your proofs. To keep them private, write a
-module that states each claim as an `axiom` instead of proving it, as
-[`examples/lean/V1Spec.lean`](../examples/lean/V1Spec.lean) does, and publish
-its export instead. A claim stated as an axiom has the same identity as the
-proved theorem, so the certificate still matches:
-
-```sh
-zklean export --project examples/lean --module V1Spec \
-  --claims Inventory.reservation_safe --out reservation.ndjson
-```
-
-The export must still contain every non-standard axiom your proofs use, since
-the certificate lists them. If there are any, declare them in a module that
-contains no proofs, import it in both your proof and your specification
-modules, and add the axioms to `--claims`, for example
-`--claims Inventory.reservation_safe,Trusted.evidence`.
-
-The certificate never contains your proofs, but ZKLean does not promise that its
-cryptographic proof reveals nothing about them.
+against your Lean source. Serve it over https at exactly that address, without
+a redirect, since `fetch` refuses redirects: `raw.githubusercontent.com` links
+work, but GitHub release download links redirect.
 
 ## Verify a certificate
 
