@@ -48,7 +48,7 @@ To prove, build the prover in its own directory, since the tests rebuild
 GOFLAGS=-buildvcs=false cargo build --release --locked -p zklean-native \
   --features prover,execute --target-dir target/prover
 export ZKLEAN_NATIVE="$PWD/target/prover/release/zklean-native"
-export ZKLEAN_GUEST_ELF=/path/to/zklean-guest   # the CI artifact
+export ZKLEAN_GUEST_ELF=/path/to/zklean-guest   # the CI artifact, or a release's zklean-guest
 ```
 
 The same two variables run `tests/guest.e2e.test.ts`.
