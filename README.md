@@ -108,7 +108,7 @@ const result = await createVerifier().verify(certificate, {
 A pass proves the listed claims; check they include the ones you rely on
 ([how](docs/USAGE.md#verify-a-certificate)).
 
-## Prove, pin, verify
+## Practical workflow
 
 1. **Prove.** You prove your specs in Lean as usual, then run `zklean prove` to
    produce the certificate: each proved theorem's name and fingerprint, the
