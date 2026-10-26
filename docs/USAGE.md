@@ -5,16 +5,28 @@ Only verifying certificates? Run `bun add zklean@0.1.0` and skip to
 
 This guide is for **authors**, who publish certificates of their Lean proofs,
 and **recipients**, who verify them, read what they claim, or build their own
-proofs on top. A certificate names each proved theorem, or **claim**, by its
-**identity**: a fingerprint of its statement and of every definition it depends
-on. It also lists the **axioms**, unproved assumptions, that the proofs rely
-on.
+proofs on top. A certificate lists:
+
+- **claims**, the proved theorems;
+- each claim's **identity**, a fingerprint of its statement and of every
+  definition it depends on;
+- the **axioms**, unproved assumptions, that the proofs rely on.
 
 ## Set up
 
+Each command needs part of the setup below:
+
+| Command                 | Needs                                                   |
+| ----------------------- | ------------------------------------------------------- |
+| `verify`                | the checkout and `bun install`                          |
+| `fetch`                 | also the native build, `zklean-native`                  |
+| `check`, `requirements` | also Lean and lean4export, unless given `--export FILE` |
+| `export`                | also Lean and lean4export                               |
+| `prove`, `pin`          | also the prover build and the guest                     |
+
 Making certificates uses the command-line tool, which runs from a release
-checkout. The full tool needs [Bun](https://bun.sh/) 1.4.4 or
-newer, stable [Rust](https://rustup.rs/), and
+checkout. The full tool needs [Bun](https://bun.sh/) 1.4.4 or newer, stable
+[Rust](https://rustup.rs/), and
 [Lean](https://lean-lang.org/install/) 4.35.0 with its build tool Lake. Your
 Lean project, and any project it depends on, must use the same version: its
 `lean-toolchain` file must select `leanprover/lean4:v4.35.0`.
@@ -27,8 +39,6 @@ bash scripts/setup-exporter.sh   # builds lean4export, which writes Lean declara
 cargo build --release --locked -p zklean-native   # the native Nanoda checker the tool runs
 alias zklean="bun $PWD/src/cli.ts"
 ```
-
-This guide writes the tool as `zklean`, as the alias above defines it.
 
 Proving needs two more things. First, a native build that includes SP1's
 prover; compiling it needs Go 1.24, `protoc` and a C compiler. Second, the
@@ -43,16 +53,6 @@ export ZKLEAN_GUEST_ELF="$PWD/zklean-guest"
 
 The first proof downloads SP1's proving files, a 6.2 GB download that takes
 7.8 GB on disk, to `~/.sp1/circuits/groth16`.
-
-Not every command needs all of this:
-
-| Command                 | Needs                                                   |
-| ----------------------- | ------------------------------------------------------- |
-| `verify`                | the checkout and `bun install`                          |
-| `fetch`                 | also the native build, `zklean-native`                  |
-| `check`, `requirements` | also Lean and lean4export, unless given `--export FILE` |
-| `export`                | also Lean and lean4export                               |
-| `prove`, `pin`          | also the prover build and the guest                     |
 
 ## Certify a module
 

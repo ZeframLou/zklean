@@ -1,8 +1,9 @@
 # ZKLean
 
-Proved something about your code in [Lean](https://lean-lang.org/), a language
-for machine-checked proofs? ZKLean ships it as a 1 KB certificate that anyone
-can check in under a second, without installing Lean.
+ZKLean turns a proof about your code, written in
+[Lean](https://lean-lang.org/) (a language for machine-checked proofs), into a
+1 KB certificate. Anyone can check it in under a second, without installing
+Lean.
 
 ## Why
 
@@ -15,19 +16,15 @@ With ZKLean, you publish a certificate with each release, and their CI checks it
 in a quarter of a second. If a release changes anything the proof depends on,
 their CI goes red before they ship against it.
 
-The certificate covers your Lean model of the service, and you keep that model
-faithful to the code.
-
 ## What you get
 
 - **Small certificates.** About 1 KB, however long the proofs are.
 - **Cheap checking.** Under a second, in TypeScript, with no Lean and no
   network.
-- **Precise claims.** Each claim is pinned to the exact statement and
-  definitions you proved, so a changed definition can't slip through under the
-  same name.
-- **An independent checker.** Proofs are re-checked by a Lean checker built
-  separately from Lean itself.
+- **Precise claims.** Each claim is fingerprinted with its exact statement and
+  definitions, so renaming can't hide a change.
+- **An independent checker.** A second Lean checker, built separately from
+  Lean, re-checks every proof.
 - **Explicit assumptions.** A certificate lists every axiom (unproved
   assumption) its proofs rely on, and you choose which ones you accept.
 
@@ -61,9 +58,8 @@ theorem reservation_safe (available requested remaining : Nat) :
       0 < requested ∧ requested ≤ available ∧ remaining + requested = available
 ```
 
-The author generates the certificate with the `zklean` command-line tool.
-`--axioms propext` accepts the one standard Lean assumption this proof relies
-on.
+Generate the certificate with the `zklean` CLI. `--axioms propext` accepts the
+one standard Lean assumption this proof relies on.
 
 ```sh
 zklean prove --project examples/lean --module V1 \
@@ -85,8 +81,8 @@ const result = await createVerifier().verify(certificate, {
 });
 ```
 
-Passing means the listed claims hold. Compare them with the claims you depend
-on, as the [usage guide](docs/USAGE.md#verify-a-certificate) shows.
+A pass proves the listed claims; check they include the ones you rely on
+([how](docs/USAGE.md#verify-a-certificate)).
 
 ## Install
 
@@ -101,12 +97,13 @@ To make certificates, you also need Lean, Rust and a 6 GB prover download; the
 
 ## Trust model
 
-You trust that the checker, [Nanoda](https://github.com/ammkrn/nanoda_lib) plus
-ZKLean's code that fingerprints claims, is correct, that the proof system,
-[SP1](https://github.com/succinctlabs/sp1), is sound, and that the verifier key
-in the library identifies that checker. A passing certificate means its claims
-follow from the axioms you allowed. It does not mean your running code matches
-the Lean model, or that the claims say what you need.
+You trust three things: the checker
+([Nanoda](https://github.com/ammkrn/nanoda_lib) plus ZKLean's fingerprinting
+code) is correct, the [SP1](https://github.com/succinctlabs/sp1) proof system
+is sound, and the library's verifier key matches that checker. A passing
+certificate means its claims follow from the axioms you allowed. It does not
+mean your running code matches the Lean model, or that the claims say what you
+need.
 
 ## More
 
