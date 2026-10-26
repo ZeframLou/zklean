@@ -6,15 +6,17 @@ This specification is for people implementing a ZKLean verifier or prover. It
 defines what a certificate states, its format, and how it is verified. The
 [README](README.md#concepts) introduces the concepts.
 
-ZKLean certifies that Lean propositions have been proved. A certificate names
-each certified proposition, and each axiom its proof uses, by an **identity**:
-a hash of the declaration and everything it depends on. It carries a 356-byte
-**Groth16 proof**, a succinct cryptographic proof produced by SP1, that a
-specific checker program accepted the proofs. That program is identified by
-its **verifier key**, which verifiers pin. The certificate also gives the URL of
-one Lean **export**, a file of declarations written by lean4export, that holds
-the definitions behind every identity. Recipients verify the proof without the
-proofs themselves or a Lean installation. A certificate is under 1 KB for a few
+ZKLean certifies that Lean **propositions**, the statements Lean theorems
+prove, have been proved. A certificate names each certified proposition, and
+each axiom its proof uses, by an **identity**: a hash of the **declaration** (a
+Lean definition, theorem or axiom) and everything it depends on. It carries a
+356-byte **Groth16 proof**, a succinct cryptographic proof produced by SP1, that
+a specific checker program accepted the proofs. That program is identified by
+its **verifier key**, which each verifier fixes in advance ("pins") rather than
+taking from a certificate. The certificate also gives the URL of one Lean
+**export**, a file of declarations written by lean4export, that holds the
+definitions behind every identity. Verifiers check the proof without the Lean
+proofs or a Lean installation. A certificate is under 1 KB for a few
 claims; it grows with the number of claims, not with the size of the proofs.
 
 ZKLean is usable independently of HTTP. The separate
@@ -26,8 +28,8 @@ API endpoints and checks them against client requirements.
 The terms MUST, MUST NOT, SHOULD, and MAY follow RFC 2119 and RFC 8174.
 
 Verification depends on the soundness of the trusted checker and the
-cryptographic proving system. Clients MUST pin a trusted verifier key and permit
-each axiom by name and identity. Equal identities denote the same statement about
+cryptographic proving system. Verifiers MUST pin a trusted verifier key and
+permit each axiom by name and identity. Equal identities denote the same statement about
 the same definitions. Certificates establish properties of a mathematical model;
 they do not attest to deployed code.
 
@@ -67,19 +69,27 @@ The **guest**, the program SP1 runs and proves, MUST:
 }
 ```
 
-- `claims`: the certified propositions, by Lean name and identity.
+- `format`: the string `"zklean/1"`.
+- `claims`: the certified propositions, by Lean name and identity. It MUST
+  contain at least one claim.
 - `axioms`: every axiom the proofs use, by name and identity. A name occurs in at
   most one of `claims` and `axioms`.
-- `proof`: the Groth16 proof of `{format, claims, axioms}`.
+- `proof`: the Groth16 proof of `{format, claims, axioms}`, encoded as
+  [ENCODING.md](docs/ENCODING.md) specifies.
 - `source`: the `https` URL, without credentials, of one lean4export file that
   contains every claim and every axiom other than Lean's standard ones, with
-  everything they depend on. Clients MUST NOT follow redirects from
-  it, so the URL is the file's final address.
+  everything they depend on. Verifiers MUST NOT follow redirects from it, so the
+  URL is the file's final address.
+
+A certificate is **well formed** when it is a JSON object with exactly these
+five fields, every name is non-empty, every identity is 64 lowercase
+hexadecimal characters, and the proof decodes to exactly 356 bytes. Verifiers
+MUST reject any other certificate.
 
 The source is not part of the proved statement. It is an untrusted pointer: a
-recipient verifies the certificate, then checks the file with Nanoda and accepts
-it only if it reproduces the identity of every claim and non-standard axiom. A source matched against an
-unverified certificate means nothing, since a forger can choose identities that
+verifier checks the certificate, then checks the file with Nanoda and accepts it
+only if it reproduces the identity of every claim and non-standard axiom. A
+source matched against an unverified certificate means nothing, since a forger can choose identities that
 match any file. A wrong source can make that check fail, but cannot make a
 different statement match. Because `source` is outside the proof, the author can
 move the file and change the URL without re-proving.
@@ -95,7 +105,8 @@ the proof encoding.
 ### 3.4. Verification
 
 Verification succeeds only when the certificate is well formed, every `axioms`
-entry equals an entry of the client's policy by name and identity, and the
+entry equals an entry of the verifier's **axiom policy**, the axioms it permits
+by name and identity, and the
 Groth16 proof verifies against the pinned verifier key and the **statement
 digest**, the hash of `{format, claims, axioms}` defined in
 [ENCODING.md](docs/ENCODING.md).
@@ -107,7 +118,8 @@ verifiers need new certificates.
 
 ## 4. Requirements
 
-A requirement lists the propositions a recipient's own proofs assume:
+A requirement lists the propositions a verifier's own proofs assume, so it can
+later confirm that a certificate still proves them:
 
 ```json
 {
@@ -116,8 +128,9 @@ A requirement lists the propositions a recipient's own proofs assume:
 }
 ```
 
-`zklean requirements` computes it from local Lean code. Each claim must be a
-proposition, proved or stated as an axiom. A certificate satisfies a requirement
+`zklean requirements` computes it from local Lean code. It MUST contain at least
+one claim, since an empty requirement is satisfied by every certificate. Each
+claim MUST be a proposition, proved or stated as an axiom. A certificate satisfies a requirement
 when every required claim appears among its `claims` with the same identity; an
 entry of `axioms` never satisfies a requirement.
 

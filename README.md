@@ -1,8 +1,9 @@
 # ZKLean
 
-ZKLean turns a checked Lean proof into a certificate of about 1 KB that anyone
-can verify in under a second, without the proof, without installing Lean, and
-without trusting whoever made it.
+ZKLean turns a proof checked by Lean, a language for machine-checked proofs,
+into a certificate of about 1 KB that anyone can verify in under a second,
+without the proof, without installing Lean, and without trusting whoever made
+it.
 
 ## Why
 
@@ -26,16 +27,16 @@ the properties their code depends on.
   proof can also add its own. Whoever relies on a proof decides which axioms
   they accept.
 - An **identity** is a hash of a Lean definition's or theorem's name and
-  meaning, together with everything it depends on. Two theorems with the same identity state the same
-  thing about the same definitions. Changing any definition a theorem mentions
-  changes its identity.
+  meaning, together with everything it depends on. Two theorems with the same
+  identity state the same thing about the same definitions. Changing any
+  definition a theorem mentions changes its identity.
+- An **export** is a file of a Lean module's definitions and theorems, written
+  by Lean's [lean4export](https://github.com/leanprover/lean4export) tool. It is
+  what ZKLean checks and computes identities from.
 - A **certificate** lists the proved theorems, called **claims**, and the
   axioms they use, each by name and identity. It carries a cryptographic proof
   that an independent Lean checker accepted the proofs, and links to the export
   behind the identities, so readers can see what the claims mean.
-- An **export** is a file of a Lean module's definitions and theorems, written
-  by Lean's [lean4export](https://github.com/leanprover/lean4export) tool. It is
-  what ZKLean checks and computes identities from.
 - The cryptographic proof comes from **[SP1](https://github.com/succinctlabs/sp1)**,
   which runs a program and produces a short proof that the program ran and gave
   a particular result. ZKLean's program checks Lean proofs with
@@ -62,11 +63,11 @@ the size of the proofs.
 ## Trust model
 
 A verifier trusts that Nanoda checks Lean correctly, that SP1's proofs are
-sound, and that the SDK's built-in **verifier key**, a fingerprint of the exact
-checker program, is the right one. A verified certificate shows that each claim
-about the Lean model follows from the axioms it lists. It says nothing about
-whether running software matches that model, or whether the claims say what you
-need.
+sound, and that the **verifier key** built into ZKLean's TypeScript SDK, a
+fingerprint of the exact checker program, is the right one. A certificate passes
+only if every axiom it uses is one you permitted, and then shows that each claim
+about the Lean model follows from those axioms. It says nothing about whether
+running software matches that model, or whether the claims say what you need.
 
 ## Install
 
@@ -77,8 +78,9 @@ The TypeScript SDK verifies certificates. It runs on [Bun](https://bun.sh/)
 bun add zklean@0.1.0
 ```
 
-The command-line tool checks and proves Lean modules. It runs from a release
-checkout, set up as in the [usage guide](docs/USAGE.md#set-up).
+The command-line tool checks and proves Lean modules, and verifies and reads
+certificates. It runs from a release checkout, set up as in the
+[usage guide](docs/USAGE.md#set-up).
 
 ## Example: an inventory reservation
 
@@ -121,8 +123,9 @@ its proof uses, each with its identity.
 }
 ```
 
-Then prove it and verify the certificate. Proving needs the prover build and
-downloads 6.2 GB of SP1 files on first use. `--source` is the URL where you will
+Then prove it and verify the certificate. Proving needs the
+[prover build](docs/USAGE.md#set-up) and downloads 6.2 GB of SP1 files on first
+use. `--source` is the URL where you will
 publish the export that `prove` writes beside the certificate:
 
 ```sh

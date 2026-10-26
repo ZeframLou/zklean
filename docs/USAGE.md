@@ -8,13 +8,17 @@ This guide is for two kinds of user:
   claim, or build their own proofs on top of them.
 
 The [README](../README.md#concepts) defines the terms used here: claims, axioms,
-identities and certificates.
+identities, certificates and exports. An **export** is a file of a Lean
+module's definitions and theorems, written by the lean4export tool; ZKLean
+checks it and computes identities from it.
 
 ## Set up
 
 Recipients who only verify certificates need just the TypeScript SDK
 (`bun add zklean@0.1.0`) and can skip to
-[Verify a certificate](#verify-a-certificate).
+[Verify a certificate](#verify-a-certificate). Reading what a certificate
+claims (`zklean fetch`) needs the command-line tool and its native build, but
+not Lean.
 
 The command-line tool, which checks and proves Lean modules, runs from a
 release checkout. It needs [Bun](https://bun.sh/) 1.4.4 or newer, stable
@@ -32,9 +36,10 @@ alias zklean="bun $PWD/src/cli.ts"
 
 This guide writes the tool as `zklean`, as the alias above defines it.
 
-Proving also needs a build that includes SP1's prover, which needs Go 1.24,
-`protoc` and a C compiler to compile, and the release's **guest**: the compiled
-checker program SP1 runs, `zklean-guest`:
+Proving needs two more things. First, a native build that includes SP1's
+prover; compiling it needs Go 1.24, `protoc` and a C compiler. Second, the
+release's **guest**, `zklean-guest`: the compiled checker program that SP1 runs
+and proves.
 
 ```sh
 GOFLAGS=-buildvcs=false cargo build --release --locked -p zklean-native --features prover,execute
@@ -42,8 +47,8 @@ curl -fLO https://github.com/ZeframLou/zklean/releases/download/v0.1.0/zklean-gu
 export ZKLEAN_GUEST_ELF="$PWD/zklean-guest"
 ```
 
-The first proof downloads SP1's proving files, about 6.2 GB, to
-`~/.sp1/circuits`.
+The first proof downloads SP1's proving files, a 6.2 GB download that takes
+7.8 GB on disk, to `~/.sp1/circuits/groth16`.
 
 ## Certify a module
 
@@ -72,10 +77,8 @@ zklean prove --project examples/lean --module V1 \
 `prove` runs the same check inside SP1. For this example that takes about 5 to
 15 minutes and up to 20 GB of memory on a 12-core machine; time grows with the
 size of the export, and `--timeout MS` raises the one-hour default limit. It
-writes the certificate,
-`reservation.json`, and beside it `reservation.ndjson`, the **export**: a file
-of the Lean declarations the identities are computed from, in lean4export's
-format.
+writes the certificate, `reservation.json`, and beside it the export it proved
+from, `reservation.ndjson`.
 
 Publish the export at the `--source` URL, so recipients can see what your claims
 mean. The export also contains your proofs. To keep them private, write a
@@ -96,6 +99,16 @@ cryptographic proof reveals nothing about them.
 
 ```sh
 zklean verify --certificate reservation.json --axioms propext
+```
+
+It prints the result and exits with status 1 unless the certificate verifies:
+
+```json
+{
+  "statementId": "…",
+  "status": "verified",
+  "reason": "valid"
+}
 ```
 
 From TypeScript:
@@ -134,8 +147,19 @@ executed.
 An export holds Lean's compiled form of the declarations rather than readable
 source. To read the definitions, or to write proofs that use them, get the
 author's Lean source from anywhere, then confirm it is the certified model:
-export it with `zklean export` and check that export with
-`zklean fetch --certificate … --from FILE`.
+export its claims and their dependencies, then check that export against the
+certificate:
+
+```sh
+# author is your copy of the author's Lean project.
+zklean export --project author --module V1 \
+  --claims Inventory.reservation_safe --out local.ndjson
+zklean fetch --certificate reservation.json --axioms propext \
+  --from local.ndjson --out checked.ndjson
+```
+
+Without `--claims`, `export` writes the whole module with all of Lean's
+standard library, hundreds of megabytes.
 
 ## Depend on a certified claim
 
@@ -151,8 +175,17 @@ zklean requirements --project client --module Remote \
 ```
 
 A certificate satisfies your requirements when every required claim appears
-among its claims with the same identity. In the SDK, verify the certificate
-first, then call `satisfies(certificate, requirements)`. To rely on a weaker
+among its claims with the same identity. The check is in the SDK only: verify
+the certificate first, then
+
+```ts
+import { loadRequirements, satisfies } from "zklean";
+
+if (!satisfies(certificate, await loadRequirements("requirements.json")))
+  throw new Error("the certificate no longer proves a required claim");
+```
+
+To rely on a weaker
 property, prove it from the author's claim in your own module, and require the
 author's claim rather than your derived one. Regenerate the requirements
 whenever the Lean code they come from changes.
@@ -177,15 +210,16 @@ ones.
 ## Tool locations
 
 The command-line tool finds its native checker `zklean-native`, lean4export,
-Lake and the verifier key file in the checkout. These environment variables override them; an override
-must point to an existing file:
+Lake and the verifier key file in the checkout. These environment variables
+override them; an override must point to an existing file:
 
 | Variable           | Default                                                                                          |
 | ------------------ | ------------------------------------------------------------------------------------------------ |
 | `ZKLEAN_NATIVE`    | `target/release/zklean-native`                                                                   |
 | `ZKLEAN_GUEST_ELF` | `crates/guest/target/elf-compilation/riscv64im-succinct-zkvm-elf/release/zklean-guest`, if built |
 | `ZKLEAN_EXPORTER`  | `.tooling/lean4export/.lake/build/bin/lean4export`                                               |
-| `ZKLEAN_LAKE`      | `lake` from Lean's installer, elan, or `PATH`                                                    |
+| `ZKLEAN_LAKE`      | `$ELAN_HOME/bin/lake` (by default `~/.elan/bin/lake`), then `lake` on `PATH`                     |
 | `ZKLEAN_PROFILE`   | `src/guest.json`                                                                                 |
 
-`SP1_GROTH16_CIRCUIT_PATH` moves SP1's proving files from `~/.sp1/circuits`.
+`SP1_GROTH16_CIRCUIT_PATH` moves SP1's proving files from
+`~/.sp1/circuits/groth16`.

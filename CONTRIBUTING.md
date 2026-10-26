@@ -7,10 +7,11 @@ certificates, see the [usage guide](docs/USAGE.md).
 
 - Bun 1.4.4 and [Lean 4.35.0](https://github.com/leanprover/lean4/releases/tag/v4.35.0)
   with Lake.
-- Stable Rust for the native tool, and Rust 1.96.0 for the two reproducible
-  builds: the WebAssembly verifier and, with the
-  [SP1 6.10.0 toolchain](https://github.com/succinctlabs/sp1/tree/v6.10.0)
-  (`cargo prove`), whose compiler is based on 1.96.0, the guest.
+- Stable Rust for the native tool.
+- Rust 1.96.0 for the reproducible WebAssembly verifier.
+- The [SP1 6.10.0 toolchain](https://github.com/succinctlabs/sp1/tree/v6.10.0)
+  (`cargo prove`) for the guest. Its compiler is based on Rust 1.96.0, so the
+  guest build pins that Cargo too.
 - For proving: Go 1.24, `protoc` and a C compiler.
 
 ```sh
@@ -66,11 +67,13 @@ fixture.
 
 ## Releases
 
-1. Set `version` in `package.json`, pin `src/guest.json` from CI's guest
-   artifact, and re-prove the identity certificate, naming the URL the tag will
-   serve as its source:
+1. Set `version` in `package.json`. With `ZKLEAN_NATIVE` set to the prover
+   build and `ZKLEAN_GUEST_ELF` to CI's guest artifact, as above, pin
+   `src/guest.json` and re-prove the identity certificate, naming the URL the
+   tag will serve as its source:
 
    ```sh
+   bun src/cli.ts pin --out src/guest.json
    bun src/cli.ts prove --export tests/fixtures/identity.ndjson \
      --claims Demo.identity --out tests/fixtures/identity.certificate.json \
      --source https://raw.githubusercontent.com/ZeframLou/zklean/vX.Y.Z/tests/fixtures/identity.ndjson
