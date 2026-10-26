@@ -32,7 +32,7 @@ test("standard axiom permissions reject a different proposition under the same n
   );
   const stderr = await new Response(child.stderr).text();
   expect(await child.exited).toBe(1);
-  expect(stderr).toContain("axiom-mismatch");
+  expect(stderr).toContain("differ from the permitted identity: propext");
 });
 
 test("custom axioms are permitted only by their reviewed identities", async () => {
