@@ -1,21 +1,19 @@
 # Using ZKLean
 
-This guide is for two kinds of user:
+Only verifying certificates? Run `bun add zklean@0.1.0` and skip to
+[Verify a certificate](#verify-a-certificate).
 
-- **Authors** have Lean proofs about their software and want to publish
-  certificates of them.
-- **Recipients** receive certificates and want to verify them, read what they
-  claim, or build their own proofs on top of them.
-
-The [README](../README.md#what-you-get) introduces the main terms: certificates,
-claims, identities and axioms. An **export** is the file of Lean definitions a
-certificate is computed from, written by the lean4export tool.
+This guide is for **authors**, who publish certificates of their Lean proofs,
+and **recipients**, who verify them, read what they claim, or build their own
+proofs on top. A certificate names each proved theorem, or **claim**, by its
+**identity**: a fingerprint of its statement and of every definition it depends
+on. It also lists the **axioms**, unproved assumptions, that the proofs rely
+on.
 
 ## Set up
 
-Verifying certificates from TypeScript needs only the SDK,
-`bun add zklean@0.1.0`. Everything else uses the command-line tool, which runs
-from a release checkout. The full tool needs [Bun](https://bun.sh/) 1.4.4 or
+Making certificates uses the command-line tool, which runs from a release
+checkout. The full tool needs [Bun](https://bun.sh/) 1.4.4 or
 newer, stable [Rust](https://rustup.rs/), and
 [Lean](https://lean-lang.org/install/) 4.35.0 with its build tool Lake. Your
 Lean project, and any project it depends on, must use the same version: its
@@ -83,8 +81,9 @@ zklean prove --project examples/lean --module V1 \
 `prove` runs the same check inside SP1. For this example that takes about 5 to
 15 minutes and up to 20 GB of memory on a 12-core machine; time grows with the
 size of the export, and `--timeout MS` raises the one-hour default limit.
-`prove` writes the certificate, `reservation.json`, and beside it the export it
-proved from, `reservation.ndjson`. (`check`, `requirements` and `fetch` stop
+`prove` writes the certificate, `reservation.json`, and beside it the
+**export** it proved from, `reservation.ndjson`: the file of Lean definitions
+the identities are computed from. (`check`, `requirements` and `fetch` stop
 their native check after 10 minutes, which only very large exports reach.)
 
 Publish the export at the `--source` URL, so recipients can confirm your claims
