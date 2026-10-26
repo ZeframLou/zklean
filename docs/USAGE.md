@@ -78,25 +78,24 @@ zklean prove --project examples/lean --module V1 \
   --source https://acme.example/reservation.ndjson --out reservation.json
 ```
 
-`prove` runs the same check inside SP1. For this example that takes about 5 to
-15 minutes and up to 20 GB of memory on a 12-core machine; time grows with the
-size of the export, and `--timeout MS` raises the one-hour default limit.
-`prove` writes the certificate, `reservation.json`, and beside it the
-**export** it proved from, `reservation.ndjson`: the file of Lean definitions
-the identities are computed from. `check`, `requirements` and `fetch` stop
-their native check after 10 minutes.
+`prove` runs the same check inside SP1. For this example it takes 5 to 15
+minutes and up to 20 GB of memory on 12 cores. Larger exports take longer;
+`--timeout MS` raises the one-hour limit. `prove` writes the certificate,
+`reservation.json`, and beside it the **export** it proved from,
+`reservation.ndjson`: the file of Lean definitions the identities are computed
+from.
 
 Publish the export at the `--source` URL, so recipients can confirm your claims
-against your Lean source. Serve it over https at exactly that address, without
-a redirect, since `fetch` refuses redirects: `raw.githubusercontent.com` links
-work, but GitHub release download links redirect.
+against your Lean source. Serve it over https at exactly that address. `fetch`
+refuses redirects, so use a `raw.githubusercontent.com` link, not a GitHub
+release link.
 
 ## Verify a certificate
 
-A verified certificate proves only its own claims. A certificate for some
-other theorem under the same name verifies too, so always check that it proves
-the claims you rely on, with the identities you expect: the ones `check` printed
-for the author's code, or your [requirements](#depend-on-a-certified-claim).
+Verify the certificate, then confirm it proves the claims you rely on, with the
+identities you expect: the ones `check` printed for the author's code, or your
+[requirements](#depend-on-a-certified-claim). A certificate for a different
+theorem under the same name also verifies, so the identity check matters.
 
 From TypeScript:
 
@@ -163,9 +162,9 @@ zklean fetch --certificate reservation.json --axioms propext --out reservation.n
 `fetch` verifies the certificate, downloads the export from its `source` URL,
 checks it with Nanoda, and saves it only if it reproduces the identity of every
 claim and every non-standard axiom. Otherwise it reports the mismatched
-identities or the missing declaration and exits with status 1. `--from FILE` checks a local copy instead. A download must finish within 10
-minutes and be at most 1 GiB. Nothing fetched is
-executed.
+identities or the missing declaration and exits with status 1. `--from FILE`
+checks a local copy instead. A download must finish within 10 minutes and be
+at most 1 GiB. Nothing fetched is executed.
 
 An export holds Lean's compiled form of the declarations rather than readable
 source. To read the definitions, or to write proofs that use them, get the
@@ -230,11 +229,10 @@ if (
   throw new Error("the certificate no longer proves a required claim");
 ```
 
-To rely on a weaker property, prove it from the author's claim in your own
-module, and require the author's claim rather than your derived one: a
-certificate lists only the author's claims, so a requirement on your own
-theorem could never be satisfied. Regenerate the requirements
-whenever the Lean code they come from changes.
+Need a weaker property? Prove it from the author's claim in your own module,
+and require the author's claim. The certificate lists only the author's
+claims, so a requirement on your own theorem can never be met. Regenerate the
+requirements whenever the Lean code they come from changes.
 
 ## Choose axioms
 

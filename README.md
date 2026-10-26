@@ -10,7 +10,8 @@ Lean.
 Say you run an inventory service, and you have proved in Lean that a
 reservation never takes more stock than you have. The team building checkout on
 top of you would love to rely on that. Today they either take your word for it
-or rebuild your Lean project on every release. Most take your word for it.
+or rebuild your Lean project, and wait out its full proof check, on every
+release. Most take your word for it.
 
 With ZKLean, you publish a certificate with each release, and their CI checks it
 in a quarter of a second. If a release changes anything the proof depends on,
@@ -23,8 +24,8 @@ their CI goes red before they ship against it.
   network.
 - **Precise claims.** Each claim is fingerprinted with its exact statement and
   definitions, so renaming can't hide a change.
-- **An independent checker.** A second Lean checker, built separately from
-  Lean, re-checks every proof.
+- **An independent checker.** A second checker, written independently of Lean,
+  re-checks every proof, so a single bug in Lean can't pass a false claim.
 - **Explicit assumptions.** A certificate lists every axiom (unproved
   assumption) its proofs rely on, and you choose which ones you accept.
 
@@ -58,7 +59,8 @@ theorem reservation_safe (available requested remaining : Nat) :
       0 < requested ∧ requested ≤ available ∧ remaining + requested = available
 ```
 
-Generate the certificate with the `zklean` CLI. `--axioms propext` accepts the
+Generate the certificate with the `zklean` CLI
+([setup](docs/USAGE.md#set-up)). `--axioms propext` accepts the
 one standard Lean assumption this proof relies on.
 
 ```sh
