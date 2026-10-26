@@ -35,7 +35,9 @@ Verification depends on the soundness of the trusted checker and the
 cryptographic proving system. Verifiers MUST pin a trusted verifier key and
 permit each axiom by name and identity. Equal identities denote the same
 statement about the same definitions. Certificates establish properties of a mathematical model;
-they do not attest to deployed code.
+they do not attest to deployed code. Acceptance establishes only the
+certificate's own claims: a verifier MUST compare each claim it relies on by
+name and identity, since a name alone carries no meaning.
 
 ## 3. Certificates
 
@@ -94,10 +96,11 @@ axiom is standard only if both its name and its identity match; a different
 axiom named `propext` is non-standard and must be in the source.
 
 A certificate is **well formed** when it is a JSON object with exactly these
-five fields, every rule above holds, every name is non-empty, every identity is
-64 lowercase hexadecimal characters, the proof is canonical base64 that decodes
-to exactly 356 bytes, and the source parses as an `https` URL without a user
-name or password. Verifiers MUST reject any other certificate.
+five fields; `format` is `"zklean/1"`; `claims` has at least one entry and no
+name in common with `axioms`; every name is non-empty and every identity is 64
+lowercase hexadecimal characters; the proof is canonical base64 that decodes to
+exactly 356 bytes; and the source parses as an `https` URL without a user name
+or password. Verifiers MUST reject any other certificate.
 
 The source is not part of the proved statement. It is an untrusted pointer: a
 verifier checks the certificate, then checks the file with Nanoda and accepts it

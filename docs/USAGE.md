@@ -111,16 +111,29 @@ cryptographic proof reveals nothing about them.
 
 ## Verify a certificate
 
+A verified certificate proves only its own claims. A certificate for some
+other theorem under the same name verifies too, so always check that it proves
+the claims you rely on, with the identities you expect: the ones `check` printed
+for the author's code, or your [requirements](#depend-on-a-certified-claim).
+
 From TypeScript:
 
 ```ts
 import { createVerifier, standardAxioms } from "zklean";
 
-const result = await createVerifier().verify(
-  await Bun.file("reservation.json").json(),
-  { axioms: { propext: standardAxioms.propext } },
-);
-if (result.status !== "verified") throw new Error(result.reason);
+// The identity `zklean check` printed for the author's code.
+const expected =
+  "65dea06fd9454a0dc98075d1d9c1c3aff55e0e74b0272c12757dd25c378c8b2f";
+
+const certificate = await Bun.file("reservation.json").json();
+const result = await createVerifier().verify(certificate, {
+  axioms: { propext: standardAxioms.propext },
+});
+if (
+  result.status !== "verified" ||
+  certificate.claims["Inventory.reservation_safe"] !== expected
+)
+  throw new Error("the certificate does not prove the expected claim");
 ```
 
 From the command line:
@@ -144,12 +157,6 @@ prints an error instead.
   "axioms": { "propext": "a6bbf25b…4158" }
 }
 ```
-
-`verified` means only that the certificate's own claims were proved. A
-certificate for some other theorem under the same name verifies too, so also
-check that it proves the claims you rely on, with the identities you expect:
-compare them with what `check` printed for the author's code, or use
-[requirements](#depend-on-a-certified-claim).
 
 Anything but `"status": "verified"` means the certificate establishes nothing:
 `status` is then `"unknown"` and `reason` is `invalid-certificate`,
