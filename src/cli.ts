@@ -156,7 +156,9 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
       const out = required("out");
       // Validate the source before hours of proving.
       parseSource(source);
-      console.error("Generating a Groth16 proof; large models may take hours…");
+      console.error(
+        "Generating a Groth16 proof; this takes minutes to hours, growing with the export…",
+      );
       const timeout = optional("timeout");
       const certificate = await prove(input, source, {
         tools,

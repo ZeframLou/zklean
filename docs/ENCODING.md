@@ -1,9 +1,14 @@
-# ZKLean v1 encoding profile
+# ZKLean v1 encoding
 
-This profile uses **SP1 6.10.0 Groth16 over BN254**. Identities are computed from
-the environment Nanoda has checked, so the checker and the identities read the
-export through one parser. Verification is offline and needs no proving
-artifacts, Lean process or native executable.
+This document defines the exact bytes an independent implementation must
+reproduce: identities, the committed statement, and the proof encoding. Read
+the [specification](../SPEC.md) first.
+
+Version 1 uses SP1 6.10.0's Groth16 proofs, over the BN254 elliptic curve that
+Ethereum also supports. Identities are computed from the declarations after
+Nanoda has checked them, so the checker and the identities read the export
+through one parser. Verification is offline and needs no proving files, Lean
+process or native executable.
 
 ## Canonical JSON
 
@@ -16,35 +21,37 @@ is lowercase hex `SHA256(UTF8(tag) || canonicalJSON(v))`.
 
 ## Identities
 
-An identity hashes one declaration's meaning together with its whole dependency
-closure. Each reference to another constant carries that constant's identity, so
-equal identities mean equal names, statements and definitions throughout.
+An identity hashes one declaration's meaning together with everything it
+depends on, directly or indirectly. Each reference to another constant carries
+that constant's identity, so equal identities mean equal names, statements and
+definitions throughout.
 
 **Names** are rendered as dotted strings. An export containing any ambiguous
 component (empty, containing `.`, or all digits) is rejected.
 
-**Built-in constants.** The checker computes natural-number and string literals,
-`Nat` arithmetic, `Quot` and `eagerReduce` natively, by name. An export may
+**Built-in constants.** For speed, the checker evaluates natural-number and
+string literals, `Nat` arithmetic, quotients (`Quot`) and the `eagerReduce`
+evaluation hint natively, recognizing them by name. An export may
 contain these 31 constants only with the identities of Lean's own definitions
 at the pinned toolchain, listed in `crates/core/src/kernel.json`; otherwise it
 is rejected, since a redefined `Nat.gcd`, for example, would prove `False`.
 This also fixes the meaning of literals, which stand for `Nat.succ` chains and
 `String.ofList [Char.ofNat …]`.
 
-**Nodes** are hashed Merkle-style as `H("zklean/node/1\0", node)`, with every
-child replaced by its hash:
+**Nodes** of each term are hashed as `H("zklean/node/1\0", node)`, with every
+child replaced by its hash, as in a Merkle tree:
 
-| Node | Hashed form |
-| --- | --- |
-| level | `{zero:true}`, `{succ:h}`, `{max:[h,h]}`, `{imax:[h,h]}`, `{param:"u"}` |
-| `bvar i` | `{bvar:i}` |
-| `sort l` | `{sort:h}` |
-| `const` | `{const:{name, id, us:[h…]}}` |
-| `app` | `{app:{fn:h, arg:h}}` |
-| `lam`, `forallE` | `{lam\|forallE:{type:h, body:h}}` |
-| `letE` | `{letE:{type:h, value:h, body:h}}` |
-| `proj` | `{proj:{name, id, idx, struct:h}}` |
-| literal | `{natVal:{value:"digits", type:id(Nat)}}`, `{strVal:{value, type:id(String)}}` |
+| Node             | Hashed form                                                                    |
+| ---------------- | ------------------------------------------------------------------------------ |
+| level            | `{zero:true}`, `{succ:h}`, `{max:[h,h]}`, `{imax:[h,h]}`, `{param:"u"}`        |
+| `bvar i`         | `{bvar:i}`                                                                     |
+| `sort l`         | `{sort:h}`                                                                     |
+| `const`          | `{const:{name, id, us:[h…]}}`                                                  |
+| `app`            | `{app:{fn:h, arg:h}}`                                                          |
+| `lam`, `forallE` | `{lam\|forallE:{type:h, body:h}}`                                              |
+| `letE`           | `{letE:{type:h, value:h, body:h}}`                                             |
+| `proj`           | `{proj:{name, id, idx, struct:h}}`                                             |
+| literal          | `{natVal:{value:"digits", type:id(Nat)}}`, `{strVal:{value, type:id(String)}}` |
 
 Binder names, binder annotations and `letE` nondependency hints are dropped:
 they do not affect meaning. `id` is the referenced constant's identity, or `null`
@@ -56,7 +63,7 @@ for a reference inside the inductive group being hashed.
   proof: a theorem, or an axiom, definition or opaque of a proposition. It is
   `{prop:{name, levelParams, type}}`. Proofs are irrelevant, so its value is
   omitted, and an `axiom` stating a theorem's proposition has the theorem's
-  identity. A definition whose *value* is a proposition, such as
+  identity. A definition whose _value_ is a proposition, such as
   `def Ok : Prop := …`, is not a proof and keeps its value.
 - Otherwise a definition is `{def:{name, levelParams, type, value}}`, an opaque
   `{opaque:{…}}` likewise, an axiom `{axiom:{name, levelParams, type}}` and a
@@ -67,8 +74,9 @@ for a reference inside the inductive group being hashed.
   `g = H("zklean/declaration/1\0", {inductive:{levelParams, numParams, types}})`,
   where `types` lists each type's `{name, type, ctors:[{name, type}]}` in block
   order. Order is part of the identity, because it fixes the order of the
-  recursors' motives; declaring a mutual block in another order changes it. Recursors are derived from this input and checked by Nanoda, so they
-  are not hashed. Each type, constructor and recursor of the block has identity
+  recursors' motives; declaring a mutual block in another order changes it.
+  Recursors are derived from this input and checked by Nanoda, so they are not
+  hashed. Each type, constructor and recursor of the block has identity
   `H("zklean/declaration/1\0", {member:{group:g, name}})`.
 
 `levelParams` are universe parameter names, so renaming one changes the identity.
@@ -97,11 +105,21 @@ Other SP1 modes and lengths are rejected.
 ## Verifier keys
 
 Verification calls the unmodified upstream `sp1-verifier` crate, compiled to
-WebAssembly. Its circuit key is fixed by version 6.10.0. The checker key is SP1's
-BN254 `vk.bytes32()` encoding of the pinned guest, in `src/guest.json`
-with the guest ELF's SHA-256; `zklean pin` derives both from a built guest.
-Applications can choose a different trusted key with `groth16Backend(key)`;
-certificate data cannot select one. Groth16 soundness relies on SP1's trusted
-setup; a new theorem needs no new ceremony. The profile establishes
-derivability and integrity; it makes no claim of witness privacy beyond
-upstream SP1's guarantees.
+WebAssembly. Two keys are involved:
+
+- SP1's **circuit key** identifies its Groth16 circuit. `sp1-verifier` 6.10.0
+  fixes it, and the proof's four-byte selector names it.
+- The **verifier key** identifies the guest program the proof is about. It is
+  SP1's `vk.bytes32()` encoding of the pinned guest, stored in `src/guest.json`
+  with the SHA-256 of the guest's compiled program (its ELF file). `zklean pin`
+  derives both from a built guest.
+
+Applications can choose a different trusted verifier key with
+`groth16Backend(key)`; certificate data cannot select one.
+
+## Security assumptions
+
+Groth16 soundness relies on SP1's trusted setup; a new theorem needs no new
+setup. Version 1 establishes that the claims were proved and that the
+certificate is intact. It makes no promise that the proof reveals nothing about
+the Lean proofs beyond what upstream SP1 guarantees.

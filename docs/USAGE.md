@@ -32,8 +32,9 @@ alias zklean="bun $PWD/src/cli.ts"
 
 This guide writes the tool as `zklean`, as the alias above defines it.
 
-Proving also needs Go 1.24, `protoc` and a C compiler, a build with the prover
-included, and the release's checker program:
+Proving also needs a build that includes SP1's prover, which needs Go 1.24,
+`protoc` and a C compiler to compile, and the release's **guest**: the compiled
+checker program SP1 runs, `zklean-guest`:
 
 ```sh
 GOFLAGS=-buildvcs=false cargo build --release --locked -p zklean-native --features prover,execute
@@ -56,7 +57,9 @@ zklean check --project examples/lean --module V1 \
 
 `check` prints the **statement** a certificate would prove: each claim and each
 axiom the proofs use, by name and identity. `--axioms` names the axioms you
-allow; `check` fails if the proofs use any other.
+allow; `check` fails if the proofs use any other. Instead of `--project` and
+`--module`, every command that reads Lean code also accepts an existing export
+as `--export FILE`.
 
 Then generate the certificate:
 
@@ -66,21 +69,28 @@ zklean prove --project examples/lean --module V1 \
   --source https://acme.example/reservation.ndjson --out reservation.json
 ```
 
-`prove` runs the same check inside SP1, which takes about 5 to 15 minutes and up
-to 20 GB of memory on a 12-core machine. It writes the certificate,
+`prove` runs the same check inside SP1. For this example that takes about 5 to
+15 minutes and up to 20 GB of memory on a 12-core machine; time grows with the
+size of the export, and `--timeout MS` raises the one-hour default limit. It
+writes the certificate,
 `reservation.json`, and beside it `reservation.ndjson`, the **export**: a file
 of the Lean declarations the identities are computed from, in lean4export's
 format.
 
 Publish the export at the `--source` URL, so recipients can see what your claims
 mean. The export also contains your proofs. To keep them private, write a
-module that states each claim as an `axiom` instead of proving it, and publish
-its export instead; a claim stated as an axiom has the same identity as the
-proved theorem:
+module that states each claim as an `axiom` instead of proving it, as
+[`examples/lean/V1Spec.lean`](../examples/lean/V1Spec.lean) does, and publish
+its export instead. A claim stated as an axiom has the same identity as the
+proved theorem, so the certificate still matches:
 
 ```sh
-zklean export --project … --module Spec --claims … --out reservation.ndjson
+zklean export --project examples/lean --module V1Spec \
+  --claims Inventory.reservation_safe --out reservation.ndjson
 ```
+
+The certificate never contains your proofs, but ZKLean does not promise that its
+cryptographic proof reveals nothing about them.
 
 ## Verify a certificate
 
@@ -117,13 +127,15 @@ zklean fetch --certificate reservation.json --axioms propext --out reservation.n
 
 `fetch` verifies the certificate, downloads the export from its `source` URL,
 checks it with Nanoda, and saves it only if it reproduces the identity of every
-claim and every non-standard axiom. `--from FILE` checks a local copy instead.
-Nothing fetched is executed.
+claim and every non-standard axiom; otherwise it lists the mismatches and exits
+with status 1. `--from FILE` checks a local copy instead. Nothing fetched is
+executed.
 
 An export holds Lean's compiled form of the declarations rather than readable
 source. To read the definitions, or to write proofs that use them, get the
-author's Lean source from anywhere: if checking it reproduces the certificate's
-identities, it is the certified model.
+author's Lean source from anywhere, then confirm it is the certified model:
+export it with `zklean export` and check that export with
+`zklean fetch --certificate … --from FILE`.
 
 ## Depend on a certified claim
 
@@ -133,39 +145,47 @@ certificate still proves them. Write your proofs against the author's Lean
 module, then generate your requirements:
 
 ```sh
+# client and Remote stand for your own project and the module importing the author's code.
 zklean requirements --project client --module Remote \
   --claims Inventory.reservation_safe --out requirements.json
 ```
 
 A certificate satisfies your requirements when every required claim appears
 among its claims with the same identity. In the SDK, verify the certificate
-first, then call `satisfies(certificate, requirements)`. If you only need a
-weaker property, derive it in your own proof and still require the author's
-claim. Regenerate the requirements whenever the Lean code they come from
-changes.
+first, then call `satisfies(certificate, requirements)`. To rely on a weaker
+property, prove it from the author's claim in your own module, and require the
+author's claim rather than your derived one. Regenerate the requirements
+whenever the Lean code they come from changes.
 
 ## Choose axioms
 
 A certificate is only as good as the axioms it assumes, so verification accepts
 only axioms you name. Lean's standard axioms, `propext`, `Quot.sound` and
 `Classical.choice`, resolve to identities pinned to Lean 4.35.0. Any other axiom
-needs its identity in an `--axiom-policy` file: a JSON object mapping axiom
-names to identities, which you should review independently of the certificate's
-author. In the SDK, pass the same map as `axioms`; `standardAxioms` holds the
-standard ones.
+needs its identity in an `--axiom-policy` file, a JSON object mapping axiom
+names to identities that you review independently of the certificate's author,
+and its name in `--axioms`:
+
+```sh
+zklean verify --certificate reservation.json \
+  --axioms propext,Trusted.evidence --axiom-policy policy.json
+```
+
+In the SDK, pass the same map as `axioms`; `standardAxioms` holds the standard
+ones.
 
 ## Tool locations
 
-The command-line tool finds `zklean-native`, lean4export, Lake and the verifier
-key in the checkout. These environment variables override them; an override
+The command-line tool finds its native checker `zklean-native`, lean4export,
+Lake and the verifier key file in the checkout. These environment variables override them; an override
 must point to an existing file:
 
-| Variable | Default |
-| --- | --- |
-| `ZKLEAN_NATIVE` | `target/release/zklean-native` |
-| `ZKLEAN_GUEST_ELF` | a guest built in the checkout, if any |
-| `ZKLEAN_EXPORTER` | `.tooling/lean4export/.lake/build/bin/lean4export` |
-| `ZKLEAN_LAKE` | `lake` from elan or `PATH` |
-| `ZKLEAN_PROFILE` | `src/guest.json` |
+| Variable           | Default                                                                                          |
+| ------------------ | ------------------------------------------------------------------------------------------------ |
+| `ZKLEAN_NATIVE`    | `target/release/zklean-native`                                                                   |
+| `ZKLEAN_GUEST_ELF` | `crates/guest/target/elf-compilation/riscv64im-succinct-zkvm-elf/release/zklean-guest`, if built |
+| `ZKLEAN_EXPORTER`  | `.tooling/lean4export/.lake/build/bin/lean4export`                                               |
+| `ZKLEAN_LAKE`      | `lake` from Lean's installer, elan, or `PATH`                                                    |
+| `ZKLEAN_PROFILE`   | `src/guest.json`                                                                                 |
 
 `SP1_GROTH16_CIRCUIT_PATH` moves SP1's proving files from `~/.sp1/circuits`.
