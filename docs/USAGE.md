@@ -25,7 +25,7 @@ git clone --branch v0.1.0 https://github.com/ZeframLou/zklean.git
 cd zklean
 bun install --frozen-lockfile
 bash scripts/setup-exporter.sh   # builds lean4export, which writes Lean declarations to a file
-cargo build --release --locked -p zklean-native
+cargo build --release --locked -p zklean-native   # the native Nanoda checker the tool runs
 alias zklean="bun $PWD/src/cli.ts"
 ```
 
@@ -82,10 +82,9 @@ zklean prove --project examples/lean --module V1 \
 `prove` runs the same check inside SP1. For this example that takes about 5 to
 15 minutes and up to 20 GB of memory on a 12-core machine; time grows with the
 size of the export, and `--timeout MS` raises the one-hour default limit.
-`check`, `requirements` and `fetch` stop their native check after 10 minutes,
-which only very large exports reach. It
-writes the certificate, `reservation.json`, and beside it the export it proved
-from, `reservation.ndjson`.
+`prove` writes the certificate, `reservation.json`, and beside it the export it
+proved from, `reservation.ndjson`. (`check`, `requirements` and `fetch` stop
+their native check after 10 minutes, which only very large exports reach.)
 
 Publish the export at the `--source` URL, so recipients can see what your claims
 mean. The export also contains your proofs. To keep them private, write a
@@ -98,6 +97,11 @@ proved theorem, so the certificate still matches:
 zklean export --project examples/lean --module V1Spec \
   --claims Inventory.reservation_safe --out reservation.ndjson
 ```
+
+The export must still contain every non-standard axiom your proofs use, since
+the certificate lists them. If there are any, import the modules that declare
+them in your specification module and add them to `--claims`, for example
+`--claims Inventory.reservation_safe,Trusted.evidence`.
 
 The certificate never contains your proofs, but ZKLean does not promise that its
 cryptographic proof reveals nothing about them.
@@ -122,7 +126,10 @@ From the command line:
 zklean verify --certificate reservation.json --axioms propext
 ```
 
-It prints the result and exits with status 1 unless the certificate verifies:
+It prints the result and exits with status 1 unless the certificate verifies.
+`statementId` is the hash of the certificate's claims and axioms that the proof
+covers, defined in [ENCODING.md](ENCODING.md#statement-and-certificate). A
+malformed certificate prints an error instead.
 
 ```json
 {

@@ -107,11 +107,6 @@ can choose identities that match any file. A wrong source can make that check fa
 different statement match. Because `source` is outside the proof, the author can
 move the file and change the URL without re-proving.
 
-`zklean prove` writes the export it proved from next to the certificate, ready
-to publish. That export contains the proofs. A provider who keeps its proofs
-private instead publishes the export of a module that states its claims as
-`axiom`s; the identities are the same.
-
 [ENCODING.md](docs/ENCODING.md) defines identities, the committed statement and
 the proof encoding.
 
@@ -145,11 +140,15 @@ later confirm that a certificate still proves them:
 }
 ```
 
-`zklean requirements` computes it from local Lean code. It MUST contain at least
-one claim, since an empty requirement is satisfied by every certificate. Each
-claim MUST be a proposition, proved or stated as an axiom. A certificate satisfies a requirement
-when every required claim appears among its `claims` with the same identity; an
-entry of `axioms` never satisfies a requirement.
+`zklean requirements` computes it from local Lean code. A requirement is well
+formed when it is a JSON object with exactly the fields `format`, equal to
+`"zklean/requirements/1"`, and `claims`; every name is non-empty; and every
+identity is 64 lowercase hexadecimal characters. It MUST contain at least one
+claim, since an empty requirement is satisfied by every certificate, and
+verifiers MUST reject any requirement that is not well formed. Each claim MUST
+be a proposition, proved or stated as an axiom. A certificate satisfies a
+requirement when every required claim appears among its `claims` with the same
+identity; an entry of `axioms` never satisfies a requirement.
 
 ## 5. References
 

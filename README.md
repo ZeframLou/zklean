@@ -55,8 +55,9 @@ the properties their code depends on.
                                                     and confirm its identities
 ```
 
-Proving takes about 5 to 15 minutes and up to 20 GB of memory on a 12-core
-machine, once per version of the proofs. Verifying needs no Lean, native code
+Proving happens once per version of the proofs. For the example below it takes
+about 5 to 15 minutes and up to 20 GB of memory on a 12-core machine; larger
+exports take longer. Verifying needs no Lean, native code
 or network access. The inventory example below has a 381 KB export but a
 certificate under 1 KB; a certificate grows with its number of claims, not with
 the size of the proofs. A certificate never contains your proofs, but the

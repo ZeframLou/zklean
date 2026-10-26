@@ -94,6 +94,10 @@ declaration's universe parameter names, so renaming one changes the identity.
   and recursor of the block, including constructors of propositions, has
   identity `H("zklean/declaration/1\0", {member:{group:g, name}})`.
 
+Besides what Nanoda rejects, computing identities rejects an export in which
+the members of an inductive block list the block differently, a term contains a
+free variable, or a name refers to a declaration the export does not contain.
+
 Nanoda checks each declaration against only those before it, so an export lists
 declarations in dependency order. Identities are computed in that order, and the
 only cycles, within an inductive block, are broken by the block hash.
