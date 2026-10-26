@@ -50,8 +50,8 @@ hashed the same way.
 | literal          | `{natVal:{value:"digits", type:id(Nat)}}`, `{strVal:{value, type:id(String)}}` |
 
 `id` is the referenced constant's identity, or `null` when that constant is a
-member of the inductive block being hashed. Binder names, binder annotations and `letE` nondependency hints
-are dropped.
+member of the inductive block being hashed. Binder names, binder annotations
+and `letE` nondependency hints are dropped.
 
 **Declarations** are hashed as `H("zklean/declaration/1\0", d)`. `type` and
 `value` are term hashes; `levelParams` are the universe parameter names, in
@@ -69,14 +69,15 @@ declaration order.
   single type such as `Nat` is a block of one. The block is
   `g = H("zklean/declaration/1\0", {inductive:{levelParams, numParams, types}})`,
   where `types` lists `{name, type, ctors:[{name, type}]}` in block order, with
-  constructors in declaration order; order is part of the identity. Each type, constructor and recursor, including
-  constructors of propositions, has identity
+  constructors in declaration order; order is part of the identity. Each type,
+  constructor and recursor, including constructors of propositions, has
+  identity
   `H("zklean/declaration/1\0", {member:{group:g, name}})`; recursors are derived
   from the block and not hashed.
 
 Besides what Nanoda rejects, an export is rejected if members of a block list
-the block differently, a term contains a free variable, or a name refers to a
-declaration the export does not contain.
+the block differently, a theorem's type is not a proposition, a term contains a
+free variable, or a name refers to a declaration the export does not contain.
 
 ## Statement and proof
 
@@ -92,7 +93,8 @@ proof whose selector does not name the circuit key is rejected.
 
 ## Keys
 
-Verification uses the unmodified `sp1-verifier` 6.10.0 crate, compiled to
-WebAssembly, which fixes SP1's **circuit key**. The **verifier key** is SP1's
-`vk.bytes32()` encoding of the guest, stored in `src/guest.json` with the
-SHA-256 of the guest ELF; `zklean pin` derives both from a built guest.
+A proof verifies when the unmodified `sp1-verifier` 6.10.0 crate accepts
+`Groth16Verifier::verify(proof, digest, verifierKey, GROTH16_VK_BYTES)`, with
+the 32-byte statement digest as the public values. `GROTH16_VK_BYTES` fixes
+SP1's **circuit key**. The **verifier key** is SP1's `vk.bytes32()` encoding of
+the guest, a `0x`-prefixed hex string: `verifierKey` in `src/guest.json`.

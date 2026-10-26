@@ -105,12 +105,13 @@ A requirement records the claims a verifier's own proofs assume:
 }
 ```
 
-It is well formed when it is a JSON object with exactly these two fields, `format` is
-`"zklean/requirements/1"`, `claims` has at least one entry, every name is
-non-empty, and every identity is 64 lowercase hexadecimal characters; verifiers
-MUST reject any other. A generator MUST include only propositions, proved or
-stated as axioms. A certificate satisfies a requirement when every required claim appears
-in its `claims` with the same identity; an entry of `axioms` never does.
+It is well formed when it is a JSON object with exactly these two fields,
+`format` is `"zklean/requirements/1"`, `claims` has at least one entry, every
+name is non-empty, and every identity is 64 lowercase hexadecimal characters;
+verifiers MUST reject any other. A generator MUST include only propositions,
+proved or stated as axioms. A certificate satisfies a requirement when every
+required claim appears in its `claims` with the same identity; an entry of
+`axioms` never does.
 
 ## 7. References
 
