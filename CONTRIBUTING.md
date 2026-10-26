@@ -1,5 +1,8 @@
 # Contributing
 
+This guide is for changing ZKLean itself. To check, prove or verify
+certificates, see the [usage guide](docs/USAGE.md).
+
 ## Tools
 
 Bun 1.4.4, stable Rust and Rust 1.96.0, the

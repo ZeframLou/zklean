@@ -1,66 +1,114 @@
 # ZKLean
 
-ZKLean lets anyone check that a Lean theorem has been proved, without the
-proof, its definitions or a Lean installation.
+ZKLean turns a checked Lean proof into a certificate of under 1 KB that anyone
+can verify in under a second, without the proof, without installing Lean, and
+without trusting whoever made it.
 
-Lean describes software behaviour mathematically, and a **formal proof**
-establishes a property of that model under stated assumptions, called axioms.
-ZKLean runs an independent Lean checker inside [SP1](https://github.com/succinctlabs/sp1),
-which produces a **cryptographic proof** that the checker accepted the
-argument. A certificate names each proved claim and each axiom it uses by a
-content **identity**, a hash of the declaration and everything it depends on,
-and links to one Lean export holding those definitions. The realistic inventory
-example below has a 381 KB Lean export and a certificate under 1 KB.
+## Why
+
+A formal proof about software is strong evidence, but hard to share. To rely
+on someone else's proof today, you download their project, install the same
+Lean version and re-run the checker, which can take minutes and gigabytes. You
+also need the proof itself, which its author may want to keep private.
+
+With ZKLean, the author proves once and publishes a small certificate. Anyone,
+including a program, can then check it offline. For example,
+[HTTPV](https://github.com/ZeframLou/httpv) uses ZKLean so that API clients can
+check, before relying on an API, that it still guarantees the behaviour their
+code depends on.
+
+## Concepts
+
+- **[Lean](https://lean-lang.org/)** is a programming language and proof
+  assistant. You model software as Lean definitions, state properties of the
+  model as **theorems**, and prove them. Lean checks every step mechanically.
+- **Axioms** are statements a proof assumes without proving. Lean's standard
+  library relies on three: `propext`, `Quot.sound` and `Classical.choice`. A
+  proof can also add its own. Whoever relies on a proof decides which axioms
+  they accept.
+- An **identity** is a hash of a declaration's name and meaning together with
+  everything it depends on. Two theorems with the same identity state the same
+  thing about the same definitions. Changing any definition a theorem mentions
+  changes its identity.
+- A **certificate** lists the proved theorems, called **claims**, and the
+  axioms they use, each by name and identity. It carries a cryptographic proof
+  that an independent Lean checker accepted the proofs, and links to a file
+  holding the definitions behind the identities, so readers can see what the
+  claims mean.
+- The cryptographic proof comes from **[SP1](https://github.com/succinctlabs/sp1)**,
+  which runs a program and produces a short proof that the program ran and gave
+  a particular result. ZKLean's program checks Lean proofs with
+  [Nanoda](https://github.com/ammkrn/nanoda_lib), a Lean checker written
+  independently of Lean itself.
+
+## How it works
+
+```text
+ author                                         recipient
+ ──────                                         ─────────
+ Lean module ── zklean prove ──▶ certificate ──▶ 1. verify the cryptographic proof
+                 (Nanoda inside SP1)             2. accept only permitted axioms
+                                                 3. optionally fetch the definitions
+                                                    and confirm their identities
+```
+
+Proving takes about 5 to 15 minutes and up to 20 GB of memory on a 12-core
+machine, once per version of the proofs. Verifying needs no Lean, native code
+or network access. The inventory example below has a 381 KB Lean export but a
+certificate under 1 KB.
 
 ## Trust model
 
-A verifier trusts the checker identified by its pinned key, SP1's cryptography,
-and the axioms it permits by identity. Acceptance establishes that the certified
-statements follow from those axioms; you decide whether they say what you need.
+A verifier trusts that Nanoda checks Lean correctly, that SP1's proofs are
+sound, and that the SDK's built-in **verifier key**, a fingerprint of the exact
+checker program, is the right one. A verified certificate shows that each claim
+follows from the axioms it lists. Whether the claims say what you need is for
+you to judge by reading them.
 
 ## Install
 
-Verifying certificates needs only the TypeScript SDK, on
-[Bun](https://bun.sh/) 1.4.4 or newer:
+The TypeScript SDK verifies certificates. It runs on [Bun](https://bun.sh/)
+1.4.4 or newer:
 
 ```sh
 bun add zklean@0.1.0
 ```
 
-Checking and proving Lean modules uses the command-line tool from a release
-checkout, with the tools listed in [CONTRIBUTING.md](CONTRIBUTING.md):
+The command-line tool checks and proves Lean modules. It runs from a release
+checkout, set up as in the [usage guide](docs/USAGE.md#set-up).
 
-```sh
-git clone --branch v0.1.0 https://github.com/ZeframLou/zklean.git
-cd zklean
-bun install --frozen-lockfile
-bash scripts/setup-exporter.sh
-cargo build --release --locked -p zklean-native
+## Example: an inventory reservation
+
+[`examples/lean/Inventory.lean`](examples/lean/Inventory.lean) models an
+endpoint that reserves stock:
+
+```lean
+def POST_reservations (available requested : Nat) : Option Nat :=
+  if 0 < requested ∧ requested ≤ available then
+    some (available - requested)
+  else
+    none
 ```
 
-Proving also needs Go 1.24, `protoc`, the prover build and the release's guest
-program:
+[`V1.lean`](examples/lean/V1.lean) proves that a successful reservation is
+positive, fits in stock, and conserves units:
 
-```sh
-GOFLAGS=-buildvcs=false cargo build --release --locked -p zklean-native --features prover,execute
-curl -fLO https://github.com/ZeframLou/zklean/releases/download/v0.1.0/zklean-guest
-export ZKLEAN_GUEST_ELF="$PWD/zklean-guest"
+```lean
+theorem reservation_safe (available requested remaining : Nat) :
+    POST_reservations available requested = some remaining →
+      0 < requested ∧ requested ≤ available ∧ remaining + requested = available
 ```
 
-## Certify an inventory reservation
-
-[`examples/lean/Inventory.lean`](examples/lean/Inventory.lean) models a
-reservation for one product, and [`V1.lean`](examples/lean/V1.lean) proves that a
-successful reservation is positive, fits in stock and conserves units. Check
-the proof directly:
+In a checkout, check the proof and see the claim's identity and the axioms it
+uses:
 
 ```sh
 bun src/cli.ts check --project examples/lean --module V1 \
   --claims Inventory.reservation_safe --axioms propext
 ```
 
-`check` prints the certificate's statement. `prove` also generates the Groth16
-proof, which takes tens of minutes to hours and several GB of memory:
+Then prove it and verify the certificate. `--source` is the URL where you will
+publish the definitions file that `prove` writes beside the certificate:
 
 ```sh
 bun src/cli.ts prove --project examples/lean --module V1 \
@@ -69,12 +117,13 @@ bun src/cli.ts prove --project examples/lean --module V1 \
 bun src/cli.ts verify --certificate reservation.json --axioms propext
 ```
 
-`propext` is an axiom Lean's arithmetic library uses; only axioms you allow are
-accepted.
+`--axioms propext` accepts the one standard axiom this proof uses. A
+certificate that uses any other axiom fails verification.
 
-See the [usage guide](docs/USAGE.md), the [certificate specification](SPEC.md),
-the [encoding](docs/ENCODING.md) and [contributing](CONTRIBUTING.md).
-[HTTPV](https://github.com/ZeframLou/httpv) builds on ZKLean to certify HTTP APIs.
+The [usage guide](docs/USAGE.md) covers verifying from TypeScript, publishing
+definitions, depending on another project's claims, and choosing axioms. The
+[certificate specification](SPEC.md) and [encoding](docs/ENCODING.md) define
+the formats; [CONTRIBUTING.md](CONTRIBUTING.md) covers development.
 
 ## License
 
