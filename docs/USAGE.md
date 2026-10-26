@@ -293,6 +293,8 @@ override them; an override must point to an existing file:
 `ZKLEAN_PROFILE` sets the verifier key that `verify` and `fetch` trust: override
 it only with a **verifier profile** (the verifier key and the guest's SHA-256,
 as in `src/guest.json`) you derived yourself, with `zklean pin --out FILE`, from
-a guest you built (see [CONTRIBUTING.md](../CONTRIBUTING.md)).
+a guest you built (see [CONTRIBUTING.md](../CONTRIBUTING.md)). In the SDK,
+`createVerifier({ backend: groth16Backend(key) })` trusts a different verifier
+key; certificate data cannot choose one.
 `SP1_GROTH16_CIRCUIT_PATH` moves SP1's proving files from
 `~/.sp1/circuits/groth16`.
