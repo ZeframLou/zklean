@@ -66,8 +66,8 @@ them; see [keeping proofs private](docs/USAGE.md#certify-a-module).
 
 ## Trust model
 
-A verifier trusts that Nanoda checks Lean correctly, that SP1's proofs are
-sound, and that the **verifier key** built into ZKLean's TypeScript library, a
+A verifier trusts that Nanoda checks Lean correctly, that SP1's proofs,
+including its one-time trusted setup, are sound, and that the **verifier key** built into ZKLean's TypeScript library, a
 fingerprint of the exact checker program, is the right one. A certificate passes
 only if every axiom it uses is one you permitted, and then shows that each claim
 about the Lean model follows from those axioms. It says nothing about whether

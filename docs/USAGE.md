@@ -140,6 +140,11 @@ malformed certificate prints an error instead.
 }
 ```
 
+Anything but `"status": "verified"` means the certificate establishes nothing:
+`status` is then `"unknown"` and `reason` is `invalid-certificate`,
+`forbidden-axiom`, `axiom-mismatch` or `verifier-unavailable`, sometimes with a
+`detail`.
+
 Verification needs no native code, Lean or network access, and runs in a
 background worker so it does not block your program. It checks the
 cryptographic proof against the verifier key built into ZKLean, never a key
