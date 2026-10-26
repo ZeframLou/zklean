@@ -86,7 +86,7 @@ free variable, or a name refers to a declaration the export does not contain.
 
 The pinned library table has one entry for every theorem of a proposition in
 Lean 4.35.0's standard library (the declarations `import Init` brings in, minus
-any that depend on an ambiguous name): `{name, id, axioms}`, where `id` is the
+any that depend on a name containing `«` or `»`): `{name, id, axioms}`, where `id` is the
 theorem's identity and `axioms` maps each axiom its proof uses to its identity.
 Entries are sorted by the UTF-8 bytes of their names.
 
